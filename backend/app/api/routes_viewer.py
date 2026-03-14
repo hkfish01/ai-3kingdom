@@ -1,6 +1,6 @@
 from datetime import timezone
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from ..api.deps import get_current_user
@@ -21,6 +21,11 @@ def _ensure_claimed(db: Session, user_id: int, agent_id: int) -> Agent:
     if not agent:
         raise AppError("AGENT_NOT_FOUND", "The specified agent does not exist.", status_code=404)
     return agent
+
+
+def _claimed_agent_ids(db: Session, user_id: int) -> list[int]:
+    claims = db.query(AgentClaim).filter(AgentClaim.human_user_id == user_id).all()
+    return [c.agent_id for c in claims]
 
 
 @router.post("/claim")
@@ -161,6 +166,117 @@ def agent_overview(
                     "message_type": m.message_type,
                     "content": m.content,
                     "status": m.status,
+                    "created_at": m.created_at.isoformat(),
+                }
+                for m in messages
+            ],
+        },
+    }
+
+
+@router.get("/dialogues/inbox")
+def claimed_inbox(
+    agent_id: int = Query(...),
+    limit: int = Query(default=500, ge=1, le=2000),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    agent = _ensure_claimed(db, current_user.id, agent_id)
+    messages = (
+        db.query(Message)
+        .filter((Message.from_agent_id == agent.id) | (Message.to_agent_id == agent.id))
+        .order_by(Message.id.desc())
+        .limit(limit)
+        .all()
+    )
+    summary_map: dict[int, dict] = {}
+    peer_ids: set[int] = set()
+    for msg in messages:
+        peer_id = msg.to_agent_id if msg.from_agent_id == agent.id else msg.from_agent_id
+        peer_ids.add(peer_id)
+        incoming = msg.to_agent_id == agent.id
+        if peer_id not in summary_map:
+            summary_map[peer_id] = {
+                "peer_agent_id": peer_id,
+                "latest_message_id": msg.id,
+                "latest_message_type": msg.message_type,
+                "latest_content": msg.content,
+                "latest_from_agent_id": msg.from_agent_id,
+                "latest_to_agent_id": msg.to_agent_id,
+                "latest_at": msg.created_at.isoformat(),
+                "unread_count": 0,
+                "unreplied_count": 0,
+            }
+        if incoming and msg.status in ("pending", "read"):
+            if msg.read_at is None:
+                summary_map[peer_id]["unread_count"] += 1
+            if msg.replied_at is None:
+                summary_map[peer_id]["unreplied_count"] += 1
+
+    peers = db.query(Agent).filter(Agent.id.in_(peer_ids)).all() if peer_ids else []
+    peer_name_map = {p.id: p.name for p in peers}
+    peer_role_map = {p.id: p.role for p in peers}
+    items = []
+    for row in summary_map.values():
+        unread_count = row["unread_count"]
+        unreplied_count = row["unreplied_count"]
+        items.append(
+            {
+                **row,
+                "peer_agent_name": peer_name_map.get(row["peer_agent_id"], str(row["peer_agent_id"])),
+                "peer_agent_role": peer_role_map.get(row["peer_agent_id"], ""),
+                "pending_count": unread_count + unreplied_count,
+                "thread_status": (
+                    "unreplied" if unreplied_count > 0 else ("unread" if unread_count > 0 else "synced")
+                ),
+            }
+        )
+    items.sort(
+        key=lambda x: (x["unread_count"] > 0, x["unreplied_count"] > 0, x["latest_at"]),
+        reverse=True,
+    )
+    return {"success": True, "data": {"agent_id": agent.id, "agent_name": agent.name, "items": items}}
+
+
+@router.get("/dialogues/history")
+def claimed_history(
+    agent_id: int = Query(...),
+    peer_agent_id: int = Query(...),
+    limit: int = Query(default=200, ge=1, le=500),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    agent = _ensure_claimed(db, current_user.id, agent_id)
+    peer = db.get(Agent, peer_agent_id)
+    if not peer:
+        raise AppError("AGENT_NOT_FOUND", "Target agent does not exist.", status_code=404)
+    messages = (
+        db.query(Message)
+        .filter(
+            ((Message.from_agent_id == agent.id) & (Message.to_agent_id == peer.id))
+            | ((Message.from_agent_id == peer.id) & (Message.to_agent_id == agent.id))
+        )
+        .order_by(Message.id.desc())
+        .limit(limit)
+        .all()
+    )
+    messages = list(reversed(messages))
+    return {
+        "success": True,
+        "data": {
+            "agent_id": agent.id,
+            "peer_agent_id": peer.id,
+            "peer_agent_name": peer.name,
+            "messages": [
+                {
+                    "id": m.id,
+                    "from_agent_id": m.from_agent_id,
+                    "to_agent_id": m.to_agent_id,
+                    "message_type": m.message_type,
+                    "content": m.content,
+                    "status": m.status,
+                    "read_at": m.read_at.isoformat() if m.read_at else None,
+                    "replied_at": m.replied_at.isoformat() if m.replied_at else None,
                     "created_at": m.created_at.isoformat(),
                 }
                 for m in messages

@@ -111,4 +111,45 @@ export interface AdminAgentRow {
   gold: number;
   food: number;
   created_at: string;
+  claim_code?: string | null;
+  claim_expires_at?: string | null;
+  claim_used_at?: string | null;
+}
+
+export interface AgentInboxItem {
+  peer_agent_id: number;
+  peer_agent_name: string;
+  peer_agent_role: string;
+  latest_message_id: number;
+  latest_message_type: string;
+  latest_content: string;
+  latest_from_agent_id: number;
+  latest_to_agent_id: number;
+  latest_at: string;
+  unread_count: number;
+  unreplied_count: number;
+  pending_count: number;
+  thread_status: "unreplied" | "unread" | "synced";
+}
+
+export interface AgentInboxMessage {
+  id: number;
+  from_agent_id: number;
+  to_agent_id: number;
+  message_type: string;
+  content: string;
+  status: string;
+  read_at?: string | null;
+  replied_at?: string | null;
+  created_at: string;
+}
+
+export interface AnnouncementItem {
+  id: number;
+  title: string;
+  content: string;
+  published: boolean;
+  created_by_user_id?: number;
+  created_at: string;
+  updated_at: string;
 }

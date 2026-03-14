@@ -1,9 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { ShieldCheckIcon } from "@heroicons/react/24/outline";
 import { apiClient } from "@/lib/api-client";
-import { AdminAgentRow, AdminUserRow } from "@/lib/types";
+import { AnnouncementItem } from "@/lib/types";
 import { useLocale } from "@/lib/locale";
 
 export default function AdminPage() {
@@ -12,37 +13,46 @@ export default function AdminPage() {
     ? {
         title: "管理平台",
         denied: "你不是管理員或尚未登入。",
-        users: "用戶",
-        agents: "代理",
         refresh: "刷新",
-        delete: "刪除",
-        resetPassword: "重設密碼",
-        resetPasswordPlaceholder: "新密碼",
-        loadFailed: "載入失敗",
+        done: "已完成",
         actionFailed: "操作失敗",
-        done: "已完成"
+        users: "用戶管理",
+        agents: "代理管理",
+        announcements: "公告管理",
+        createAnnouncement: "新增公告",
+        announcementTitle: "標題",
+        announcementContent: "內容",
+        published: "已發佈",
+        delete: "刪除",
+        publish: "發佈",
+        unpublish: "下架"
       }
     : {
         title: "Admin Panel",
         denied: "You are not an admin or not logged in.",
-        users: "Users",
-        agents: "Agents",
         refresh: "Refresh",
-        delete: "Delete",
-        resetPassword: "Reset Password",
-        resetPasswordPlaceholder: "New password",
-        loadFailed: "Failed to load",
+        done: "Done",
         actionFailed: "Action failed",
-        done: "Done"
+        users: "User Management",
+        agents: "Agent Management",
+        announcements: "Announcement Management",
+        createAnnouncement: "Create Announcement",
+        announcementTitle: "Title",
+        announcementContent: "Content",
+        published: "Published",
+        delete: "Delete",
+        publish: "Publish",
+        unpublish: "Unpublish"
       }), [locale]);
 
   const [allowed, setAllowed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
-  const [users, setUsers] = useState<AdminUserRow[]>([]);
-  const [agents, setAgents] = useState<AdminAgentRow[]>([]);
-  const [resetPwdMap, setResetPwdMap] = useState<Record<number, string>>({});
+  const [announcements, setAnnouncements] = useState<AnnouncementItem[]>([]);
+  const [title, setTitle] = useState("");
+  const [content, setContent] = useState("");
+  const [published, setPublished] = useState(true);
 
   const load = async () => {
     setLoading(true);
@@ -56,10 +66,9 @@ export default function AdminPage() {
       }
       setAllowed(true);
       const data = await apiClient.adminOverview();
-      setUsers(data.users);
-      setAgents(data.agents);
+      setAnnouncements(data.announcements ?? []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : t.loadFailed);
+      setError(err instanceof Error ? err.message : t.actionFailed);
     } finally {
       setLoading(false);
     }
@@ -69,42 +78,44 @@ export default function AdminPage() {
     void load();
   }, []);
 
-  const onDeleteUser = async (userId: number) => {
-    setError("");
-    setMessage("");
-    try {
-      await apiClient.adminDeleteUser(userId);
-      setMessage(t.done);
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t.actionFailed);
-    }
-  };
-
-  const onDeleteAgent = async (agentId: number) => {
-    setError("");
-    setMessage("");
-    try {
-      await apiClient.adminDeleteAgent(agentId);
-      setMessage(t.done);
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t.actionFailed);
-    }
-  };
-
-  const onResetPassword = async (event: FormEvent<HTMLFormElement>, userId: number) => {
+  const onCreate = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const newPassword = resetPwdMap[userId] ?? "";
-    if (!newPassword) {
+    if (!title.trim() || !content.trim()) {
       return;
     }
     setError("");
     setMessage("");
     try {
-      await apiClient.adminResetUserPassword(userId, { new_password: newPassword });
+      await apiClient.adminCreateAnnouncement({ title: title.trim(), content: content.trim(), published });
+      setTitle("");
+      setContent("");
+      setPublished(true);
       setMessage(t.done);
-      setResetPwdMap((prev) => ({ ...prev, [userId]: "" }));
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t.actionFailed);
+    }
+  };
+
+  const onToggle = async (item: AnnouncementItem) => {
+    setError("");
+    setMessage("");
+    try {
+      await apiClient.adminUpdateAnnouncement(item.id, { published: !item.published });
+      setMessage(t.done);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t.actionFailed);
+    }
+  };
+
+  const onDelete = async (id: number) => {
+    setError("");
+    setMessage("");
+    try {
+      await apiClient.adminDeleteAnnouncement(id);
+      setMessage(t.done);
+      await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : t.actionFailed);
     }
@@ -128,46 +139,42 @@ export default function AdminPage() {
       {message ? <p className="rounded-lg bg-emerald-500/20 p-sm text-sm">{message}</p> : null}
 
       {allowed ? (
-        <section className="grid gap-md xl:grid-cols-2">
-          <article className="glass-card p-md">
-            <h2 className="mb-sm text-xl font-bold text-primary">{t.users}</h2>
-            <div className="space-y-sm">
-              {users.map((u) => (
-                <div key={u.id} className="rounded-lg border border-white/15 bg-white/5 p-sm text-sm">
-                  <p className="font-semibold">#{u.id} {u.username} {u.is_admin ? "(admin)" : ""}</p>
-                  <p className="text-white/80">{u.email}</p>
-                  <p className="text-white/70">agents: {u.agent_count}</p>
-                  <form className="mt-xs flex flex-wrap gap-xs" onSubmit={(e) => void onResetPassword(e, u.id)}>
-                    <input
-                      type="password"
-                      value={resetPwdMap[u.id] ?? ""}
-                      onChange={(e) => setResetPwdMap((prev) => ({ ...prev, [u.id]: e.target.value }))}
-                      placeholder={t.resetPasswordPlaceholder}
-                      minLength={8}
-                      pattern="^[\\x21-\\x7E]+$"
-                      required
-                    />
-                    <button type="submit" className="btn-base btn-secondary">{t.resetPassword}</button>
-                    <button type="button" className="btn-base btn-cta" onClick={() => void onDeleteUser(u.id)}>{t.delete}</button>
-                  </form>
-                </div>
-              ))}
-            </div>
-          </article>
+        <section className="grid gap-md md:grid-cols-2">
+          <Link href="/admin/users" className="glass-card p-lg hover:bg-white/10">
+            <h2 className="text-xl font-bold text-primary">{t.users}</h2>
+          </Link>
+          <Link href="/admin/agents" className="glass-card p-lg hover:bg-white/10">
+            <h2 className="text-xl font-bold text-primary">{t.agents}</h2>
+          </Link>
+        </section>
+      ) : null}
 
-          <article className="glass-card p-md">
-            <h2 className="mb-sm text-xl font-bold text-primary">{t.agents}</h2>
-            <div className="space-y-sm">
-              {agents.map((a) => (
-                <div key={a.id} className="rounded-lg border border-white/15 bg-white/5 p-sm text-sm">
-                  <p className="font-semibold">#{a.id} {a.name}</p>
-                  <p className="text-white/80">owner: {a.owner_user_id} | role: {a.role}</p>
-                  <p className="text-white/70">gold {a.gold} food {a.food} energy {a.energy}</p>
-                  <button type="button" className="btn-base btn-cta mt-xs" onClick={() => void onDeleteAgent(a.id)}>{t.delete}</button>
+      {allowed ? (
+        <section className="glass-card p-md">
+          <h2 className="mb-sm text-xl font-bold text-primary">{t.announcements}</h2>
+          <form className="space-y-sm rounded-lg border border-white/15 bg-white/5 p-sm" onSubmit={(e) => void onCreate(e)}>
+            <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t.announcementTitle} required />
+            <textarea value={content} onChange={(e) => setContent(e.target.value)} placeholder={t.announcementContent} rows={3} required />
+            <label className="flex items-center gap-xs text-sm text-white/80">
+              <input type="checkbox" checked={published} onChange={(e) => setPublished(e.target.checked)} />
+              {t.published}
+            </label>
+            <button type="submit" className="btn-base btn-secondary">{t.createAnnouncement}</button>
+          </form>
+          <div className="mt-sm space-y-sm">
+            {announcements.map((a) => (
+              <div key={a.id} className="rounded-lg border border-white/15 bg-white/5 p-sm">
+                <p className="font-semibold">#{a.id} {a.title}</p>
+                <p className="mt-xs text-sm text-white/85">{a.content}</p>
+                <div className="mt-xs flex flex-wrap gap-xs">
+                  <button type="button" className="btn-base btn-secondary" onClick={() => void onToggle(a)}>
+                    {a.published ? t.unpublish : t.publish}
+                  </button>
+                  <button type="button" className="btn-base btn-cta" onClick={() => void onDelete(a.id)}>{t.delete}</button>
                 </div>
-              ))}
-            </div>
-          </article>
+              </div>
+            ))}
+          </div>
         </section>
       ) : null}
     </main>

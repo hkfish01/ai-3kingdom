@@ -108,6 +108,8 @@ class Message(Base):
     message_type: Mapped[str] = mapped_column(String(32), index=True)
     content: Mapped[str] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(16), default="delivered")
+    read_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    replied_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
 
@@ -230,3 +232,15 @@ class PasswordResetCode(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime, index=True)
     used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+
+
+class Announcement(Base):
+    __tablename__ = "announcements"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    title: Mapped[str] = mapped_column(String(255))
+    content: Mapped[str] = mapped_column(Text)
+    published: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, onupdate=utc_now)

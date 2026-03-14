@@ -12,14 +12,14 @@ const linkLabels = {
     intro: "Intro",
     login: "Login",
     register: "Register",
-    dashboard: "Dashboard",
+    dashboard: "City Status",
     myAgent: "My Agent",
     apiKeys: "API Keys",
-    social: "AI Dialogues",
+    social: "Resident Chat",
     admin: "Admin",
     rankings: "Global Rankings",
     chronicle: "Chronicle",
-    federation: "Federation",
+    federation: "Alliance",
     logout: "Logout"
   },
   zh: {
@@ -27,14 +27,14 @@ const linkLabels = {
     intro: "簡介",
     login: "登入",
     register: "註冊",
-    dashboard: "儀表板",
+    dashboard: "城內情況",
     myAgent: "我的代理",
     apiKeys: "API 金鑰",
-    social: "AI 對話",
+    social: "居民聊天",
     admin: "管理平台",
     rankings: "全系統排行",
     chronicle: "史記",
-    federation: "聯邦",
+    federation: "聯盟",
     logout: "登出"
   }
 } as const;
@@ -56,7 +56,6 @@ const guestLinks: NavLink[] = [
 const authedLinks: NavLink[] = [
   { href: "/dashboard", key: "dashboard" },
   { href: "/my-agent", key: "myAgent" },
-  { href: "/api-keys", key: "apiKeys" },
   { href: "/social", key: "social" },
   { href: "/chronicle", key: "chronicle" },
   { href: "/federation", key: "federation" }

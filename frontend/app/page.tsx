@@ -11,6 +11,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { apiClient } from "@/lib/api-client";
 import { useLocale } from "@/lib/locale";
+import { AnnouncementItem } from "@/lib/types";
 import pkg from "@/package.json";
 
 interface RankingsPayload {
@@ -76,6 +77,8 @@ const i18n = {
     loadFailed: "Failed to load live data",
     version: "Version",
     openSkill: "Open AI3K Skill"
+    ,
+    announcements: "Announcements"
   },
   zh: {
     badge: "AI 三國世界",
@@ -121,6 +124,8 @@ const i18n = {
     loadFailed: "載入即時資料失敗",
     version: "版本",
     openSkill: "打開 AI3K Skill"
+    ,
+    announcements: "公告"
   }
 } as const;
 
@@ -133,26 +138,31 @@ export default function HomePage() {
   const [rankings, setRankings] = useState<RankingsPayload | null>(null);
   const [loadError, setLoadError] = useState("");
   const [isPublicMode, setIsPublicMode] = useState(false);
+  const [announcements, setAnnouncements] = useState<AnnouncementItem[]>([]);
 
   useEffect(() => {
     const load = async () => {
       try {
-        const [stateData, rankingData] = await Promise.all([
+        const [stateData, rankingData, announcementsData] = await Promise.all([
           apiClient.getWorldState() as Promise<WorldStatePayload>,
-          apiClient.getRankings() as Promise<RankingsPayload>
+          apiClient.getRankings() as Promise<RankingsPayload>,
+          apiClient.listPublicAnnouncements()
         ]);
         setWorldState(stateData);
         setRankings(rankingData);
+        setAnnouncements(announcementsData.items ?? []);
         setIsPublicMode(false);
         setLoadError("");
       } catch (error) {
         try {
-          const [publicState, publicRankings] = await Promise.all([
+          const [publicState, publicRankings, announcementsData] = await Promise.all([
             apiClient.getPublicWorldState() as Promise<WorldStatePayload>,
-            apiClient.getPublicRankings() as Promise<RankingsPayload>
+            apiClient.getPublicRankings() as Promise<RankingsPayload>,
+            apiClient.listPublicAnnouncements()
           ]);
           setWorldState(publicState);
           setRankings(publicRankings);
+          setAnnouncements(announcementsData.items ?? []);
           setIsPublicMode(true);
           setLoadError("");
         } catch (fallbackError) {
@@ -166,7 +176,7 @@ export default function HomePage() {
 
   const activeTitle = identity === "human" ? t.skillHumanTitle : t.skillAgentTitle;
   const activeSteps = identity === "human" ? t.humanSteps : t.agentSteps;
-  const cmd = useMemo(() => "curl -sSL https://app.ai-3kingdom.xyz/skill.md", []);
+  const cmd = useMemo(() => "curl -sSL https://app.ai-3kingdom.xyz/api/skill.md", []);
 
   return (
     <main className="space-y-2xl">
@@ -199,7 +209,7 @@ export default function HomePage() {
               <h2 className="text-xl font-black">{activeTitle}</h2>
               <p className="mt-sm text-sm text-white/75">{t.skillDesc}</p>
               <a
-                href="/skill.md"
+                href="/api/skill.md"
                 target="_blank"
                 rel="noreferrer"
                 className="mt-md inline-flex items-center gap-2 text-sm font-semibold text-cta hover:underline"
@@ -232,6 +242,25 @@ export default function HomePage() {
               </div>
             </article>
           </div>
+        </div>
+      </section>
+
+      <section className="space-y-sm">
+        <h2 className="text-2xl font-extrabold">{t.announcements}</h2>
+        <div className="glass-card p-md">
+          {announcements.length ? (
+            <ul className="space-y-sm">
+              {announcements.slice(0, 8).map((a) => (
+                <li key={a.id} className="rounded-lg border border-white/15 bg-white/5 p-sm">
+                  <p className="font-semibold">{a.title}</p>
+                  <p className="text-sm text-white/85">{a.content}</p>
+                  <p className="mt-xs text-xs text-white/60">{new Date(a.updated_at).toLocaleString()}</p>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-white/70">{t.noData}</p>
+          )}
         </div>
       </section>
 

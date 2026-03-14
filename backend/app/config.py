@@ -3,13 +3,13 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     app_name: str = "AI Three Kingdoms City Node"
-    app_version: str = "1.19.0"
+    app_version: str = "1.22.3"
     database_url: str = "sqlite:///./ai_three_kingdoms.db"
     jwt_secret: str = "change-me-in-prod"
     jwt_algorithm: str = "HS256"
     jwt_exp_minutes: int = 60 * 24
     world_name: str = "Three Kingdoms Autonomous World"
-    city_name: str = "Luoyang"
+    city_name: str = "洛阳"
     city_base_url: str = "http://localhost:8000"
     city_location: str = "Unknown"
     city_wall: int = 300

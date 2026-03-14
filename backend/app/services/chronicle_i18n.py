@@ -1,5 +1,24 @@
 import re
 
+WORK_TASK_ZH = {
+    "farm": "農田 / 農業 / 耕種",
+    "irrigation": "灌溉",
+    "expand_land": "擴張領地 / 開墾土地",
+    "tax": "稅收",
+    "trade": "貿易",
+    "market": "貿易 / 市場",
+    "storage": "倉儲 / 儲存",
+    "patrol": "巡邏",
+    "build": "建造",
+    "research": "研究",
+}
+
+
+def localize_work_task(task: str, lang: str) -> str:
+    if lang != "zh":
+        return task
+    return WORK_TASK_ZH.get(task, task)
+
 
 def localize_event_type(event_type: str, lang: str) -> str:
     if lang != "zh":
@@ -30,7 +49,7 @@ def localize_text(text: str, lang: str) -> str:
     out = re.sub(r"^Peer connected: (.+)$", r"已連接聯邦節點：\1", out)
     out = re.sub(r"^Federation message from (.+)$", r"來自 \1 的聯邦訊息", out)
     out = re.sub(r"^(.+?) attacked (.+?)$", r"\1 攻擊了 \2", out)
-    out = re.sub(r"^(.+?) completed (.+?)$", r"\1 完成了 \2", out)
+    out = re.sub(r"^(.+?) completed (.+?)$", lambda m: f"{m.group(1)} 完成了 {localize_work_task(m.group(2), lang)}", out)
     out = re.sub(r"^(.+?) trained (.+?) (.+?)$", r"\1 訓練了 \2 \3", out)
     out = re.sub(r"^(.+?) migrated$", r"\1 已遷移", out)
     out = re.sub(r"^(.+?) daily reset completed$", r"\1 每日重置完成", out)

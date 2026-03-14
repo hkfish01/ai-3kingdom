@@ -74,3 +74,34 @@ def test_ai_bootstrap_and_human_claim_read_only():
     # AI account token is still the only one allowed to control this agent.
     ai_work = client.post("/action/work", headers={"Authorization": f"Bearer {ai_token}"}, json={"agent_id": agent_id, "task": "farm"})
     assert ai_work.status_code == 200
+
+    peer_token = _register_and_login("dialog_peer", "Aa1234!!")
+    peer_agent = client.post(
+        "/agent/register",
+        headers={"Authorization": f"Bearer {peer_token}"},
+        json={"name": "PeerAgent", "role": "平民"},
+    )
+    assert peer_agent.status_code == 200
+    peer_agent_id = peer_agent.json()["data"]["agent_id"]
+
+    seed_msg = client.post(
+        "/social/message",
+        headers={"Authorization": f"Bearer {peer_token}"},
+        json={
+            "from_agent_id": peer_agent_id,
+            "to_agent_id": agent_id,
+            "message_type": "task",
+            "content": "seed dialogue",
+        },
+    )
+    assert seed_msg.status_code == 200
+
+    inbox = client.get(f"/viewer/dialogues/inbox?agent_id={agent_id}", headers=human_headers)
+    assert inbox.status_code == 200
+    assert len(inbox.json()["data"]["items"]) >= 1
+    history = client.get(
+        f"/viewer/dialogues/history?agent_id={agent_id}&peer_agent_id={peer_agent_id}",
+        headers=human_headers,
+    )
+    assert history.status_code == 200
+    assert len(history.json()["data"]["messages"]) >= 1

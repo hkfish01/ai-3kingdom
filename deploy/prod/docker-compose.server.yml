@@ -77,11 +77,11 @@ services:
       context: ../../frontend
       args:
         NEXT_PUBLIC_API_BASE_URL: /api
-        NEXT_PUBLIC_RELEASE_VERSION: ${NEXT_PUBLIC_RELEASE_VERSION:-1.19.0}
+        NEXT_PUBLIC_RELEASE_VERSION: -e
     container_name: ai3k-frontend
     environment:
       NEXT_PUBLIC_API_BASE_URL: /api
-      NEXT_PUBLIC_RELEASE_VERSION: ${NEXT_PUBLIC_RELEASE_VERSION:-1.19.0}
+      NEXT_PUBLIC_RELEASE_VERSION: -e
     depends_on:
       - city-api
 

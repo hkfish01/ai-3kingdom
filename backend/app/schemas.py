@@ -116,6 +116,18 @@ class MessageRequest(BaseModel):
     content: str = Field(min_length=1, max_length=500)
 
 
+class InboxMarkReadRequest(BaseModel):
+    agent_id: int
+    peer_agent_id: int
+
+
+class InboxReplyRequest(BaseModel):
+    from_agent_id: int
+    to_agent_id: int
+    content: str = Field(min_length=1, max_length=500)
+    message_type: str = Field(default="reply", min_length=1, max_length=32)
+
+
 class CreateFactionRequest(BaseModel):
     name: str = Field(min_length=1, max_length=64)
     leader_agent_id: int
@@ -203,3 +215,45 @@ class AdminResetPasswordRequest(BaseModel):
     @classmethod
     def validate_new_password(cls, value: str) -> str:
         return RegisterUserRequest.validate_password(value)
+
+
+class AdminUpdateClaimExpiryRequest(BaseModel):
+    expires_at: str = Field(min_length=10, max_length=64)
+
+
+class AnnouncementCreateRequest(BaseModel):
+    title: str = Field(min_length=1, max_length=255)
+    content: str = Field(min_length=1, max_length=4000)
+    published: bool = True
+
+
+class AnnouncementUpdateRequest(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=255)
+    content: str | None = Field(default=None, min_length=1, max_length=4000)
+    published: bool | None = None
+
+
+class AdminUpdateUserRequest(BaseModel):
+    username: str | None = Field(default=None, min_length=2, max_length=64)
+    email: str | None = Field(default=None, min_length=5, max_length=255)
+    is_admin: bool | None = None
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        out = value.strip().lower()
+        if not re.match(r"^[^\s@]+@[^\s@]+\.[^\s@]+$", out):
+            raise ValueError("Invalid email format.")
+        return out
+
+
+class AdminUpdateAgentRequest(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=64)
+    role: str | None = Field(default=None, min_length=1, max_length=64)
+    home_city: str | None = Field(default=None, min_length=1, max_length=64)
+    current_city: str | None = Field(default=None, min_length=1, max_length=64)
+    energy: int | None = Field(default=None, ge=0, le=1000)
+    gold: int | None = Field(default=None, ge=0)
+    food: int | None = Field(default=None, ge=0)

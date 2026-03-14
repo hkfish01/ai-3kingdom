@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   BuildingOffice2Icon,
   CurrencyDollarIcon,
@@ -80,7 +80,7 @@ export default function DashboardPage() {
         prosperity: "繁榮度",
         defense: "防禦力",
         treasury: "國庫黃金",
-        cityRoster: "城內代理名冊",
+        cityRoster: "城內居民名冊",
         roleStructure: "在職職位（僅顯示目前有人任職）",
         role: "職位",
         tier: "層級",
@@ -98,7 +98,18 @@ export default function DashboardPage() {
         ready: "就緒",
         loadFailed: "載入失敗",
         civilLabel: "文臣",
-        militaryLabel: "武將"
+        militaryLabel: "武將",
+        filterKeyword: "關鍵字",
+        filterBranch: "體系",
+        all: "全部",
+        sortBy: "排序",
+        sortAsc: "升序",
+        sortDesc: "降序",
+        pageSize: "每頁",
+        page: "頁",
+        prev: "上一頁",
+        next: "下一頁",
+        total: "總數"
       }
     : {
         title: "City Dashboard",
@@ -108,7 +119,7 @@ export default function DashboardPage() {
         prosperity: "Prosperity",
         defense: "Defense",
         treasury: "Treasury Gold",
-        cityRoster: "City Agent Roster",
+        cityRoster: "City Resident Roster",
         roleStructure: "Occupied Positions (Only roles currently assigned)",
         role: "Position",
         tier: "Tier",
@@ -126,12 +137,29 @@ export default function DashboardPage() {
         ready: "Ready",
         loadFailed: "Load failed",
         civilLabel: "Civil",
-        militaryLabel: "Military"
+        militaryLabel: "Military",
+        filterKeyword: "Keyword",
+        filterBranch: "Branch",
+        all: "All",
+        sortBy: "Sort",
+        sortAsc: "ASC",
+        sortDesc: "DESC",
+        pageSize: "Page Size",
+        page: "Page",
+        prev: "Prev",
+        next: "Next",
+        total: "Total"
       };
 
   const [world, setWorld] = useState<WorldState | null>(null);
   const [roster, setRoster] = useState<CityRosterPayload | null>(null);
   const [message, setMessage] = useState(t.ready);
+  const [keyword, setKeyword] = useState("");
+  const [branchFilter, setBranchFilter] = useState<"all" | "civil" | "military">("all");
+  const [sortBy, setSortBy] = useState<"id" | "name" | "role" | "energy" | "gold" | "food">("gold");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [pageSize, setPageSize] = useState(10);
+  const [page, setPage] = useState(1);
 
   const occupiedRoles = (() => {
     if (!roster) return [] as OccupiedRoleItem[];
@@ -179,6 +207,39 @@ export default function DashboardPage() {
   useEffect(() => {
     void load();
   }, []);
+
+  const filteredAgents = useMemo(() => {
+    const src = roster?.agents ?? [];
+    const kw = keyword.trim().toLowerCase();
+    const filtered = src.filter((a) => {
+      if (branchFilter !== "all" && a.branch !== branchFilter) return false;
+      if (!kw) return true;
+      return (
+        a.name.toLowerCase().includes(kw) ||
+        a.role.toLowerCase().includes(kw) ||
+        String(a.id).includes(kw)
+      );
+    });
+    const sorted = [...filtered].sort((a, b) => {
+      let diff = 0;
+      if (sortBy === "id") diff = a.id - b.id;
+      if (sortBy === "name") diff = a.name.localeCompare(b.name);
+      if (sortBy === "role") diff = a.role.localeCompare(b.role);
+      if (sortBy === "energy") diff = a.energy - b.energy;
+      if (sortBy === "gold") diff = a.gold - b.gold;
+      if (sortBy === "food") diff = a.food - b.food;
+      return sortDir === "asc" ? diff : -diff;
+    });
+    return sorted;
+  }, [roster?.agents, keyword, branchFilter, sortBy, sortDir]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredAgents.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const pagedAgents = filteredAgents.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  useEffect(() => {
+    setPage(1);
+  }, [keyword, branchFilter, sortBy, sortDir, pageSize]);
 
   return (
     <main className="space-y-lg">
@@ -233,6 +294,67 @@ export default function DashboardPage() {
 
       <section className="glass-card p-lg">
         <h2 className="mb-md text-xl font-bold">{t.cityRoster}</h2>
+        <div className="mb-md grid gap-sm md:grid-cols-2 lg:grid-cols-5">
+          <label className="text-sm text-white/80">
+            {t.filterKeyword}
+            <input
+              className="mt-1 w-full rounded-lg border border-white/15 bg-black/20 px-sm py-xs text-white"
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
+              placeholder={locale === "zh" ? "輸入名稱/職位/ID" : "Name/Role/ID"}
+            />
+          </label>
+          <label className="text-sm text-white/80">
+            {t.filterBranch}
+            <select
+              className="mt-1 w-full rounded-lg border border-white/15 bg-black/20 px-sm py-xs text-white"
+              value={branchFilter}
+              onChange={(e) => setBranchFilter(e.target.value as "all" | "civil" | "military")}
+            >
+              <option value="all">{t.all}</option>
+              <option value="civil">{t.civilLabel}</option>
+              <option value="military">{t.militaryLabel}</option>
+            </select>
+          </label>
+          <label className="text-sm text-white/80">
+            {t.sortBy}
+            <select
+              className="mt-1 w-full rounded-lg border border-white/15 bg-black/20 px-sm py-xs text-white"
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as "id" | "name" | "role" | "energy" | "gold" | "food")}
+            >
+              <option value="id">ID</option>
+              <option value="name">{t.name}</option>
+              <option value="role">{t.role}</option>
+              <option value="energy">{t.energy}</option>
+              <option value="gold">{t.gold}</option>
+              <option value="food">{t.food}</option>
+            </select>
+          </label>
+          <label className="text-sm text-white/80">
+            {locale === "zh" ? "方向" : "Direction"}
+            <select
+              className="mt-1 w-full rounded-lg border border-white/15 bg-black/20 px-sm py-xs text-white"
+              value={sortDir}
+              onChange={(e) => setSortDir(e.target.value as "asc" | "desc")}
+            >
+              <option value="desc">{t.sortDesc}</option>
+              <option value="asc">{t.sortAsc}</option>
+            </select>
+          </label>
+          <label className="text-sm text-white/80">
+            {t.pageSize}
+            <select
+              className="mt-1 w-full rounded-lg border border-white/15 bg-black/20 px-sm py-xs text-white"
+              value={pageSize}
+              onChange={(e) => setPageSize(Number(e.target.value))}
+            >
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={50}>50</option>
+            </select>
+          </label>
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[760px] text-left text-sm">
             <thead className="text-white/70">
@@ -248,7 +370,7 @@ export default function DashboardPage() {
               </tr>
             </thead>
             <tbody>
-              {(roster?.agents ?? []).length ? (roster?.agents ?? []).map((agent) => (
+              {pagedAgents.length ? pagedAgents.map((agent) => (
                 <tr key={agent.id} className="border-t border-white/10">
                   <td className="py-sm">{agent.name}</td>
                   <td className="py-sm">{agent.role}</td>
@@ -266,6 +388,26 @@ export default function DashboardPage() {
               )}
             </tbody>
           </table>
+        </div>
+        <div className="mt-md flex flex-wrap items-center justify-between gap-sm text-sm text-white/80">
+          <p>{t.total}: {filteredAgents.length}</p>
+          <div className="flex items-center gap-sm">
+            <button
+              className="btn-base btn-secondary"
+              disabled={currentPage <= 1}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+            >
+              {t.prev}
+            </button>
+            <span>{t.page} {currentPage} / {totalPages}</span>
+            <button
+              className="btn-base btn-secondary"
+              disabled={currentPage >= totalPages}
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            >
+              {t.next}
+            </button>
+          </div>
         </div>
       </section>
 

@@ -69,6 +69,12 @@ export default function LoginPage() {
     try {
       const data = await apiClient.login({ username, password: normalizePassword(password) });
       localStorage.setItem("token", data.token);
+      try {
+        const skill = await apiClient.getDynamicSkillMd();
+        localStorage.setItem("skill_md_runtime", skill);
+      } catch (_e) {
+        // Non-blocking for login flow.
+      }
       router.push("/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : t.failed);

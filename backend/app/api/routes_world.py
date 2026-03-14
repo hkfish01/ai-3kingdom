@@ -5,9 +5,9 @@ from sqlalchemy.orm import Session
 from ..api.deps import get_current_user
 from ..config import settings
 from ..db import get_db
-from ..models import Agent, ChronicleEntry, City, Faction, User
+from ..models import Agent, Announcement, ChronicleEntry, City, Faction, User
 from ..rules import DAILY_ENERGY, TROOP_TYPES, WORK_TASKS, city_defense_power, prosperity
-from ..services.chronicle_i18n import localize_event_type, localize_text
+from ..services.chronicle_i18n import WORK_TASK_ZH, localize_event_type, localize_text, localize_work_task
 from ..services.positions import civil_hierarchy, get_position, military_hierarchy, role_max_slots
 from ..services.roles import get_effective_allowed_roles
 
@@ -56,6 +56,7 @@ def _build_world_state_payload(db: Session) -> dict:
         "defense_power": round(city_defense_power(local_city.city_wall, local_troop_power, city_prosperity), 4),
         "treasury": {"gold": local_city.treasury_gold, "food": local_city.treasury_food},
         "available_work_tasks": list(WORK_TASKS.keys()),
+        "available_work_tasks_zh": {k: localize_work_task(k, "zh") for k in WORK_TASKS},
     }
 
 
@@ -117,6 +118,7 @@ def rules_endpoint(current_user: User = Depends(get_current_user)):
             "daily_energy": DAILY_ENERGY,
             "city_tax_rate": settings.city_tax_rate,
             "work_tasks": WORK_TASKS,
+            "work_tasks_zh": WORK_TASK_ZH,
             "troop_types": TROOP_TYPES,
             "battle_loot_ratio": {"gold": 0.3, "food": 0.3},
             "rule_version": settings.rule_version,
@@ -144,6 +146,33 @@ def public_state(db: Session = Depends(get_db)):
 @router.get("/public/rankings")
 def public_rankings(db: Session = Depends(get_db)):
     return {"success": True, "data": _build_rankings_payload(db)}
+
+
+@router.get("/public/announcements")
+def public_announcements(db: Session = Depends(get_db)):
+    rows = (
+        db.query(Announcement)
+        .filter(Announcement.published.is_(True))
+        .order_by(Announcement.id.desc())
+        .limit(30)
+        .all()
+    )
+    return {
+        "success": True,
+        "data": {
+            "items": [
+                {
+                    "id": a.id,
+                    "title": a.title,
+                    "content": a.content,
+                    "published": a.published,
+                    "created_at": a.created_at.isoformat(),
+                    "updated_at": a.updated_at.isoformat(),
+                }
+                for a in rows
+            ]
+        },
+    }
 
 
 @router.get("/city/roster")

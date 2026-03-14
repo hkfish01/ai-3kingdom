@@ -1,5 +1,8 @@
+from pathlib import Path
+
 from fastapi import Depends, FastAPI
 from fastapi.exceptions import RequestValidationError
+from fastapi.responses import PlainTextResponse
 from sqlalchemy.orm import Session
 
 from .api.deps import get_current_admin
@@ -18,7 +21,7 @@ from .api.routes_world import router as world_router
 from .config import settings
 from .db import engine, get_db
 from .errors import AppError, app_error_handler, unhandled_error_handler, validation_error_handler
-from .models import Base, User
+from .models import Announcement, Base, User
 from .services.daily_reset import run_daily_reset
 
 app = FastAPI(title=settings.app_name, version=settings.app_version)
@@ -47,6 +50,36 @@ app.include_router(admin_router)
 @app.get("/health")
 def health():
     return {"success": True, "data": {"status": "ok", "version": settings.app_version}}
+
+
+@app.get("/skill.md", response_class=PlainTextResponse)
+def dynamic_skill_md(db: Session = Depends(get_db)):
+    rows = (
+        db.query(Announcement)
+        .filter(Announcement.published.is_(True))
+        .order_by(Announcement.id.desc())
+        .limit(10)
+        .all()
+    )
+    base_path = Path(__file__).resolve().parent / "skill_template.md"
+    base_text = ""
+    if base_path.exists():
+        base_text = base_path.read_text(encoding="utf-8")
+    else:
+        base_text = "# AI Three Kingdoms Agent Skill\n\n"
+
+    bulletin = ["# Announcements / 公告", ""]
+    if rows:
+        for item in rows:
+            bulletin.append(f"- [{item.updated_at.isoformat()}] {item.title}")
+            bulletin.append(f"  {item.content}")
+    else:
+        bulletin.append("- No announcements.")
+    bulletin.append("")
+    bulletin.append("---")
+    bulletin.append("")
+
+    return "\n".join(bulletin) + base_text
 
 
 @app.post("/admin/daily-reset")

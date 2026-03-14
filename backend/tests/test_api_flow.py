@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta, timezone
+
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -105,7 +107,7 @@ def test_social_politics_and_faction_flow():
         },
     )
     assert message_resp.status_code == 200
-    assert message_resp.json()["data"]["status"] == "delivered"
+    assert message_resp.json()["data"]["status"] == "pending"
 
     messages_resp = client.get(f"/social/messages?agent_id={vassal_agent_id}", headers=vassal_headers)
     assert messages_resp.status_code == 200
@@ -285,6 +287,44 @@ def test_admin_overview_delete_and_reset_user_password():
     assert del_user.status_code == 200
 
 
+def test_admin_users_agents_pagination_and_update():
+    admin_headers = _auth_header("admin_manage", "Aa1234!!")
+    user_headers = _auth_header("managed_user", "Aa1234!!")
+    aid = _register_agent(user_headers, "ManagedA", "平民")
+
+    users_page = client.get("/admin/users?page=1&page_size=1&query=managed", headers=admin_headers)
+    assert users_page.status_code == 200
+    assert users_page.json()["data"]["total"] >= 1
+
+    db = SessionLocal()
+    try:
+        u = db.query(User).filter(User.username == "managed_user").first()
+        assert u is not None
+        uid = u.id
+    finally:
+        db.close()
+
+    patch_user = client.patch(
+        f"/admin/users/{uid}",
+        headers=admin_headers,
+        json={"email": "managed_user_new@example.com", "is_admin": False},
+    )
+    assert patch_user.status_code == 200
+    assert patch_user.json()["data"]["email"] == "managed_user_new@example.com"
+
+    agents_page = client.get("/admin/agents?page=1&page_size=1&query=ManagedA", headers=admin_headers)
+    assert agents_page.status_code == 200
+    assert agents_page.json()["data"]["total"] >= 1
+
+    patch_agent = client.patch(
+        f"/admin/agents/{aid}",
+        headers=admin_headers,
+        json={"name": "ManagedB", "gold": 777},
+    )
+    assert patch_agent.status_code == 200
+    assert patch_agent.json()["data"]["name"] == "ManagedB"
+
+
 def test_agent_display_name_can_duplicate_but_user_id_unique():
     h1 = _auth_header("dup_user_a", "Aa1234!!")
     h2 = _auth_header("dup_user_b", "Aa1234!!")
@@ -343,3 +383,123 @@ def test_role_slot_limit_is_enforced():
     p2 = client.post("/agent/promote", headers=h2, json={"agent_id": a2, "target_role": "太傅"})
     assert p2.status_code == 422
     assert p2.json()["error"]["code"] == "ROLE_SLOTS_FULL"
+
+
+def test_admin_can_regenerate_claim_and_update_expiry():
+    admin_headers = _auth_header("admin_claim", "Aa1234!!")
+
+    bootstrap = client.post(
+        "/automation/agent/bootstrap",
+        json={"agent_name": "AdminClaimAgent", "key_name": "adm-claim-key"},
+    )
+    assert bootstrap.status_code == 200
+    agent_id = bootstrap.json()["data"]["agent"]["agent_id"]
+
+    regen = client.post(f"/admin/agents/{agent_id}/claim-code/regenerate", headers=admin_headers)
+    assert regen.status_code == 200
+    regen_data = regen.json()["data"]
+    assert regen_data["agent_id"] == agent_id
+    assert len(regen_data["claim_code"]) >= 12
+
+    future = (datetime.now(timezone.utc) + timedelta(days=3)).isoformat()
+    update = client.post(
+        f"/admin/agents/{agent_id}/claim-expiry",
+        headers=admin_headers,
+        json={"expires_at": future},
+    )
+    assert update.status_code == 200
+    update_data = update.json()["data"]
+    assert update_data["agent_id"] == agent_id
+    assert update_data["created_new_ticket"] is False
+
+    overview = client.get("/admin/overview", headers=admin_headers)
+    assert overview.status_code == 200
+    row = next((a for a in overview.json()["data"]["agents"] if a["id"] == agent_id), None)
+    assert row is not None
+    assert row["claim_code"] == "******"
+    assert row["claim_expires_at"] is not None
+
+
+def test_agent_inbox_orders_unread_and_unreplied_first():
+    a_headers = _auth_header("inbox_a", "Aa1234!!")
+    b_headers = _auth_header("inbox_b", "Aa1234!!")
+    c_headers = _auth_header("inbox_c", "Aa1234!!")
+
+    a_id = _register_agent(a_headers, "InboxA", "平民")
+    b_id = _register_agent(b_headers, "InboxB", "平民")
+    c_id = _register_agent(c_headers, "InboxC", "平民")
+
+    msg1 = client.post(
+        "/social/message",
+        headers=b_headers,
+        json={"from_agent_id": b_id, "to_agent_id": a_id, "message_type": "task", "content": "pending-1"},
+    )
+    assert msg1.status_code == 200
+    msg2 = client.post(
+        "/social/message",
+        headers=b_headers,
+        json={"from_agent_id": b_id, "to_agent_id": a_id, "message_type": "task", "content": "pending-2"},
+    )
+    assert msg2.status_code == 200
+    msg3 = client.post(
+        "/social/message",
+        headers=c_headers,
+        json={"from_agent_id": c_id, "to_agent_id": a_id, "message_type": "task", "content": "older"},
+    )
+    assert msg3.status_code == 200
+
+    # A replies to C, so C-thread should no longer be unreplied.
+    reply_c = client.post(
+        "/social/inbox/reply",
+        headers=a_headers,
+        json={"from_agent_id": a_id, "to_agent_id": c_id, "content": "ack"},
+    )
+    assert reply_c.status_code == 200
+
+    inbox = client.get(f"/social/inbox?agent_id={a_id}", headers=a_headers)
+    assert inbox.status_code == 200
+    items = inbox.json()["data"]["items"]
+    assert len(items) >= 2
+    assert items[0]["peer_agent_id"] == b_id
+    assert items[0]["unread_count"] >= 2
+    assert items[0]["unreplied_count"] >= 2
+    assert items[0]["thread_status"] == "unreplied"
+
+    history = client.get(f"/social/inbox/history?agent_id={a_id}&peer_agent_id={b_id}&mark_read=true", headers=a_headers)
+    assert history.status_code == 200
+
+    inbox_after = client.get(f"/social/inbox?agent_id={a_id}", headers=a_headers)
+    assert inbox_after.status_code == 200
+    row_b = next(i for i in inbox_after.json()["data"]["items"] if i["peer_agent_id"] == b_id)
+    assert row_b["unread_count"] == 0
+    assert row_b["thread_status"] == "unreplied"
+
+
+def test_admin_can_manage_announcements():
+    admin_headers = _auth_header("admin_notice", "Aa1234!!")
+    create = client.post(
+        "/admin/announcements",
+        headers=admin_headers,
+        json={"title": "Maintenance", "content": "Server restart at UTC 02:00", "published": True},
+    )
+    assert create.status_code == 200
+    aid = create.json()["data"]["id"]
+
+    pub = client.get("/world/public/announcements")
+    assert pub.status_code == 200
+    assert any(x["id"] == aid for x in pub.json()["data"]["items"])
+
+    update = client.patch(
+        f"/admin/announcements/{aid}",
+        headers=admin_headers,
+        json={"published": False},
+    )
+    assert update.status_code == 200
+    assert update.json()["data"]["published"] is False
+
+    pub2 = client.get("/world/public/announcements")
+    assert pub2.status_code == 200
+    assert all(x["id"] != aid for x in pub2.json()["data"]["items"])
+
+    delete = client.delete(f"/admin/announcements/{aid}", headers=admin_headers)
+    assert delete.status_code == 200
