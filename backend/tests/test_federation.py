@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 
 from fastapi.testclient import TestClient
 
+from app.config import settings
 from app.main import app
 from app.services.federation_security import make_signature
 
@@ -62,7 +63,7 @@ def test_federation_hello_attack_migrate_and_replay_guard():
     attack_payload = {
         "request_id": "req-attack-001",
         "from_city": "ChengDu",
-        "target_city": "Luoyang",
+        "target_city": settings.city_name,
         "troops": {"infantry": 50, "archer": 20, "cavalry": 10},
     }
     attack_resp = client.post(
@@ -84,7 +85,7 @@ def test_federation_hello_attack_migrate_and_replay_guard():
     migrate_payload = {
         "request_id": "req-migrate-001",
         "from_city": "ChengDu",
-        "to_city": "Luoyang",
+        "to_city": settings.city_name,
         "agent_name": "GanNing",
         "role": "武將",
         "gold": 200,
