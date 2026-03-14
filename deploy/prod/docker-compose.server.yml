@@ -1,0 +1,114 @@
+services:
+  city-api:
+    build:
+      context: ../../backend
+    container_name: ai3k-city-api
+    environment:
+      DATABASE_URL: postgresql+psycopg://postgres:${POSTGRES_PASSWORD}@postgres:5432/ai3k
+      JWT_SECRET: ${JWT_SECRET}
+      CITY_NAME: ${CITY_NAME}
+      CITY_BASE_URL: ${CITY_BASE_URL}
+      CITY_LOCATION: ${CITY_LOCATION}
+      WORLD_NAME: ${WORLD_NAME}
+      CITY_WALL: ${CITY_WALL}
+      CITY_TAX_RATE: ${CITY_TAX_RATE}
+      OPEN_FOR_MIGRATION: ${OPEN_FOR_MIGRATION}
+      PROTOCOL_VERSION: ${PROTOCOL_VERSION}
+      RULE_VERSION: ${RULE_VERSION}
+      FEDERATION_SHARED_SECRET: ${FEDERATION_SHARED_SECRET}
+      CENTRAL_REGISTRY_URL: ${CENTRAL_REGISTRY_URL}
+      CENTRAL_REGISTRY_TOKEN: ${CENTRAL_REGISTRY_TOKEN}
+      CENTRAL_ROLES_POLICY_URL: ${CENTRAL_ROLES_POLICY_URL}
+      CENTRAL_HEARTBEAT_URL: ${CENTRAL_HEARTBEAT_URL}
+      CENTRAL_NODE_ID: ${CENTRAL_NODE_ID}
+      CENTRAL_ROLES_POLICY_REQUIRED: ${CENTRAL_ROLES_POLICY_REQUIRED}
+      ADMIN_USERNAMES: ${ADMIN_USERNAMES}
+      PASSWORD_RESET_CODE_TTL_MINUTES: ${PASSWORD_RESET_CODE_TTL_MINUTES}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_FROM: ${SMTP_FROM}
+      SMTP_USE_TLS: ${SMTP_USE_TLS}
+      AUTO_CREATE_SCHEMA: ${AUTO_CREATE_SCHEMA}
+    depends_on:
+      - postgres
+      - redis
+
+  city-worker:
+    build:
+      context: ../../backend
+    container_name: ai3k-city-worker
+    command: ["python", "-m", "app.worker"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://postgres:${POSTGRES_PASSWORD}@postgres:5432/ai3k
+      JWT_SECRET: ${JWT_SECRET}
+      CITY_NAME: ${CITY_NAME}
+      CITY_BASE_URL: ${CITY_BASE_URL}
+      CITY_LOCATION: ${CITY_LOCATION}
+      WORLD_NAME: ${WORLD_NAME}
+      CITY_WALL: ${CITY_WALL}
+      CITY_TAX_RATE: ${CITY_TAX_RATE}
+      OPEN_FOR_MIGRATION: ${OPEN_FOR_MIGRATION}
+      PROTOCOL_VERSION: ${PROTOCOL_VERSION}
+      RULE_VERSION: ${RULE_VERSION}
+      FEDERATION_SHARED_SECRET: ${FEDERATION_SHARED_SECRET}
+      CENTRAL_REGISTRY_URL: ${CENTRAL_REGISTRY_URL}
+      CENTRAL_REGISTRY_TOKEN: ${CENTRAL_REGISTRY_TOKEN}
+      CENTRAL_ROLES_POLICY_URL: ${CENTRAL_ROLES_POLICY_URL}
+      CENTRAL_HEARTBEAT_URL: ${CENTRAL_HEARTBEAT_URL}
+      CENTRAL_NODE_ID: ${CENTRAL_NODE_ID}
+      CENTRAL_ROLES_POLICY_REQUIRED: ${CENTRAL_ROLES_POLICY_REQUIRED}
+      ADMIN_USERNAMES: ${ADMIN_USERNAMES}
+      PASSWORD_RESET_CODE_TTL_MINUTES: ${PASSWORD_RESET_CODE_TTL_MINUTES}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_FROM: ${SMTP_FROM}
+      SMTP_USE_TLS: ${SMTP_USE_TLS}
+      AUTO_CREATE_SCHEMA: ${AUTO_CREATE_SCHEMA}
+    depends_on:
+      - postgres
+      - redis
+
+  frontend:
+    build:
+      context: ../../frontend
+      args:
+        NEXT_PUBLIC_API_BASE_URL: /api
+        NEXT_PUBLIC_RELEASE_VERSION: ${NEXT_PUBLIC_RELEASE_VERSION:-1.19.0}
+    container_name: ai3k-frontend
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: /api
+      NEXT_PUBLIC_RELEASE_VERSION: ${NEXT_PUBLIC_RELEASE_VERSION:-1.19.0}
+    depends_on:
+      - city-api
+
+  gateway:
+    image: nginx:1.25-alpine
+    container_name: ai3k-gateway
+    depends_on:
+      - frontend
+      - city-api
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "${GATEWAY_PORT:-10090}:80"
+
+  postgres:
+    image: postgres:16
+    container_name: ai3k-postgres
+    environment:
+      POSTGRES_DB: ai3k
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    container_name: ai3k-redis
+
+volumes:
+  postgres-data:

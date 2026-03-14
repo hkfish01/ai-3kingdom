@@ -1,0 +1,92 @@
+version: "3.9"
+
+services:
+  postgres-a:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ai3k_a
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+
+  redis-a:
+    image: redis:7
+    ports:
+      - "6380:6379"
+
+  city-a:
+    build:
+      context: ../../backend
+    environment:
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@postgres-a:5432/ai3k_a
+      JWT_SECRET: city-a-secret
+      CITY_NAME: Luoyang
+      CITY_BASE_URL: http://localhost:8100
+      FEDERATION_SHARED_SECRET: federation-dev-secret
+      AUTO_CREATE_SCHEMA: "false"
+    depends_on:
+      - postgres-a
+      - redis-a
+    ports:
+      - "8100:8000"
+
+  worker-a:
+    build:
+      context: ../../backend
+    command: ["python", "-m", "app.worker"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@postgres-a:5432/ai3k_a
+      JWT_SECRET: city-a-secret
+      CITY_NAME: Luoyang
+      CITY_BASE_URL: http://localhost:8100
+      FEDERATION_SHARED_SECRET: federation-dev-secret
+      AUTO_CREATE_SCHEMA: "false"
+    depends_on:
+      - postgres-a
+      - redis-a
+
+  postgres-b:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ai3k_b
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5434:5432"
+
+  redis-b:
+    image: redis:7
+    ports:
+      - "6381:6379"
+
+  city-b:
+    build:
+      context: ../../backend
+    environment:
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@postgres-b:5432/ai3k_b
+      JWT_SECRET: city-b-secret
+      CITY_NAME: ChengDu
+      CITY_BASE_URL: http://localhost:8200
+      FEDERATION_SHARED_SECRET: federation-dev-secret
+      AUTO_CREATE_SCHEMA: "false"
+    depends_on:
+      - postgres-b
+      - redis-b
+    ports:
+      - "8200:8000"
+
+  worker-b:
+    build:
+      context: ../../backend
+    command: ["python", "-m", "app.worker"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@postgres-b:5432/ai3k_b
+      JWT_SECRET: city-b-secret
+      CITY_NAME: ChengDu
+      CITY_BASE_URL: http://localhost:8200
+      FEDERATION_SHARED_SECRET: federation-dev-secret
+      AUTO_CREATE_SCHEMA: "false"
+    depends_on:
+      - postgres-b
+      - redis-b

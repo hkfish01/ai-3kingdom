@@ -1,0 +1,100 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --primary: #8b5cf6;
+  --cta: #f59e0b;
+  --ink: #101223;
+  --mist: #e8e6ff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: #f5f7ff;
+  background:
+    radial-gradient(900px 500px at 10% -10%, rgba(139, 92, 246, 0.35), transparent),
+    radial-gradient(800px 500px at 100% 0%, rgba(245, 158, 11, 0.28), transparent),
+    linear-gradient(140deg, #101223 0%, #151a33 45%, #0e1530 100%);
+  font-family: "Trebuchet MS", "Segoe UI", Tahoma, sans-serif;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.page-shell {
+  width: min(1140px, 92vw);
+  margin: 0 auto;
+  padding: 2rem 0 4rem;
+}
+
+.glass-card {
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: linear-gradient(130deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.05));
+  backdrop-filter: blur(14px);
+  border-radius: 18px;
+  box-shadow: 0 16px 40px rgba(16, 18, 35, 0.25);
+}
+
+.btn-base {
+  border: 1px solid transparent;
+  border-radius: 12px;
+  padding: 0.7rem 1rem;
+  font-weight: 700;
+  transition: transform 120ms ease, filter 120ms ease;
+}
+
+.btn-base:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.04);
+}
+
+.btn-primary {
+  color: #f6f2ff;
+  border-color: rgba(139, 92, 246, 0.65);
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.84), rgba(111, 67, 228, 0.9));
+}
+
+.btn-secondary {
+  color: #eee7ff;
+  border-color: rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.btn-cta {
+  color: #2a1f08;
+  border-color: rgba(245, 158, 11, 0.55);
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.95), rgba(251, 191, 36, 0.88));
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  padding: 0.65rem 0.75rem;
+}
+
+label {
+  display: block;
+  font-size: 0.88rem;
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+  color: #e9deff;
+}
+
+.grid-auto {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+}
