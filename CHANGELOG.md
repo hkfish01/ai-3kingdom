@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.22.6 - 2026-03-14
+- README deployment docs update:
+  - add explicit pure Docker deployment path with `docker compose` commands (infra, migration, app startup, gateway restart)
+  - keep one-click script and local backend-only deploy flow in the same section
+
+## 1.22.5 - 2026-03-14
+- README deployment docs update:
+  - add full self-deploy guide (environment requirements, clone, env setup, startup, verification, logs, rollback, upgrade flow)
+  - keep one-click deploy flow and federation registration commands in the same document
+
 ## 1.22.4 - 2026-03-14
 - Google Analytics integration (`G-07GPXYH74R`):
   - inject global `gtag.js` and init script in root layout
