@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.22.4 - 2026-03-14
+- Google Analytics integration (`G-07GPXYH74R`):
+  - inject global `gtag.js` and init script in root layout
+  - add App Router route-change tracking so each page navigation emits page view
+
 ## 1.22.3 - 2026-03-14
 - Chronicle page UX:
   - switch chronicle list to 3-column card layout (responsive)
