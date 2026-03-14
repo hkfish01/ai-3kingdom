@@ -98,3 +98,150 @@ label {
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 1rem;
 }
+
+.pixel-agent {
+  position: relative;
+  width: 14px;
+  height: 18px;
+}
+
+.pixel-head {
+  position: absolute;
+  left: 3px;
+  top: 0;
+  width: 8px;
+  height: 6px;
+  border: 1px solid rgba(15, 23, 42, 0.6);
+  background: #fcd7b8;
+}
+
+.pixel-body {
+  position: absolute;
+  left: 2px;
+  top: 6px;
+  width: 10px;
+  height: 7px;
+  border: 1px solid rgba(15, 23, 42, 0.6);
+  background: linear-gradient(180deg, #8b5cf6 0%, #6d3ae3 100%);
+}
+
+.pixel-leg {
+  position: absolute;
+  top: 13px;
+  width: 3px;
+  height: 5px;
+  background: #f59e0b;
+}
+
+.pixel-leg-left {
+  left: 3px;
+}
+
+.pixel-leg-right {
+  right: 3px;
+}
+
+.pixel-step-a .pixel-leg-left {
+  transform: translateY(0);
+}
+
+.pixel-step-a .pixel-leg-right {
+  transform: translateY(1px);
+}
+
+.pixel-step-b .pixel-leg-left {
+  transform: translateY(1px);
+}
+
+.pixel-step-b .pixel-leg-right {
+  transform: translateY(0);
+}
+
+.pixel-hoe {
+  position: absolute;
+  right: -3px;
+  top: 9px;
+  width: 6px;
+  height: 2px;
+  background: #b45309;
+  transform-origin: left center;
+}
+
+.pixel-farm .pixel-hoe {
+  animation: farm-swing 0.45s linear infinite alternate;
+}
+
+@keyframes farm-swing {
+  from {
+    transform: rotate(10deg);
+  }
+  to {
+    transform: rotate(-32deg);
+  }
+}
+
+.pixel-sprite-wrap {
+  position: relative;
+  width: 16px;
+  height: 16px;
+}
+
+.pixel-sprite {
+  width: 16px;
+  height: 16px;
+  image-rendering: pixelated;
+  background-repeat: no-repeat;
+  background-size: 64px 16px;
+  filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.35));
+}
+
+.pixel-sprite-anim {
+  animation: pixel-frames 0.65s steps(4) infinite;
+}
+
+.pixel-shadow {
+  position: absolute;
+  left: 2px;
+  bottom: -3px;
+  width: 12px;
+  height: 3px;
+  background: rgba(0, 0, 0, 0.28);
+  border-radius: 999px;
+}
+
+.pixel-flip {
+  transform: scaleX(-1);
+}
+
+@keyframes pixel-frames {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: -64px 0;
+  }
+}
+
+.rpg-sprite-wrap {
+  position: relative;
+}
+
+.rpg-sprite {
+  image-rendering: pixelated;
+  background-repeat: no-repeat;
+  filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.35));
+}
+
+.rpg-sprite-shadow {
+  position: absolute;
+  left: 20%;
+  bottom: -3px;
+  width: 60%;
+  height: 3px;
+  background: rgba(0, 0, 0, 0.26);
+  border-radius: 999px;
+}
+
+.rpg-sprite-mirror {
+  transform: scaleX(-1);
+}

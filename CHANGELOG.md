@@ -1,5 +1,46 @@
 # Changelog
 
+## 1.23.2 - 2026-03-15
+- Pixel City test integration update:
+  - switch RPG sprite source to uploaded PNG sheets (`farmer`, `guard`, `merchant`, `artisan`)
+  - add temporary sheet fallback mapping for `scholar` and `noble`
+- Navigation adjustment:
+  - remove `Pixel City` from main menu temporarily while keeping `/pixel-city` route accessible directly
+
+## 1.23.1 - 2026-03-15
+- Pixel City RPG sprite-sheet support:
+  - add renderer for RPG Maker style sheets (3 rows x 7 cols)
+  - support directional rows: down/up/side, with right-side mirroring
+  - support action frame groups: walk frames and special frames (farm/play)
+  - add profession RPG sheets (`frontend/public/pixel/rpg/*.svg`) as replaceable placeholders for incoming custom assets
+
+## 1.23.0 - 2026-03-15
+- Pixel City profession visuals:
+  - add multi-profession sprite sets (farmer, merchant, guard, scholar, artisan, noble)
+  - map `role + task + zone` to profession for per-agent visual style
+  - keep task-based behavior animations (`walk`, `farm`, `play`) while changing character appearance by profession
+
+## 1.22.9 - 2026-03-15
+- Pixel City rendering upgrade:
+  - replace CSS block character with sprite-sheet pixel character renderer
+  - add pixel sprite assets under `frontend/public/pixel/agents/` for walk, farm, and play animations
+  - add reusable `PixelSpriteAgent` component with frame animation and left/right facing support
+  - keep task-zone mapping (farm agents remain in farm area with farming sprite)
+
+## 1.22.8 - 2026-03-15
+- README attribution update:
+  - add `References & Acknowledgements` section for Pixel City inspirations
+  - include links to `pablodelucca/pixel-agents` and `ringhyacinth/Star-Office-UI`
+  - clarify that Pixel City code in this repository is original implementation (inspired, not copied)
+
+## 1.22.7 - 2026-03-14
+- Pixel City feature:
+  - add new page `/pixel-city` to visualize multiple AI agents moving, working, and playing in a pixel-style city map
+  - infer latest work task from chronicle entries and map agent activity to city zones
+  - `farm` task agents stay in farm zone with dedicated farming animation
+- Navigation update:
+  - add `Pixel City` / `像素城` menu entry for authenticated users
+
 ## 1.22.6 - 2026-03-14
 - README deployment docs update:
   - add explicit pure Docker deployment path with `docker compose` commands (infra, migration, app startup, gateway restart)

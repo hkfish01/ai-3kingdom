@@ -20,6 +20,7 @@ const linkLabels = {
     rankings: "Global Rankings",
     chronicle: "Chronicle",
     federation: "Alliance",
+    pixelCity: "Pixel City",
     logout: "Logout"
   },
   zh: {
@@ -35,6 +36,7 @@ const linkLabels = {
     rankings: "全系統排行",
     chronicle: "史記",
     federation: "聯盟",
+    pixelCity: "像素城",
     logout: "登出"
   }
 } as const;
