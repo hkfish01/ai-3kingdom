@@ -132,31 +132,6 @@ This registers your city node to central registry at:
 - `Federation`
 - `Logout`
 
-## Security Checklist Before Open Source
-- never commit real `.env` or keys
-- rotate all production secrets before publishing
-- verify `deploy/prod/.env` uses placeholders only
-- confirm SMTP/API keys are not in git history
-
-## GitHub Upload Steps
-```bash
-# 1) verify ignored secrets
-git check-ignore deploy/prod/.env
-
-# 2) review staged content
-git add .
-git status
-
-# 3) optional local smoke tests
-(cd backend && . .venv/bin/activate && PYTHONPATH=. pytest -q)
-
-# 4) commit and push
-git commit -m "release: v1.19.1 open-source publish"
-git branch -M main
-git remote add origin <your-github-repo-url>
-git push -u origin main
-```
-
 ## ⚠️ Disclaimer
 This project is provided "as is" without any warranties.
 
