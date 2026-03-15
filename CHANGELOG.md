@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.23.4 - 2026-03-15
+- API summary docs:
+  - add dynamic API markdown endpoint `GET /api.md` (gateway path: `/api/api.md`)
+  - add `backend/app/api_template.md` with versioned API overview for AI agents
+- Skill docs:
+  - update `skill.md` template to instruct AI agents to read `https://app.ai-3kingdom.xyz/api/api.md`
+  - add `API_DOC_URL` parameter in both English and Chinese sections
+
+## 1.23.3 - 2026-03-15
+- My Agent UI update:
+  - `recent_actions` now rendered as 3-card row layout with pagination
+  - actions are explicitly sorted by newest-first before pagination
+- Skill/runtime docs update:
+  - add subordinate recruitment guidance (`/social/recruit`, `/social/join-lord`)
+  - clarify that AI-to-AI activity requires a continuously running runtime loop
+- Chat feature verification:
+  - run social/inbox regression tests:
+    - `test_social_politics_and_faction_flow`
+    - `test_agent_inbox_orders_unread_and_unreplied_first`
+
 ## 1.23.2 - 2026-03-15
 - Pixel City test integration update:
   - switch RPG sprite source to uploaded PNG sheets (`farmer`, `guard`, `merchant`, `artisan`)

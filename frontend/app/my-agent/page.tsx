@@ -27,6 +27,18 @@ interface AgentOverview {
   recent_messages: Array<{ id: number; from_agent_id: number; to_agent_id: number; message_type: string; content: string; created_at: string }>;
 }
 
+function summarizeActionResult(resultJson: string): string {
+  try {
+    const parsed = JSON.parse(resultJson) as Record<string, unknown>;
+    if (typeof parsed.task === "string") return `task: ${parsed.task}`;
+    if (typeof parsed.troop_type === "string") return `troop: ${parsed.troop_type}`;
+    if (typeof parsed.quantity === "number") return `quantity: ${parsed.quantity}`;
+  } catch {
+    return "";
+  }
+  return "";
+}
+
 export default function MyAgentPage() {
   const { locale } = useLocale();
   const t = useMemo(
@@ -46,7 +58,11 @@ export default function MyAgentPage() {
             abilities: "能力值",
             noActions: "暫無行動紀錄",
             noMessages: "暫無交流紀錄",
-            statusFail: "載入失敗"
+            statusFail: "載入失敗",
+            page: "頁",
+            prev: "上一頁",
+            next: "下一頁",
+            total: "總數"
           }
         : {
             title: "My Agent (Read-only)",
@@ -62,16 +78,23 @@ export default function MyAgentPage() {
             abilities: "Abilities",
             noActions: "No action records yet.",
             noMessages: "No message records yet.",
-            statusFail: "Failed to load"
+            statusFail: "Failed to load",
+            page: "Page",
+            prev: "Prev",
+            next: "Next",
+            total: "Total"
           },
     [locale]
   );
+
+  const ACTION_PAGE_SIZE = 9;
 
   const [claimCode, setClaimCode] = useState("");
   const [agents, setAgents] = useState<ViewerAgentSummary[]>([]);
   const [selected, setSelected] = useState<number | null>(null);
   const [overview, setOverview] = useState<AgentOverview | null>(null);
   const [message, setMessage] = useState("");
+  const [actionPage, setActionPage] = useState(1);
 
   const loadAgents = async () => {
     try {
@@ -104,6 +127,10 @@ export default function MyAgentPage() {
     }
   }, [selected]);
 
+  useEffect(() => {
+    setActionPage(1);
+  }, [overview?.agent?.id]);
+
   const claim = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     try {
@@ -115,6 +142,18 @@ export default function MyAgentPage() {
       setMessage(err instanceof Error ? err.message : t.statusFail);
     }
   };
+
+  const sortedActions = useMemo(() => {
+    const actions = overview?.recent_actions ?? [];
+    return [...actions].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  }, [overview?.recent_actions]);
+
+  const actionTotalPages = Math.max(1, Math.ceil(sortedActions.length / ACTION_PAGE_SIZE));
+  const currentActionPage = Math.min(actionPage, actionTotalPages);
+  const pagedActions = sortedActions.slice(
+    (currentActionPage - 1) * ACTION_PAGE_SIZE,
+    currentActionPage * ACTION_PAGE_SIZE
+  );
 
   return (
     <main className="space-y-lg">
@@ -182,17 +221,43 @@ export default function MyAgentPage() {
 
               <div>
                 <h3 className="mb-xs text-lg font-bold">{t.actions}</h3>
-                {overview.recent_actions.length === 0 ? (
+                {sortedActions.length === 0 ? (
                   <p className="text-sm text-white/70">{t.noActions}</p>
                 ) : (
-                  <ul className="space-y-xs text-sm">
-                    {overview.recent_actions.map((item) => (
-                      <li key={item.id} className="rounded-md bg-white/5 p-sm">
-                        <p className="font-semibold">{item.action_type}</p>
-                        <p className="text-xs text-white/70">{new Date(item.created_at).toLocaleString()}</p>
-                      </li>
-                    ))}
-                  </ul>
+                  <>
+                    <ul className="grid grid-cols-1 gap-sm md:grid-cols-3">
+                      {pagedActions.map((item) => {
+                        const summary = summarizeActionResult(item.result_json);
+                        return (
+                          <li key={item.id} className="rounded-md border border-white/15 bg-white/5 p-sm">
+                            <p className="font-semibold">{item.action_type}</p>
+                            <p className="text-xs text-white/70">{new Date(item.created_at).toLocaleString()}</p>
+                            {summary ? <p className="mt-1 text-xs text-white/80">{summary}</p> : null}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                    <div className="mt-sm flex items-center justify-between text-xs text-white/80">
+                      <span>{t.total}: {sortedActions.length}</span>
+                      <div className="inline-flex items-center gap-xs">
+                        <button
+                          className="btn-base btn-secondary px-3 py-1 text-xs"
+                          onClick={() => setActionPage((p) => Math.max(1, p - 1))}
+                          disabled={currentActionPage <= 1}
+                        >
+                          {t.prev}
+                        </button>
+                        <span>{t.page} {currentActionPage} / {actionTotalPages}</span>
+                        <button
+                          className="btn-base btn-secondary px-3 py-1 text-xs"
+                          onClick={() => setActionPage((p) => Math.min(actionTotalPages, p + 1))}
+                          disabled={currentActionPage >= actionTotalPages}
+                        >
+                          {t.next}
+                        </button>
+                      </div>
+                    </div>
+                  </>
                 )}
               </div>
 

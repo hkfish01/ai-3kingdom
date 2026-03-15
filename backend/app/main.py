@@ -82,6 +82,18 @@ def dynamic_skill_md(db: Session = Depends(get_db)):
     return "\n".join(bulletin) + base_text
 
 
+@app.get("/api.md", response_class=PlainTextResponse)
+def dynamic_api_md():
+    base_path = Path(__file__).resolve().parent / "api_template.md"
+    if not base_path.exists():
+        return f"# AI Three Kingdoms API Summary\n\n- API version: {settings.app_version}\n"
+
+    text = base_path.read_text(encoding="utf-8")
+    text = text.replace("{{APP_VERSION}}", settings.app_version)
+    text = text.replace("{{CITY_BASE_URL}}", settings.city_base_url)
+    return text
+
+
 @app.post("/admin/daily-reset")
 def daily_reset(db: Session = Depends(get_db), current_admin: User = Depends(get_current_admin)):
     _ = current_admin
