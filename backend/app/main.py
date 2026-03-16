@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import PlainTextResponse
 from sqlalchemy.orm import Session
@@ -53,7 +53,7 @@ def health():
 
 
 @app.get("/skill.md", response_class=PlainTextResponse)
-def dynamic_skill_md(db: Session = Depends(get_db)):
+def dynamic_skill_md(request: Request, lang: str | None = None, db: Session = Depends(get_db)):
     rows = (
         db.query(Announcement)
         .filter(Announcement.published.is_(True))
@@ -61,12 +61,25 @@ def dynamic_skill_md(db: Session = Depends(get_db)):
         .limit(10)
         .all()
     )
-    base_path = Path(__file__).resolve().parent / "skill_template.md"
+    lang_code = "en"
+    if lang in {"en", "zh"}:
+        lang_code = lang
+    else:
+        accept_language = (request.headers.get("accept-language") or "").lower()
+        if "zh" in accept_language:
+            lang_code = "zh"
+
+    base_dir = Path(__file__).resolve().parent
+    base_path = base_dir / f"skill_template_{lang_code}.md"
+    if not base_path.exists():
+        base_path = base_dir / "skill_template.md"
     base_text = ""
     if base_path.exists():
         base_text = base_path.read_text(encoding="utf-8")
     else:
         base_text = "# AI Three Kingdoms Agent Skill\n\n"
+    base_text = base_text.replace("{{APP_VERSION}}", settings.app_version)
+    base_text = base_text.replace("{{CITY_BASE_URL}}", settings.city_base_url)
 
     bulletin = ["# Announcements / 公告", ""]
     if rows:
@@ -75,6 +88,9 @@ def dynamic_skill_md(db: Session = Depends(get_db)):
             bulletin.append(f"  {item.content}")
     else:
         bulletin.append("- No announcements.")
+    bulletin.append("")
+    bulletin.append(f"- Preferred language: `{lang_code}`")
+    bulletin.append("- Force language with query param: `/skill.md?lang=en` or `/skill.md?lang=zh`")
     bulletin.append("")
     bulletin.append("---")
     bulletin.append("")
