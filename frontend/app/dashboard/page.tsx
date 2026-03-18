@@ -110,7 +110,8 @@ export default function DashboardPage() {
         prev: "上一頁",
         next: "下一頁",
         total: "總數",
-        loginRequired: "請先登入以查看城內資料。"
+        loginRequired: "請先登入以查看城內資料。",
+        sessionExpired: "登入已超時，請重新登入。"
       }
     : {
         title: "City Dashboard",
@@ -150,13 +151,15 @@ export default function DashboardPage() {
         prev: "Prev",
         next: "Next",
         total: "Total",
-        loginRequired: "Please login first to view city data."
+        loginRequired: "Please login first to view city data.",
+        sessionExpired: "Session expired. Please login again."
       };
 
   const [world, setWorld] = useState<WorldState | null>(null);
   const [roster, setRoster] = useState<CityRosterPayload | null>(null);
   const [message, setMessage] = useState(t.ready);
   const [authReady, setAuthReady] = useState(false);
+  const [authMessage, setAuthMessage] = useState("");
   const [keyword, setKeyword] = useState("");
   const [branchFilter, setBranchFilter] = useState<"all" | "civil" | "military">("all");
   const [sortBy, setSortBy] = useState<"id" | "name" | "role" | "energy" | "gold" | "food">("gold");
@@ -193,6 +196,23 @@ export default function DashboardPage() {
     return out.sort((a, b) => b.tier - a.tier || a.role.localeCompare(b.role));
   })();
 
+  const logout = (hint: string) => {
+    setAuthMessage(hint);
+    alert(hint);
+    localStorage.removeItem("token");
+    window.location.href = "/login";
+  };
+
+  const handleAuthExpired = (err: unknown) => {
+    const status = (err as { status?: number }).status;
+    const code = (err as { code?: string }).code;
+    if (status === 401 || code === "UNAUTHORIZED" || code === "USER_NOT_FOUND") {
+      logout(t.sessionExpired);
+      return true;
+    }
+    return false;
+  };
+
   const load = async () => {
     try {
       const [worldData, rosterData] = await Promise.all([
@@ -203,6 +223,9 @@ export default function DashboardPage() {
       setRoster(rosterData);
       setMessage(t.ready);
     } catch (err) {
+      if (handleAuthExpired(err)) {
+        return;
+      }
       setMessage(err instanceof Error ? err.message : t.loadFailed);
     }
   };
@@ -210,8 +233,7 @@ export default function DashboardPage() {
   useEffect(() => {
     const token = typeof window === "undefined" ? null : localStorage.getItem("token");
     if (!token) {
-      alert(t.loginRequired);
-      window.history.back();
+      logout(t.loginRequired);
       return;
     }
     setAuthReady(true);
@@ -257,6 +279,13 @@ export default function DashboardPage() {
   }, [keyword, branchFilter, sortBy, sortDir, pageSize]);
 
   if (!authReady) {
+    if (authMessage) {
+      return (
+        <main className="space-y-lg">
+          <p className="rounded-lg bg-red-500/20 p-sm text-sm">{authMessage}</p>
+        </main>
+      );
+    }
     return null;
   }
 

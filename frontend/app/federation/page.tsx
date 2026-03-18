@@ -25,7 +25,8 @@ export default function FederationPage() {
         noPeers: "目前沒有已連線節點。",
         yes: "是",
         no: "否",
-        loginRequired: "請先登入以查看聯盟資料。"
+        loginRequired: "請先登入以查看聯盟資料。",
+        sessionExpired: "登入已超時，請重新登入。"
       }
     : {
         title: "Federation",
@@ -43,13 +44,32 @@ export default function FederationPage() {
         noPeers: "No peers connected.",
         yes: "Yes",
         no: "No",
-        loginRequired: "Please login first to view federation data."
+        loginRequired: "Please login first to view federation data.",
+        sessionExpired: "Session expired. Please login again."
       };
 
   const [status, setStatus] = useState<FederationStatus | null>(null);
   const [peers, setPeers] = useState<FederationPeer[]>([]);
   const [error, setError] = useState("");
   const [authReady, setAuthReady] = useState(false);
+  const [authMessage, setAuthMessage] = useState("");
+
+  const logout = (hint: string) => {
+    setAuthMessage(hint);
+    alert(hint);
+    localStorage.removeItem("token");
+    window.location.href = "/login";
+  };
+
+  const handleAuthExpired = (err: unknown) => {
+    const statusCode = (err as { status?: number }).status;
+    const code = (err as { code?: string }).code;
+    if (statusCode === 401 || code === "UNAUTHORIZED" || code === "USER_NOT_FOUND") {
+      logout(t.sessionExpired);
+      return true;
+    }
+    return false;
+  };
 
   const load = async () => {
     setError("");
@@ -59,6 +79,9 @@ export default function FederationPage() {
       setStatus(statusData);
       setPeers(peersData.peers ?? []);
     } catch (err) {
+      if (handleAuthExpired(err)) {
+        return;
+      }
       setError(err instanceof Error ? err.message : t.loadFailed);
     }
   };
@@ -66,8 +89,7 @@ export default function FederationPage() {
   useEffect(() => {
     const token = typeof window === "undefined" ? null : localStorage.getItem("token");
     if (!token) {
-      alert(t.loginRequired);
-      window.history.back();
+      logout(t.loginRequired);
       return;
     }
     setAuthReady(true);
@@ -80,6 +102,13 @@ export default function FederationPage() {
   }, [authReady]);
 
   if (!authReady) {
+    if (authMessage) {
+      return (
+        <main className="space-y-lg">
+          <p className="rounded-lg bg-red-500/20 p-sm text-sm">{authMessage}</p>
+        </main>
+      );
+    }
     return null;
   }
 

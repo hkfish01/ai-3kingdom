@@ -40,7 +40,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       ? (raw as { detail: Array<{ msg?: string }> }).detail[0]?.msg
       : undefined;
     const errMsg = payload.error?.message ?? detailMsg ?? `Request failed: ${response.status}`;
-    throw new Error(errMsg);
+    const error = new Error(errMsg) as Error & { code?: string; status?: number };
+    error.code = payload.error?.code;
+    error.status = response.status;
+    throw error;
   }
 
   return payload.data as T;

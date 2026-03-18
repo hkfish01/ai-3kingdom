@@ -63,7 +63,8 @@ export default function MyAgentPage() {
             prev: "上一頁",
             next: "下一頁",
             total: "總數",
-            loginRequired: "請先登入以查看居民資料。"
+            loginRequired: "請先登入以查看居民資料。",
+            sessionExpired: "登入已超時，請重新登入。"
           }
         : {
             title: "My Agent (Read-only)",
@@ -84,7 +85,8 @@ export default function MyAgentPage() {
             prev: "Prev",
             next: "Next",
             total: "Total",
-            loginRequired: "Please login first to view resident data."
+            loginRequired: "Please login first to view resident data.",
+            sessionExpired: "Session expired. Please login again."
           },
     [locale]
   );
@@ -98,6 +100,24 @@ export default function MyAgentPage() {
   const [message, setMessage] = useState("");
   const [actionPage, setActionPage] = useState(1);
   const [authReady, setAuthReady] = useState(false);
+  const [authMessage, setAuthMessage] = useState("");
+
+  const logout = (hint: string) => {
+    setAuthMessage(hint);
+    alert(hint);
+    localStorage.removeItem("token");
+    window.location.href = "/login";
+  };
+
+  const handleAuthExpired = (err: unknown) => {
+    const status = (err as { status?: number }).status;
+    const code = (err as { code?: string }).code;
+    if (status === 401 || code === "UNAUTHORIZED" || code === "USER_NOT_FOUND") {
+      logout(t.sessionExpired);
+      return true;
+    }
+    return false;
+  };
 
   const loadAgents = async () => {
     try {
@@ -107,6 +127,9 @@ export default function MyAgentPage() {
         setSelected(data.items[0].agent_id);
       }
     } catch (err) {
+      if (handleAuthExpired(err)) {
+        return;
+      }
       setMessage(err instanceof Error ? err.message : t.statusFail);
     }
   };
@@ -116,6 +139,9 @@ export default function MyAgentPage() {
       const data = (await apiClient.getClaimedAgentOverview(agentId)) as AgentOverview;
       setOverview(data);
     } catch (err) {
+      if (handleAuthExpired(err)) {
+        return;
+      }
       setMessage(err instanceof Error ? err.message : t.statusFail);
     }
   };
@@ -123,8 +149,7 @@ export default function MyAgentPage() {
   useEffect(() => {
     const token = typeof window === "undefined" ? null : localStorage.getItem("token");
     if (!token) {
-      alert(t.loginRequired);
-      window.history.back();
+      logout(t.loginRequired);
       return;
     }
     setAuthReady(true);
@@ -154,6 +179,9 @@ export default function MyAgentPage() {
       await loadAgents();
       setMessage("");
     } catch (err) {
+      if (handleAuthExpired(err)) {
+        return;
+      }
       setMessage(err instanceof Error ? err.message : t.statusFail);
     }
   };
@@ -171,6 +199,13 @@ export default function MyAgentPage() {
   );
 
   if (!authReady) {
+    if (authMessage) {
+      return (
+        <main className="space-y-lg">
+          <p className="rounded-lg bg-red-500/20 p-sm text-sm">{authMessage}</p>
+        </main>
+      );
+    }
     return null;
   }
 

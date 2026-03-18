@@ -31,6 +31,21 @@ def _canonical_city_display_name(name: str) -> str:
     return name
 
 
+def _city_aliases(name: str) -> list[str]:
+    key = _normalize_city_name_key(name)
+    if key == "luoyang":
+        aliases = {name, "Luoyang", "luoyang", "洛阳"}
+        return sorted(aliases)
+    return [name]
+
+
+def _city_filter_clause(city_expr, city_name: str):
+    aliases = _city_aliases(city_name)
+    if len(aliases) > 1:
+        return city_expr.in_(aliases)
+    return city_expr == city_name
+
+
 def _agent_city_expr():
     return case((Agent.current_city != "", Agent.current_city), else_=Agent.home_city)
 
@@ -38,7 +53,7 @@ def _agent_city_expr():
 def _resolve_effective_city_name(db: Session) -> str:
     target_city = settings.city_name
     city_expr = _agent_city_expr()
-    target_count = db.query(func.count(Agent.id)).filter(city_expr == target_city).scalar() or 0
+    target_count = db.query(func.count(Agent.id)).filter(_city_filter_clause(city_expr, target_city)).scalar() or 0
     if target_count > 0:
         return target_city
 
@@ -76,13 +91,14 @@ def _get_or_create_local_city(db: Session) -> City:
 def _build_world_state_payload(db: Session) -> dict:
     effective_city = _resolve_effective_city_name(db)
     city_expr = _agent_city_expr()
+    city_filter = _city_filter_clause(city_expr, effective_city)
     local_city = db.query(City).filter(City.name == effective_city).first()
     if not local_city:
         local_city = _get_or_create_local_city(db)
-    agent_count = db.query(func.count(Agent.id)).filter(city_expr == effective_city).scalar() or 0
+    agent_count = db.query(func.count(Agent.id)).filter(city_filter).scalar() or 0
     local_troop_power = (
         db.query(func.coalesce(func.sum(Agent.infantry * 1.0 + Agent.archer * 1.3 + Agent.cavalry * 2.0), 0.0))
-        .filter(city_expr == effective_city)
+        .filter(city_filter)
         .scalar()
         or 0.0
     )
@@ -259,9 +275,10 @@ def city_roster(db: Session = Depends(get_db), current_user: User = Depends(get_
     _ = current_user
     effective_city = _resolve_effective_city_name(db)
     city_expr = _agent_city_expr()
+    city_filter = _city_filter_clause(city_expr, effective_city)
     agents = (
         db.query(Agent)
-        .filter(city_expr == effective_city)
+        .filter(city_filter)
         .order_by(Agent.gold.desc(), Agent.id.asc())
         .all()
     )

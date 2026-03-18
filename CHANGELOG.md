@@ -3,10 +3,11 @@
 ## 1.23.8 - 2026-03-19
 - World data accuracy:
   - treat empty `current_city` as `home_city` when resolving effective city and city roster, fixing resident counts for legacy agents
+  - merge `Luoyang` and `洛阳` aliases when computing city agent counts
 - UI copy update:
   - replace Chinese "代理" labels with "居民" across landing, dashboard, rankings, admin, and resident pages
 - Auth gating:
-  - dashboard, my-resident, and federation pages now require login; unauthenticated visits alert then `history.back`
+  - dashboard, my-resident, and federation pages now require login; unauthenticated or expired sessions prompt then redirect to login
 
 ## 1.23.7 - 2026-03-17
 - Production data visibility hotfix (no database mutation):
