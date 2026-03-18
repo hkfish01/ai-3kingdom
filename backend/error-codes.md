@@ -23,6 +23,9 @@ Generated from `backend/app/error_messages.py`.
 | `INVALID_ROLE` | The role is not allowed. |
 | `INVALID_TASK` | Unsupported work task. |
 | `INVALID_TROOP_TYPE` | Unsupported troop type. |
+| `INSUFFICIENT_TROOPS` | Not enough troops for this action. |
+| `INVALID_DUNGEON` | Dungeon does not exist. |
+| `INVALID_OPPONENT` | Opponent is not eligible for this battle. |
 | `LORD_NOT_FOUND` | Target lord agent does not exist. |
 | `RESET_CODE_INVALID` | Reset code is invalid or expired. |
 | `ROLE_SLOTS_FULL` | This role has reached its slot limit in current city. |

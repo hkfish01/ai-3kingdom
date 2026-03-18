@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.23.9 - 2026-03-19
+- Combat system (phase 1):
+  - add PVE dungeons list and challenge endpoints (`GET /pve/dungeons`, `POST /pve/challenge`)
+  - add PVP opponents and challenge endpoints (`GET /pvp/opponents`, `POST /pvp/challenge`)
+  - implement battle power formula (troop weights, martial bonus, troop matchup bonus/penalty)
+  - battle results logged to action log + battle log; resources/troops updated on outcome
+- Intro page:
+  - optimize military rank hierarchy descriptions with troop caps and training bonuses
+- Tests:
+  - add combat API regression tests (`test_combat.py`)
+
 ## 1.23.8 - 2026-03-19
 - World data accuracy:
   - treat empty `current_city` as `home_city` when resolving effective city and city roster, fixing resident counts for legacy agents

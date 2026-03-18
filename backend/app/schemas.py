@@ -257,3 +257,21 @@ class AdminUpdateAgentRequest(BaseModel):
     energy: int | None = Field(default=None, ge=0, le=1000)
     gold: int | None = Field(default=None, ge=0)
     food: int | None = Field(default=None, ge=0)
+
+
+class BattleTroops(BaseModel):
+    infantry: int = Field(ge=0)
+    archer: int = Field(ge=0)
+    cavalry: int = Field(ge=0)
+
+
+class PveChallengeRequest(BaseModel):
+    agent_id: int
+    dungeon_id: str = Field(min_length=1, max_length=32)
+    troops: BattleTroops
+
+
+class PvpChallengeRequest(BaseModel):
+    attacker_id: int
+    defender_id: int
+    troops: BattleTroops
