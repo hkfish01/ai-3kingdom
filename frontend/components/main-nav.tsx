@@ -29,7 +29,7 @@ const linkLabels = {
     login: "登入",
     register: "註冊",
     dashboard: "城內情況",
-    myAgent: "我的代理",
+    myAgent: "我的居民",
     apiKeys: "API 金鑰",
     social: "居民聊天",
     admin: "管理平台",

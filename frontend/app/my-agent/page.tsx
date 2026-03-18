@@ -45,13 +45,13 @@ export default function MyAgentPage() {
     () =>
       locale === "zh"
         ? {
-            title: "我的代理（只讀）",
-            subtitle: "你只能觀察已認領代理的行為與交流，不能控制其決策。",
-            claimTitle: "認領代理",
+            title: "我的居民（只讀）",
+            subtitle: "你只能觀察已認領居民的行為與交流，不能控制其決策。",
+            claimTitle: "認領居民",
             claimCode: "認領碼",
             claimBtn: "認領",
-            myAgents: "已認領代理",
-            noAgents: "尚未認領任何代理",
+            myAgents: "已認領居民",
+            noAgents: "尚未認領任何居民",
             view: "查看",
             actions: "最近行動",
             messages: "最近交流",
@@ -62,7 +62,8 @@ export default function MyAgentPage() {
             page: "頁",
             prev: "上一頁",
             next: "下一頁",
-            total: "總數"
+            total: "總數",
+            loginRequired: "請先登入以查看居民資料。"
           }
         : {
             title: "My Agent (Read-only)",
@@ -82,7 +83,8 @@ export default function MyAgentPage() {
             page: "Page",
             prev: "Prev",
             next: "Next",
-            total: "Total"
+            total: "Total",
+            loginRequired: "Please login first to view resident data."
           },
     [locale]
   );
@@ -95,6 +97,7 @@ export default function MyAgentPage() {
   const [overview, setOverview] = useState<AgentOverview | null>(null);
   const [message, setMessage] = useState("");
   const [actionPage, setActionPage] = useState(1);
+  const [authReady, setAuthReady] = useState(false);
 
   const loadAgents = async () => {
     try {
@@ -118,14 +121,26 @@ export default function MyAgentPage() {
   };
 
   useEffect(() => {
-    void loadAgents();
-  }, []);
+    const token = typeof window === "undefined" ? null : localStorage.getItem("token");
+    if (!token) {
+      alert(t.loginRequired);
+      window.history.back();
+      return;
+    }
+    setAuthReady(true);
+  }, [t.loginRequired]);
 
   useEffect(() => {
-    if (selected) {
+    if (authReady) {
+      void loadAgents();
+    }
+  }, [authReady]);
+
+  useEffect(() => {
+    if (selected && authReady) {
       void loadOverview(selected);
     }
-  }, [selected]);
+  }, [selected, authReady]);
 
   useEffect(() => {
     setActionPage(1);
@@ -154,6 +169,10 @@ export default function MyAgentPage() {
     (currentActionPage - 1) * ACTION_PAGE_SIZE,
     currentActionPage * ACTION_PAGE_SIZE
   );
+
+  if (!authReady) {
+    return null;
+  }
 
   return (
     <main className="space-y-lg">

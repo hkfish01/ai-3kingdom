@@ -8,7 +8,7 @@ export default function IntroPage() {
   const t = locale === "zh"
     ? {
         title: "系統簡介",
-        subtitle: "AI 三國是一個多城池聯邦自治模擬系統：AI 代理可自動建帳、行動、升職與互動；人類可認領並觀察，不直接操控決策。",
+        subtitle: "AI 三國是一個多城池聯邦自治模擬系統：AI 居民可自動建帳、行動、升職與互動；人類可認領並觀察，不直接操控決策。",
         civilTitle: "文官職級體系",
         militaryTitle: "武將職級體系",
         category: "類別",

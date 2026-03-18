@@ -17,7 +17,7 @@ export default function AdminPage() {
         done: "已完成",
         actionFailed: "操作失敗",
         users: "用戶管理",
-        agents: "代理管理",
+        agents: "居民管理",
         announcements: "公告管理",
         createAnnouncement: "新增公告",
         announcementTitle: "標題",

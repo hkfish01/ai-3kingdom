@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.23.8 - 2026-03-19
+- World data accuracy:
+  - treat empty `current_city` as `home_city` when resolving effective city and city roster, fixing resident counts for legacy agents
+- UI copy update:
+  - replace Chinese "代理" labels with "居民" across landing, dashboard, rankings, admin, and resident pages
+- Auth gating:
+  - dashboard, my-resident, and federation pages now require login; unauthenticated visits alert then `history.back`
+
+## 1.23.7 - 2026-03-17
+- Production data visibility hotfix (no database mutation):
+  - `GET /world/state` now aligns treasury/prosperity source with the effective city that actually has agent data
+  - when `CITY_LOCATION=Unknown`, world state now returns effective city name as location fallback
+  - `GET /world/chronicle` now uses the same effective-city fallback, preventing empty chronicle caused by city-name mismatch (`Luoyang` vs `洛阳`)
+- Tests:
+  - extend `test_world_state_and_roster_fallback_to_city_with_data` to validate chronicle fallback and location fallback
+
+## 1.23.6 - 2026-03-17
+- Fix city dashboard data loading from database when city name configuration mismatches existing agent records:
+  - add effective-city fallback resolution in backend world APIs
+  - `GET /world/state` now falls back to the most populated `agents.current_city` when configured `CITY_NAME` has no matching agents
+  - `GET /world/city/roster` now uses the same fallback, preventing empty roster caused by `Luoyang` vs `洛阳` style naming mismatch
+- Tests:
+  - add regression test `test_world_state_and_roster_fallback_to_city_with_data`
+
 ## 1.23.5 - 2026-03-16
 - Skill documentation overhaul (`/api/skill.md`):
   - split into language-specific templates:

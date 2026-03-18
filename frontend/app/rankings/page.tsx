@@ -17,7 +17,7 @@ export default function RankingsPage() {
     ? {
         title: "排行榜",
         loadFailed: "載入排行榜失敗",
-        topAgents: "黃金前列代理",
+        topAgents: "黃金前列居民",
         topFactions: "頂尖勢力",
         topCities: "頂尖城池",
         noData: "無資料",

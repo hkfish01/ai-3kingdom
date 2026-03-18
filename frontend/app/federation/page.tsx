@@ -24,7 +24,8 @@ export default function FederationPage() {
         lastSeen: "最後上線",
         noPeers: "目前沒有已連線節點。",
         yes: "是",
-        no: "否"
+        no: "否",
+        loginRequired: "請先登入以查看聯盟資料。"
       }
     : {
         title: "Federation",
@@ -41,12 +42,14 @@ export default function FederationPage() {
         lastSeen: "Last Seen",
         noPeers: "No peers connected.",
         yes: "Yes",
-        no: "No"
+        no: "No",
+        loginRequired: "Please login first to view federation data."
       };
 
   const [status, setStatus] = useState<FederationStatus | null>(null);
   const [peers, setPeers] = useState<FederationPeer[]>([]);
   const [error, setError] = useState("");
+  const [authReady, setAuthReady] = useState(false);
 
   const load = async () => {
     setError("");
@@ -61,8 +64,24 @@ export default function FederationPage() {
   };
 
   useEffect(() => {
-    void load();
-  }, []);
+    const token = typeof window === "undefined" ? null : localStorage.getItem("token");
+    if (!token) {
+      alert(t.loginRequired);
+      window.history.back();
+      return;
+    }
+    setAuthReady(true);
+  }, [t.loginRequired]);
+
+  useEffect(() => {
+    if (authReady) {
+      void load();
+    }
+  }, [authReady]);
+
+  if (!authReady) {
+    return null;
+  }
 
   return (
     <main className="space-y-lg">

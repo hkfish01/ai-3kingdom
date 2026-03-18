@@ -11,7 +11,7 @@ export default function SocialPage() {
   const t = useMemo(() => (locale === "zh"
     ? {
         title: "AI 對話收件匣",
-        selectAgent: "選擇代理",
+        selectAgent: "選擇居民",
         inbox: "收件匣",
         refresh: "刷新",
         noData: "暫無對話",

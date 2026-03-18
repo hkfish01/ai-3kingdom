@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from sqlalchemy import func
+from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 
 from ..api.deps import get_current_user
@@ -12,6 +12,46 @@ from ..services.positions import civil_hierarchy, get_position, military_hierarc
 from ..services.roles import get_effective_allowed_roles
 
 router = APIRouter(prefix="/world", tags=["world"])
+
+
+def _normalize_city_name_key(name: str) -> str:
+    raw = (name or "").strip()
+    lowered = raw.lower().replace(" ", "").replace("-", "").replace("_", "")
+    alias_map = {
+        "luoyang": "luoyang",
+        "洛阳": "luoyang",
+    }
+    return alias_map.get(lowered, lowered or raw)
+
+
+def _canonical_city_display_name(name: str) -> str:
+    key = _normalize_city_name_key(name)
+    if key == "luoyang":
+        return "洛阳"
+    return name
+
+
+def _agent_city_expr():
+    return case((Agent.current_city != "", Agent.current_city), else_=Agent.home_city)
+
+
+def _resolve_effective_city_name(db: Session) -> str:
+    target_city = settings.city_name
+    city_expr = _agent_city_expr()
+    target_count = db.query(func.count(Agent.id)).filter(city_expr == target_city).scalar() or 0
+    if target_count > 0:
+        return target_city
+
+    fallback = (
+        db.query(city_expr.label("city"), func.count(Agent.id).label("count"))
+        .filter(city_expr.is_not(None), city_expr != "")
+        .group_by(city_expr)
+        .order_by(func.count(Agent.id).desc(), city_expr.asc())
+        .first()
+    )
+    if fallback and fallback[0]:
+        return str(fallback[0])
+    return target_city
 
 
 def _get_or_create_local_city(db: Session) -> City:
@@ -34,11 +74,15 @@ def _get_or_create_local_city(db: Session) -> City:
 
 
 def _build_world_state_payload(db: Session) -> dict:
-    local_city = _get_or_create_local_city(db)
-    agent_count = db.query(func.count(Agent.id)).filter(Agent.current_city == settings.city_name).scalar() or 0
+    effective_city = _resolve_effective_city_name(db)
+    city_expr = _agent_city_expr()
+    local_city = db.query(City).filter(City.name == effective_city).first()
+    if not local_city:
+        local_city = _get_or_create_local_city(db)
+    agent_count = db.query(func.count(Agent.id)).filter(city_expr == effective_city).scalar() or 0
     local_troop_power = (
         db.query(func.coalesce(func.sum(Agent.infantry * 1.0 + Agent.archer * 1.3 + Agent.cavalry * 2.0), 0.0))
-        .filter(Agent.current_city == settings.city_name)
+        .filter(city_expr == effective_city)
         .scalar()
         or 0.0
     )
@@ -47,9 +91,13 @@ def _build_world_state_payload(db: Session) -> dict:
     db.add(local_city)
     db.commit()
 
+    city_location = settings.city_location
+    if not city_location or city_location.lower() == "unknown":
+        city_location = effective_city
+
     return {
-        "city": settings.city_name,
-        "city_location": settings.city_location,
+        "city": effective_city,
+        "city_location": city_location,
         "agent_count": agent_count,
         "prosperity": city_prosperity,
         "city_wall": local_city.city_wall,
@@ -72,6 +120,39 @@ def _build_rankings_payload(db: Session) -> dict:
     )
     top_cities = db.query(City).order_by(City.prosperity.desc()).limit(10).all()
 
+    city_rows = []
+    for c in top_cities:
+        city_rows.append(
+            {
+                "name": c.name,
+                "prosperity": c.prosperity,
+                "agent_tax_rate": c.city_tax_rate,
+            }
+        )
+
+    merged_cities: dict[str, dict] = {}
+    for row in city_rows:
+        key = _normalize_city_name_key(row["name"])
+        existing = merged_cities.get(key)
+        if not existing:
+            merged_cities[key] = {
+                "name": _canonical_city_display_name(row["name"]),
+                "prosperity": row["prosperity"],
+                "agent_tax_rate": row["agent_tax_rate"],
+            }
+            continue
+
+        # Keep the highest prosperity as ranking score for same city aliases.
+        if row["prosperity"] > existing["prosperity"]:
+            existing["prosperity"] = row["prosperity"]
+            existing["agent_tax_rate"] = row["agent_tax_rate"]
+
+    top_cities_by_prosperity = sorted(
+        merged_cities.values(),
+        key=lambda item: item["prosperity"],
+        reverse=True,
+    )[:10]
+
     return {
         "top_agents_by_gold": [
             {
@@ -84,9 +165,7 @@ def _build_rankings_payload(db: Session) -> dict:
             for a in top_agents
         ],
         "top_factions_by_members": [{"name": name, "members": members} for name, members in top_factions],
-        "top_cities_by_prosperity": [
-            {"name": c.name, "prosperity": c.prosperity, "agent_tax_rate": c.city_tax_rate} for c in top_cities
-        ],
+        "top_cities_by_prosperity": top_cities_by_prosperity,
     }
 
 
@@ -178,9 +257,11 @@ def public_announcements(db: Session = Depends(get_db)):
 @router.get("/city/roster")
 def city_roster(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     _ = current_user
+    effective_city = _resolve_effective_city_name(db)
+    city_expr = _agent_city_expr()
     agents = (
         db.query(Agent)
-        .filter(Agent.current_city == settings.city_name)
+        .filter(city_expr == effective_city)
         .order_by(Agent.gold.desc(), Agent.id.asc())
         .all()
     )
@@ -190,7 +271,7 @@ def city_roster(db: Session = Depends(get_db), current_user: User = Depends(get_
     return {
         "success": True,
         "data": {
-            "city_name": settings.city_name,
+            "city_name": effective_city,
             "city_location": settings.city_location,
             "civil_hierarchy": civil_hierarchy("zh"),
             "military_hierarchy": military_hierarchy("zh"),
@@ -236,9 +317,10 @@ def chronicle(
 ):
     _ = current_user
     lang = "zh" if lang == "zh" else "en"
+    effective_city = _resolve_effective_city_name(db)
     entries = (
         db.query(ChronicleEntry)
-        .filter(ChronicleEntry.city_name == settings.city_name)
+        .filter(ChronicleEntry.city_name == effective_city)
         .order_by(ChronicleEntry.id.desc())
         .limit(max(1, min(limit, 200)))
         .all()

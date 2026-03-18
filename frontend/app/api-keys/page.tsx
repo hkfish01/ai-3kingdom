@@ -11,7 +11,7 @@ export default function ApiKeysPage() {
   const t = locale === "zh"
     ? {
         title: "API 金鑰管理",
-        subtitle: "為代理整合建立、列出、複製與撤銷 API 金鑰。",
+        subtitle: "為居民整合建立、列出、複製與撤銷 API 金鑰。",
         createKey: "建立金鑰",
         keyName: "金鑰名稱",
         generate: "產生金鑰",

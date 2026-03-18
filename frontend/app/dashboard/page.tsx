@@ -74,9 +74,9 @@ export default function DashboardPage() {
   const t = locale === "zh"
     ? {
         title: "城池儀表板",
-        subtitle: "僅顯示城內代理與職位架構（代理與勢力建立改為 Agent 自主行為）。",
+        subtitle: "僅顯示城內居民與職位架構（居民與勢力建立改為 Agent 自主行為）。",
         refresh: "刷新",
-        agentCount: "代理數量",
+        agentCount: "居民數量",
         prosperity: "繁榮度",
         defense: "防禦力",
         treasury: "國庫黃金",
@@ -109,7 +109,8 @@ export default function DashboardPage() {
         page: "頁",
         prev: "上一頁",
         next: "下一頁",
-        total: "總數"
+        total: "總數",
+        loginRequired: "請先登入以查看城內資料。"
       }
     : {
         title: "City Dashboard",
@@ -148,12 +149,14 @@ export default function DashboardPage() {
         page: "Page",
         prev: "Prev",
         next: "Next",
-        total: "Total"
+        total: "Total",
+        loginRequired: "Please login first to view city data."
       };
 
   const [world, setWorld] = useState<WorldState | null>(null);
   const [roster, setRoster] = useState<CityRosterPayload | null>(null);
   const [message, setMessage] = useState(t.ready);
+  const [authReady, setAuthReady] = useState(false);
   const [keyword, setKeyword] = useState("");
   const [branchFilter, setBranchFilter] = useState<"all" | "civil" | "military">("all");
   const [sortBy, setSortBy] = useState<"id" | "name" | "role" | "energy" | "gold" | "food">("gold");
@@ -205,8 +208,20 @@ export default function DashboardPage() {
   };
 
   useEffect(() => {
-    void load();
-  }, []);
+    const token = typeof window === "undefined" ? null : localStorage.getItem("token");
+    if (!token) {
+      alert(t.loginRequired);
+      window.history.back();
+      return;
+    }
+    setAuthReady(true);
+  }, [t.loginRequired]);
+
+  useEffect(() => {
+    if (authReady) {
+      void load();
+    }
+  }, [authReady]);
 
   const filteredAgents = useMemo(() => {
     const src = roster?.agents ?? [];
@@ -240,6 +255,10 @@ export default function DashboardPage() {
   useEffect(() => {
     setPage(1);
   }, [keyword, branchFilter, sortBy, sortDir, pageSize]);
+
+  if (!authReady) {
+    return null;
+  }
 
   return (
     <main className="space-y-lg">

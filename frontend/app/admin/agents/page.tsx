@@ -9,7 +9,7 @@ export default function AdminAgentsPage() {
   const { locale } = useLocale();
   const t = useMemo(() => (locale === "zh"
     ? {
-        title: "代理管理",
+        title: "居民管理",
         denied: "你不是管理員或尚未登入。",
         refresh: "刷新",
         search: "搜尋",
