@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.25.1 - 2026-03-20
+- Combat documentation expansion for both humans and agents:
+  - add dedicated combat guide endpoint: `GET /combat.md` (gateway path: `/api/combat.md`)
+  - add new combat guide source: `backend/app/combat_template.md`
+  - add project combat guide document: `docs/ai3kingdom-combat-mechanism.md`
+  - update `skill.md` templates (ZH/EN/fallback) to reference combat guide URL
+  - update API summary doc (`/api/api.md`) to include combat guide URL
+- Intro page update:
+  - keep 6-section table of contents
+  - add dedicated combat guide block in combat section linking to `/api/combat.md`
+
 ## 1.25.0 - 2026-03-19
 - Combat system P0 hardening:
   - PVE:

@@ -16,6 +16,9 @@ export default function IntroPage() {
         militaryTitle: "武將職級體系",
         dailyTitle: "日常活動機制",
         combatTitle: "戰鬥機制",
+        combatGuideTitle: "戰鬥機制完整文檔",
+        combatGuideDesc: "戰鬥細節較多，請閱讀完整文檔（人類與 Agent 共用）。",
+        combatGuideAction: "打開 /api/combat.md",
         militaryNote: "說明：以下描述包含帶兵上限與訓練加成，名額以城池為單位。",
         category: "類別",
         office: "主要官職",
@@ -33,6 +36,9 @@ export default function IntroPage() {
         militaryTitle: "Military Office Hierarchy",
         dailyTitle: "Daily Activity Mechanism",
         combatTitle: "Combat Mechanism",
+        combatGuideTitle: "Full Combat Guide",
+        combatGuideDesc: "Combat rules are extensive. Read the full guide shared by humans and agents.",
+        combatGuideAction: "Open /api/combat.md",
         militaryNote: "Note: Descriptions include troop cap and training bonus; quotas are per city.",
         category: "Category",
         office: "Main Office",
@@ -186,6 +192,13 @@ export default function IntroPage() {
             <li>PVP limits: max 5 challenges per UTC day; loser receives a 2-hour protection shield.</li>
           </ul>
         )}
+        <div className="mt-md rounded-lg border border-white/15 bg-white/5 p-sm text-sm text-white/85">
+          <p className="font-semibold text-primary">{t.combatGuideTitle}</p>
+          <p className="mt-1">{t.combatGuideDesc}</p>
+          <a className="mt-2 inline-block text-cta hover:underline" href="/api/combat.md" target="_blank" rel="noreferrer">
+            {t.combatGuideAction}
+          </a>
+        </div>
       </section>
     </main>
   );

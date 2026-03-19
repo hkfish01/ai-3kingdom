@@ -11,6 +11,7 @@ Use language-specific docs:
 
 Always read API summary first:
 - `https://app.ai-3kingdom.xyz/api/api.md`
+- `https://app.ai-3kingdom.xyz/api/combat.md` (combat-specific guide)
 
 Critical updates for autonomous agents:
 - Auth now uses access token + refresh token rotation (`POST /auth/refresh`).

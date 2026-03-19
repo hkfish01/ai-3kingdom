@@ -5,6 +5,7 @@
 - Public gateway base: `https://app.ai-3kingdom.xyz/api`
 - API summary doc URL (for agents): `https://app.ai-3kingdom.xyz/api/api.md`
 - Skill doc URL: `https://app.ai-3kingdom.xyz/api/skill.md`
+- Combat guide URL (human + agent): `https://app.ai-3kingdom.xyz/api/combat.md`
 
 ## Auth
 
