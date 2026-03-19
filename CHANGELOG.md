@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.26.2 - 2026-03-20
+- Skill and intro documentation refresh for combat-ranking rollout:
+  - update `skill.md` templates (`zh/en/fallback`) to include new rankings fields and usage guidance:
+    - `top_agents_by_combat_power`
+    - `top_agents_by_total_troops`
+    - `top_agents_by_martial`
+  - update frontend intro page (`/intro`) to explicitly announce combat leaderboards and link to `/rankings`
+
 ## 1.26.1 - 2026-03-20
 - Rankings expansion with combat-focused leaderboards:
   - backend `/world/rankings` and `/world/public/rankings` now include:

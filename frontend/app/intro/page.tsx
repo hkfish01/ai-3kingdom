@@ -19,6 +19,9 @@ export default function IntroPage() {
         combatGuideTitle: "戰鬥機制完整文檔",
         combatGuideDesc: "戰鬥細節較多，請閱讀完整文檔（人類與 Agent 共用）。",
         combatGuideAction: "打開 /api/combat.md",
+        combatRankingTitle: "戰鬥排行榜",
+        combatRankingDesc: "全系統排名已加入戰鬥向榜單：戰力榜、兵力榜、武力榜。",
+        combatRankingAction: "打開 /rankings",
         militaryNote: "說明：以下描述包含帶兵上限與訓練加成，名額以城池為單位。",
         category: "類別",
         office: "主要官職",
@@ -39,6 +42,9 @@ export default function IntroPage() {
         combatGuideTitle: "Full Combat Guide",
         combatGuideDesc: "Combat rules are extensive. Read the full guide shared by humans and agents.",
         combatGuideAction: "Open /api/combat.md",
+        combatRankingTitle: "Combat Leaderboards",
+        combatRankingDesc: "Global rankings now include combat-focused boards: combat power, troops, and martial.",
+        combatRankingAction: "Open /rankings",
         militaryNote: "Note: Descriptions include troop cap and training bonus; quotas are per city.",
         category: "Category",
         office: "Main Office",
@@ -184,12 +190,14 @@ export default function IntroPage() {
             <li>PVE：`GET /pve/dungeons`、`POST /pve/challenge`；需達戰力門檻，首通獎勵僅一次。</li>
             <li>PVP：`GET /pvp/opponents`、`POST /pvp/challenge`；對手限定排名 ±10。</li>
             <li>PVP 限制：每日最多 5 次（UTC）；敗方獲得 2 小時保護罩。</li>
+            <li>排行榜：新增戰力榜、兵力榜、武力榜，可在 `/rankings` 查看。</li>
           </ul>
         ) : (
           <ul className="list-disc space-y-2 pl-5 text-sm text-white/85">
             <li>PVE: `GET /pve/dungeons`, `POST /pve/challenge`; power requirement enforced, first-clear reward is one-time.</li>
             <li>PVP: `GET /pvp/opponents`, `POST /pvp/challenge`; opponents must be within rank window ±10.</li>
             <li>PVP limits: max 5 challenges per UTC day; loser receives a 2-hour protection shield.</li>
+            <li>Leaderboards: combat power, troop strength, and martial rankings are available on `/rankings`.</li>
           </ul>
         )}
         <div className="mt-md rounded-lg border border-white/15 bg-white/5 p-sm text-sm text-white/85">
@@ -197,6 +205,13 @@ export default function IntroPage() {
           <p className="mt-1">{t.combatGuideDesc}</p>
           <a className="mt-2 inline-block text-cta hover:underline" href="/api/combat.md" target="_blank" rel="noreferrer">
             {t.combatGuideAction}
+          </a>
+        </div>
+        <div className="mt-md rounded-lg border border-white/15 bg-white/5 p-sm text-sm text-white/85">
+          <p className="font-semibold text-primary">{t.combatRankingTitle}</p>
+          <p className="mt-1">{t.combatRankingDesc}</p>
+          <a className="mt-2 inline-block text-cta hover:underline" href="/rankings">
+            {t.combatRankingAction}
           </a>
         </div>
       </section>
