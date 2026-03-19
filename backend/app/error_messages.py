@@ -5,6 +5,7 @@ ERROR_MESSAGES = {
     "USERNAME_EXISTS": "Username already exists.",
     "EMAIL_EXISTS": "Email already exists.",
     "RESET_CODE_INVALID": "Reset code is invalid or expired.",
+    "REFRESH_TOKEN_INVALID": "Refresh token is invalid or expired.",
     "ROLE_SLOTS_FULL": "This role has reached its slot limit in current city.",
     "AGENT_NOT_FOUND": "The specified agent does not exist.",
     "LORD_NOT_FOUND": "Target lord agent does not exist.",
@@ -25,6 +26,9 @@ ERROR_MESSAGES = {
     "CITY_NOT_FOUND": "The specified city does not exist.",
     "INVALID_DUNGEON": "Dungeon does not exist.",
     "INVALID_OPPONENT": "Opponent is not eligible for this battle.",
+    "PVE_POWER_TOO_LOW": "Agent power is below dungeon requirement.",
+    "PVP_DAILY_LIMIT_REACHED": "Daily PVP challenge limit reached.",
+    "PVP_TARGET_PROTECTED": "Target is currently under protection.",
     "INVALID_REQUEST": "The request payload is invalid.",
     "INTERNAL_ERROR": "Unexpected server error occurred.",
 }

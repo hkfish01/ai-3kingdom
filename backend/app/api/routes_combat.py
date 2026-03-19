@@ -1,5 +1,6 @@
 import json
 import random
+from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, Query
@@ -9,12 +10,14 @@ from ..api.deps import get_current_user
 from ..config import settings
 from ..db import get_db
 from ..errors import AppError
-from ..models import ActionLog, Agent, BattleLog, User
+from ..models import ActionLog, Agent, AgentProtection, BattleLog, DungeonClear, PvpChallengeDaily, User
 from ..schemas import PveChallengeRequest, PvpChallengeRequest
 from ..services import combat
 from ..services.chronicle import write_chronicle
 
 router = APIRouter(tags=["combat"])
+PVP_DAILY_LIMIT = 5
+PVP_PROTECTION_HOURS = 2
 
 
 def _get_owned_agent(db: Session, user_id: int, agent_id: int) -> Agent:
@@ -39,6 +42,63 @@ def _assert_troops_available(agent: Agent, troops: dict) -> None:
         raise AppError("INSUFFICIENT_TROOPS", "Not enough archer.", status_code=422)
     if troops["cavalry"] > agent.cavalry:
         raise AppError("INSUFFICIENT_TROOPS", "Not enough cavalry.", status_code=422)
+
+
+def _normalize_utc(dt: datetime) -> datetime:
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def _agent_troops(agent: Agent) -> dict:
+    return combat.troop_summary({"infantry": agent.infantry, "archer": agent.archer, "cavalry": agent.cavalry})
+
+
+def _agent_power(agent: Agent) -> float:
+    return combat.raw_power(_agent_troops(agent), agent.martial)
+
+
+def _rank_map(db: Session) -> dict[int, int]:
+    rows = db.query(Agent).all()
+    ranked = sorted(rows, key=lambda a: (-_agent_power(a), a.id))
+    return {agent.id: idx + 1 for idx, agent in enumerate(ranked)}
+
+
+def _utc_day() -> str:
+    return datetime.now(timezone.utc).date().isoformat()
+
+
+def _get_or_create_daily_counter(db: Session, agent_id: int, day: str) -> PvpChallengeDaily:
+    row = (
+        db.query(PvpChallengeDaily)
+        .filter(PvpChallengeDaily.agent_id == agent_id, PvpChallengeDaily.day == day)
+        .order_by(PvpChallengeDaily.id.desc())
+        .first()
+    )
+    if row:
+        return row
+    row = PvpChallengeDaily(agent_id=agent_id, day=day, count=0)
+    db.add(row)
+    db.flush()
+    return row
+
+
+def _is_agent_protected(db: Session, agent_id: int, now: datetime) -> bool:
+    row = db.query(AgentProtection).filter(AgentProtection.agent_id == agent_id).first()
+    if not row:
+        return False
+    return _normalize_utc(row.protected_until) > now
+
+
+def _apply_protection(db: Session, agent_id: int, now: datetime) -> None:
+    row = db.query(AgentProtection).filter(AgentProtection.agent_id == agent_id).first()
+    protected_until = now + timedelta(hours=PVP_PROTECTION_HOURS)
+    if row:
+        row.protected_until = protected_until
+        row.reason = "pvp_loss"
+    else:
+        row = AgentProtection(agent_id=agent_id, protected_until=protected_until, reason="pvp_loss")
+    db.add(row)
 
 
 @router.get("/pve/dungeons")
@@ -79,6 +139,9 @@ def pve_challenge(
 
     attacker_troops = _troops_from_request(payload.troops)
     _assert_troops_available(attacker, attacker_troops)
+    attacker_raw_power = combat.raw_power(attacker_troops, attacker.martial)
+    if attacker_raw_power < dungeon.power_requirement:
+        raise AppError("PVE_POWER_TOO_LOW", "Agent power is below dungeon requirement.", status_code=422)
 
     defender_troops = combat.clamp_troops(dungeon.enemy_troops)
     attacker_power = combat.total_power(attacker_troops, attacker.martial, defender_troops)
@@ -96,6 +159,14 @@ def pve_challenge(
         rewards["gold"] = random.randint(*dungeon.reward_gold)
         rewards["food"] = random.randint(*dungeon.reward_food)
         rewards["exp"] = dungeon.reward_exp
+        first_clear = (
+            db.query(DungeonClear)
+            .filter(DungeonClear.agent_id == attacker.id, DungeonClear.dungeon_id == dungeon.id)
+            .first()
+        )
+        if not first_clear and dungeon.first_clear_gold:
+            rewards["gold"] += dungeon.first_clear_gold
+            db.add(DungeonClear(agent_id=attacker.id, dungeon_id=dungeon.id))
         attacker.gold += rewards["gold"]
         attacker.food += rewards["food"]
 
@@ -163,12 +234,17 @@ def pvp_opponents(
     current_user: User = Depends(get_current_user),
 ):
     attacker = _get_owned_agent(db, current_user.id, agent_id)
-    attacker_troops = combat.troop_summary(
-        {"infantry": attacker.infantry, "archer": attacker.archer, "cavalry": attacker.cavalry}
+    attacker_power = _agent_power(attacker)
+    rank_map = _rank_map(db)
+    attacker_rank = rank_map.get(attacker.id, 0)
+    day = _utc_day()
+    daily_counter = (
+        db.query(PvpChallengeDaily)
+        .filter(PvpChallengeDaily.agent_id == attacker.id, PvpChallengeDaily.day == day)
+        .order_by(PvpChallengeDaily.id.desc())
+        .first()
     )
-    attacker_power = combat.raw_power(attacker_troops, attacker.martial)
-    min_power = attacker_power * 0.6
-    max_power = attacker_power * 1.4
+    daily_used = daily_counter.count if daily_counter else 0
 
     candidates = (
         db.query(Agent)
@@ -178,12 +254,13 @@ def pvp_opponents(
         .all()
     )
     opponents = []
+    now = datetime.now(timezone.utc)
     for agent in candidates:
-        troop_snapshot = combat.troop_summary(
-            {"infantry": agent.infantry, "archer": agent.archer, "cavalry": agent.cavalry}
-        )
-        power = combat.raw_power(troop_snapshot, agent.martial)
-        if power < min_power or power > max_power:
+        if _is_agent_protected(db, agent.id, now):
+            continue
+        power = _agent_power(agent)
+        rank = rank_map.get(agent.id, 0)
+        if rank <= 0 or abs(rank - attacker_rank) > 10:
             continue
         opponents.append(
             {
@@ -191,13 +268,23 @@ def pvp_opponents(
                 "name": agent.name,
                 "role": agent.role,
                 "power": round(power, 2),
+                "rank": rank,
                 "city": agent.current_city,
             }
         )
         if len(opponents) >= 10:
             break
 
-    return {"success": True, "data": {"items": opponents}}
+    return {
+        "success": True,
+        "data": {
+            "items": opponents,
+            "attacker_rank": attacker_rank,
+            "daily_limit": PVP_DAILY_LIMIT,
+            "daily_used": daily_used,
+            "daily_remaining": max(0, PVP_DAILY_LIMIT - daily_used),
+        },
+    }
 
 
 @router.post("/pvp/challenge")
@@ -212,6 +299,18 @@ def pvp_challenge(
         raise AppError("AGENT_NOT_FOUND", "Target agent does not exist.", status_code=404)
     if defender.owner_user_id == current_user.id:
         raise AppError("INVALID_REQUEST", "Cannot challenge your own agent.", status_code=422)
+    now = datetime.now(timezone.utc)
+    if _is_agent_protected(db, defender.id, now):
+        raise AppError("PVP_TARGET_PROTECTED", "Target is currently under protection.", status_code=422)
+    rank_map = _rank_map(db)
+    attacker_rank = rank_map.get(attacker.id, 0)
+    defender_rank = rank_map.get(defender.id, 0)
+    if attacker_rank <= 0 or defender_rank <= 0 or abs(attacker_rank - defender_rank) > 10:
+        raise AppError("INVALID_OPPONENT", "Opponent is not eligible for this battle.", status_code=422)
+    day = _utc_day()
+    daily_counter = _get_or_create_daily_counter(db, attacker.id, day)
+    if daily_counter.count >= PVP_DAILY_LIMIT:
+        raise AppError("PVP_DAILY_LIMIT_REACHED", "Daily PVP challenge limit reached.", status_code=422)
 
     attacker_troops = _troops_from_request(payload.troops)
     _assert_troops_available(attacker, attacker_troops)
@@ -253,6 +352,11 @@ def pvp_challenge(
         attacker.food += food_steal
         spoils["gold"] = gold_steal
         spoils["food"] = food_steal
+        _apply_protection(db, defender.id, now)
+    else:
+        _apply_protection(db, attacker.id, now)
+    daily_counter.count += 1
+    db.add(daily_counter)
 
     battle_id = f"pvp_{uuid4().hex}"
     db.add(
@@ -300,12 +404,14 @@ def pvp_challenge(
 
     return {
         "success": True,
-        "data": {
-            "battle_id": battle_id,
-            "attacker_win": attacker_win,
+            "data": {
+                "battle_id": battle_id,
+                "attacker_win": attacker_win,
             "attacker_power": round(attacker_power, 4),
             "defender_power": round(defender_power, 4),
-            "spoils": spoils,
-            "losses": {"attacker": attacker_losses, "defender": defender_losses},
-        },
-    }
+                "spoils": spoils,
+                "losses": {"attacker": attacker_losses, "defender": defender_losses},
+                "daily_used": daily_counter.count,
+                "daily_remaining": max(0, PVP_DAILY_LIMIT - daily_counter.count),
+            },
+        }

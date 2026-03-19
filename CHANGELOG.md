@@ -1,5 +1,44 @@
 # Changelog
 
+## 1.25.0 - 2026-03-19
+- Combat system P0 hardening:
+  - PVE:
+    - enforce dungeon power requirement (`PVE_POWER_TOO_LOW`)
+    - implement one-time first-clear reward tracking via `dungeon_clears`
+  - PVP:
+    - enforce rank-window opponent rule (±10 by computed power rank)
+    - enforce daily challenge cap (5/day, UTC) via `pvp_challenge_daily`
+    - add loss protection shield (2 hours) via `agent_protections`
+    - add new error codes: `PVP_DAILY_LIMIT_REACHED`, `PVP_TARGET_PROTECTED`
+    - opponents API now returns rank and daily quota fields
+- Database:
+  - add Alembic migration `20260319_0008` for combat state tables and indexes
+- Tests:
+  - expand `backend/tests/test_combat.py` with:
+    - PVE power gate + first-clear once-only reward
+    - PVP daily cap + protection shield
+    - PVP rank-window opponent assertions
+
+## 1.24.0 - 2026-03-19
+- Authentication refresh-token rollout:
+  - add long-lived refresh token persistence table (`refresh_tokens`) with Alembic migration `20260319_0007`
+  - add `POST /auth/refresh` endpoint with refresh-token rotation (old token revoked on use)
+  - update `POST /auth/login` response to include:
+    - `token` (access token)
+    - `refresh_token`
+    - `token_type`
+    - `expires_in`
+    - `refresh_expires_in`
+  - set access token default TTL to 15 minutes and refresh token default TTL to 30 days
+- Frontend auth resilience:
+  - `frontend/lib/api-client.ts` now auto-refreshes on `401` and retries the original request once
+  - login/register pages now store `refresh_token`
+  - logout paths now clear both `token` and `refresh_token`
+- AI runtime docs fix:
+  - fix skill templates to read login response field `data.token` (replace incorrect `data.access_token`)
+- Tests:
+  - add `backend/tests/test_auth_refresh.py` for login payload + refresh rotation behavior
+
 ## 1.23.9 - 2026-03-19
 - Combat system (phase 1):
   - add PVE dungeons list and challenge endpoints (`GET /pve/dungeons`, `POST /pve/challenge`)

@@ -16,25 +16,79 @@ import {
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api";
 
+interface AuthTokens {
+  token: string;
+  refresh_token: string;
+  token_type?: string;
+  expires_in?: number;
+  refresh_expires_in?: number;
+}
+
+const clearStoredAuth = () => {
+  if (typeof window === "undefined") {
+    return;
+  }
+  localStorage.removeItem("token");
+  localStorage.removeItem("refresh_token");
+};
+
+const refreshAccessToken = async (): Promise<string | null> => {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const refreshToken = localStorage.getItem("refresh_token");
+  if (!refreshToken) {
+    return null;
+  }
+
+  const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    cache: "no-store",
+    body: JSON.stringify({ refresh_token: refreshToken })
+  });
+  const raw = await response.json();
+  const payload = raw as ApiResponse<AuthTokens>;
+  if (!response.ok || !payload.success || !payload.data?.token || !payload.data?.refresh_token) {
+    clearStoredAuth();
+    return null;
+  }
+  localStorage.setItem("token", payload.data.token);
+  localStorage.setItem("refresh_token", payload.data.refresh_token);
+  return payload.data.token;
+};
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const token = typeof window === "undefined" ? null : localStorage.getItem("token");
-  const headers: Record<string, string> = {
+  const baseHeaders: Record<string, string> = {
     "Content-Type": "application/json",
     ...((init?.headers as Record<string, string> | undefined) ?? {})
   };
+  const token = typeof window === "undefined" ? null : localStorage.getItem("token");
 
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
+  const doFetch = async (accessToken?: string | null) => {
+    const headers = { ...baseHeaders };
+    if (accessToken) {
+      headers.Authorization = `Bearer ${accessToken}`;
+    }
+    const response = await fetch(`${API_BASE_URL}${path}`, {
+      ...init,
+      headers,
+      cache: "no-store"
+    });
+    const raw = await response.json();
+    return { response, raw, payload: raw as ApiResponse<T> };
+  };
+
+  let { response, raw, payload } = await doFetch(token);
+
+  if (response.status === 401 && path !== "/auth/refresh") {
+    const newToken = await refreshAccessToken();
+    if (newToken) {
+      ({ response, raw, payload } = await doFetch(newToken));
+    }
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    headers,
-    cache: "no-store"
-  });
-
-  const raw = await response.json();
-  const payload = raw as ApiResponse<T>;
   if (!response.ok || !payload.success) {
     const detailMsg = Array.isArray((raw as { detail?: Array<{ msg?: string }> }).detail)
       ? (raw as { detail: Array<{ msg?: string }> }).detail[0]?.msg
@@ -57,7 +111,7 @@ export const apiClient = {
     }),
 
   login: (payload: UserCredentials) =>
-    request<{ token: string }>("/auth/login", {
+    request<AuthTokens>("/auth/login", {
       method: "POST",
       body: JSON.stringify(payload)
     }),

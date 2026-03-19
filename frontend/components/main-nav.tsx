@@ -96,6 +96,7 @@ export default function MainNav() {
 
   const logout = () => {
     localStorage.removeItem("token");
+    localStorage.removeItem("refresh_token");
     setAuthed(false);
     setIsAdmin(false);
     router.push("/login");

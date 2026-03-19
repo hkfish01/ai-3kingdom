@@ -102,3 +102,139 @@ def test_pvp_challenge_awards_spoils():
         assert attacker.food >= 2000 + spoils["food"]
         assert defender.gold <= 800 - spoils["gold"]
         assert defender.food <= 600 - spoils["food"]
+
+
+def test_pve_power_requirement_and_first_clear_reward_once():
+    headers = _auth_header("pve_power_gate")
+    agent_id = _register_agent(headers, "GateHero", "武將")
+    _seed_agent(agent_id, infantry=20, archer=5, cavalry=1, gold=1000, food=1000, martial=30)
+
+    too_low = client.post(
+        "/pve/challenge",
+        headers=headers,
+        json={
+            "agent_id": agent_id,
+            "dungeon_id": "hulao",
+            "troops": {"infantry": 20, "archer": 5, "cavalry": 1},
+        },
+    )
+    assert too_low.status_code == 422
+    assert too_low.json()["error"]["code"] == "PVE_POWER_TOO_LOW"
+
+    _seed_agent(agent_id, infantry=400, archer=200, cavalry=100, gold=1000, food=1000, martial=95)
+    first = client.post(
+        "/pve/challenge",
+        headers=headers,
+        json={
+            "agent_id": agent_id,
+            "dungeon_id": "huangjin",
+            "troops": {"infantry": 200, "archer": 100, "cavalry": 50},
+        },
+    )
+    assert first.status_code == 200
+    first_data = first.json()["data"]
+    assert first_data["win"] is True
+    assert 600 <= first_data["rewards"]["gold"] <= 700
+
+    second = client.post(
+        "/pve/challenge",
+        headers=headers,
+        json={
+            "agent_id": agent_id,
+            "dungeon_id": "huangjin",
+            "troops": {"infantry": 200, "archer": 100, "cavalry": 50},
+        },
+    )
+    assert second.status_code == 200
+    second_data = second.json()["data"]
+    assert second_data["win"] is True
+    assert 100 <= second_data["rewards"]["gold"] <= 200
+
+
+def test_pvp_daily_limit_and_target_protection():
+    attacker_headers = _auth_header("pvp_limit_attacker")
+    attacker_id = _register_agent(attacker_headers, "LimitAttacker", "武將")
+    _seed_agent(attacker_id, infantry=600, archer=250, cavalry=120, gold=3000, food=3000, martial=95)
+
+    defender_ids: list[int] = []
+    for i in range(1, 7):
+        headers = _auth_header(f"pvp_limit_def_{i}")
+        defender_id = _register_agent(headers, f"LimitDef{i}", "武將")
+        _seed_agent(defender_id, infantry=40, archer=20, cavalry=10, gold=900, food=900, martial=30)
+        defender_ids.append(defender_id)
+
+    first = client.post(
+        "/pvp/challenge",
+        headers=attacker_headers,
+        json={
+            "attacker_id": attacker_id,
+            "defender_id": defender_ids[0],
+            "troops": {"infantry": 250, "archer": 120, "cavalry": 60},
+        },
+    )
+    assert first.status_code == 200
+    assert first.json()["data"]["daily_used"] == 1
+
+    protected = client.post(
+        "/pvp/challenge",
+        headers=attacker_headers,
+        json={
+            "attacker_id": attacker_id,
+            "defender_id": defender_ids[0],
+            "troops": {"infantry": 250, "archer": 120, "cavalry": 60},
+        },
+    )
+    assert protected.status_code == 422
+    assert protected.json()["error"]["code"] == "PVP_TARGET_PROTECTED"
+
+    for idx in range(1, 5):
+        ok = client.post(
+            "/pvp/challenge",
+            headers=attacker_headers,
+            json={
+                "attacker_id": attacker_id,
+                "defender_id": defender_ids[idx],
+                "troops": {"infantry": 250, "archer": 120, "cavalry": 60},
+            },
+        )
+        assert ok.status_code == 200
+
+    limit_hit = client.post(
+        "/pvp/challenge",
+        headers=attacker_headers,
+        json={
+            "attacker_id": attacker_id,
+            "defender_id": defender_ids[5],
+            "troops": {"infantry": 250, "archer": 120, "cavalry": 60},
+        },
+    )
+    assert limit_hit.status_code == 422
+    assert limit_hit.json()["error"]["code"] == "PVP_DAILY_LIMIT_REACHED"
+
+
+def test_pvp_opponents_enforces_rank_window():
+    attacker_headers = _auth_header("pvp_rank_attacker")
+    attacker_id = _register_agent(attacker_headers, "RankAttacker", "武將")
+    _seed_agent(attacker_id, infantry=200, archer=100, cavalry=50, gold=1500, food=1500, martial=70)
+
+    for i in range(1, 15):
+        headers = _auth_header(f"pvp_rank_def_{i}")
+        defender_id = _register_agent(headers, f"RankDef{i}", "武將")
+        _seed_agent(
+            defender_id,
+            infantry=max(10, 250 - i * 12),
+            archer=max(5, 120 - i * 6),
+            cavalry=max(2, 60 - i * 3),
+            gold=1000,
+            food=1000,
+            martial=max(20, 80 - i),
+        )
+
+    resp = client.get(f"/pvp/opponents?agent_id={attacker_id}", headers=attacker_headers)
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert data["daily_limit"] == 5
+    assert "daily_used" in data and "daily_remaining" in data
+    attacker_rank = data["attacker_rank"]
+    for row in data["items"]:
+        assert abs(row["rank"] - attacker_rank) <= 10

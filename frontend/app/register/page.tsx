@@ -73,6 +73,7 @@ export default function RegisterPage() {
       await apiClient.registerUser({ username, email, password: normalizedPassword });
       const login = await apiClient.login({ username, password: normalizedPassword });
       localStorage.setItem("token", login.token);
+      localStorage.setItem("refresh_token", login.refresh_token);
       router.push("/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : t.failed);

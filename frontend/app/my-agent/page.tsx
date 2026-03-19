@@ -106,6 +106,7 @@ export default function MyAgentPage() {
     setAuthMessage(hint);
     alert(hint);
     localStorage.removeItem("token");
+    localStorage.removeItem("refresh_token");
     window.location.href = "/login";
   };
 

@@ -69,6 +69,7 @@ export default function LoginPage() {
     try {
       const data = await apiClient.login({ username, password: normalizePassword(password) });
       localStorage.setItem("token", data.token);
+      localStorage.setItem("refresh_token", data.refresh_token);
       try {
         const skill = await apiClient.getDynamicSkillMd();
         localStorage.setItem("skill_md_runtime", skill);

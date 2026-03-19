@@ -200,6 +200,7 @@ export default function DashboardPage() {
     setAuthMessage(hint);
     alert(hint);
     localStorage.removeItem("token");
+    localStorage.removeItem("refresh_token");
     window.location.href = "/login";
   };
 

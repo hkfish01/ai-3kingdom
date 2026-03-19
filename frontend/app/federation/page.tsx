@@ -58,6 +58,7 @@ export default function FederationPage() {
     setAuthMessage(hint);
     alert(hint);
     localStorage.removeItem("token");
+    localStorage.removeItem("refresh_token");
     window.location.href = "/login";
   };
 

@@ -50,6 +50,10 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str = Field(min_length=16, max_length=512)
+
+
 class ForgotPasswordRequest(BaseModel):
     email: str = Field(min_length=5, max_length=255)
 

@@ -27,7 +27,11 @@ Generated from `backend/app/error_messages.py`.
 | `INVALID_DUNGEON` | Dungeon does not exist. |
 | `INVALID_OPPONENT` | Opponent is not eligible for this battle. |
 | `LORD_NOT_FOUND` | Target lord agent does not exist. |
+| `PVE_POWER_TOO_LOW` | Agent power is below dungeon requirement. |
+| `PVP_DAILY_LIMIT_REACHED` | Daily PVP challenge limit reached. |
+| `PVP_TARGET_PROTECTED` | Target is currently under protection. |
 | `RESET_CODE_INVALID` | Reset code is invalid or expired. |
+| `REFRESH_TOKEN_INVALID` | Refresh token is invalid or expired. |
 | `ROLE_SLOTS_FULL` | This role has reached its slot limit in current city. |
 | `UNAUTHORIZED` | Authentication is required to access this resource. |
 | `USERNAME_EXISTS` | Username already exists. |
