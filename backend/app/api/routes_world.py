@@ -126,6 +126,7 @@ def _build_world_state_payload(db: Session) -> dict:
 
 def _build_rankings_payload(db: Session) -> dict:
     top_agents = db.query(Agent).order_by(Agent.gold.desc()).limit(10).all()
+    all_agents = db.query(Agent).all()
     top_factions = (
         db.query(Faction.name, func.count(Agent.id).label("members"))
         .outerjoin(Agent, Agent.faction_id == Faction.id)
@@ -169,6 +170,24 @@ def _build_rankings_payload(db: Session) -> dict:
         reverse=True,
     )[:10]
 
+    top_agents_by_combat_power = sorted(
+        all_agents,
+        key=lambda a: ((a.infantry * 1.0 + a.archer * 3.0 + a.cavalry * 5.0) * (1.0 + a.martial / 100.0), a.id),
+        reverse=True,
+    )[:10]
+
+    top_agents_by_total_troops = sorted(
+        all_agents,
+        key=lambda a: (a.infantry + a.archer + a.cavalry, a.id),
+        reverse=True,
+    )[:10]
+
+    top_agents_by_martial = sorted(
+        all_agents,
+        key=lambda a: (a.martial, a.id),
+        reverse=True,
+    )[:10]
+
     return {
         "top_agents_by_gold": [
             {
@@ -182,6 +201,40 @@ def _build_rankings_payload(db: Session) -> dict:
         ],
         "top_factions_by_members": [{"name": name, "members": members} for name, members in top_factions],
         "top_cities_by_prosperity": top_cities_by_prosperity,
+        "top_agents_by_combat_power": [
+            {
+                "agent_id": a.id,
+                "name": a.name,
+                "combat_power": round(
+                    (a.infantry * 1.0 + a.archer * 3.0 + a.cavalry * 5.0) * (1.0 + a.martial / 100.0),
+                    4,
+                ),
+                "martial": a.martial,
+                "home_city": a.home_city,
+            }
+            for a in top_agents_by_combat_power
+        ],
+        "top_agents_by_total_troops": [
+            {
+                "agent_id": a.id,
+                "name": a.name,
+                "total_troops": a.infantry + a.archer + a.cavalry,
+                "infantry": a.infantry,
+                "archer": a.archer,
+                "cavalry": a.cavalry,
+                "home_city": a.home_city,
+            }
+            for a in top_agents_by_total_troops
+        ],
+        "top_agents_by_martial": [
+            {
+                "agent_id": a.id,
+                "name": a.name,
+                "martial": a.martial,
+                "home_city": a.home_city,
+            }
+            for a in top_agents_by_martial
+        ],
     }
 
 

@@ -3,7 +3,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     app_name: str = "AI Three Kingdoms City Node"
-    app_version: str = "1.25.1"
+    app_version: str = "1.26.1"
     database_url: str = "sqlite:///./ai_three_kingdoms.db"
     jwt_secret: str = "change-me-in-prod"
     jwt_algorithm: str = "HS256"

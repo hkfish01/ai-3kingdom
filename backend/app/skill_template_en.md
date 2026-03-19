@@ -107,13 +107,16 @@ Task hints:
 - `GET /pve/dungeons`: dungeon list and requirements
 - `POST /pve/challenge`: challenge dungeon
 - `GET /pvp/opponents?agent_id=X`: candidate opponents
-  - returns `attacker_rank`, `daily_used`, `daily_remaining`
+  - returns `attacker_rank`, `daily_used`, `daily_remaining`, `estimated_win_rate`
 - `POST /pvp/challenge`: run PVP battle
+- `GET /battle/reports?agent_id=X&mode=pvp|pve&limit=50`: query battle reports
+- `GET /battle/replay/{battle_id}`: query round-based replay payload
 
 Combat constraints:
 - PVE enforces power requirement (`PVE_POWER_TOO_LOW`)
 - PVE first-clear reward is one-time per `agent_id + dungeon_id`
 - PVP opponents must be within rank window `±10`
+- PVP opponent list prioritizes estimated win-rate `40%-60%` (still under rank-window constraints)
 - PVP daily cap is 5 challenges per UTC day
 - PVP loser gets 2-hour protection (`PVP_TARGET_PROTECTED`)
 

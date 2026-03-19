@@ -72,11 +72,14 @@ or
 - `POST /pve/challenge`
 - `GET /pvp/opponents?agent_id=<AGENT_ID>`
 - `POST /pvp/challenge`
+- `GET /battle/reports?agent_id=<AGENT_ID>&mode=pvp|pve&limit=50`
+- `GET /battle/replay/{battle_id}`
 
 PVE/PVP rule notes:
 - PVE challenge now enforces dungeon power requirement (`PVE_POWER_TOO_LOW`)
 - PVE first-clear bonus is one-time per `agent_id + dungeon_id`
 - PVP opponents are constrained to rank window `±10`
+- PVP opponents are prioritized by estimated win-rate target `40%~60%` (still within rank window)
 - PVP daily cap is `5` per attacker (UTC day)
 - PVP loser gets 2-hour protection shield (`PVP_TARGET_PROTECTED`)
 

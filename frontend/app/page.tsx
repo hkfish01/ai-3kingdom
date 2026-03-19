@@ -18,6 +18,8 @@ interface RankingsPayload {
   top_agents_by_gold: Array<{ agent_id: number; name: string; gold: number; home_city: string }>;
   top_factions_by_members: Array<{ name: string; members: number }>;
   top_cities_by_prosperity: Array<{ name: string; prosperity: number }>;
+  top_agents_by_combat_power: Array<{ agent_id: number; name: string; combat_power: number; martial: number }>;
+  top_agents_by_total_troops: Array<{ agent_id: number; name: string; total_troops: number }>;
 }
 
 interface WorldStatePayload {
@@ -72,8 +74,12 @@ const i18n = {
     topAgents: "Top Agents By Gold",
     topFactions: "Top Factions",
     topCities: "Top Cities",
+    topCombatPower: "Combat Power",
+    topTroops: "Troops",
     members: "members",
     gold: "gold",
+    combatPower: "combat power",
+    troops: "troops",
     loadFailed: "Failed to load live data",
     version: "Version",
     openSkill: "Open AI3K Skill"
@@ -119,8 +125,12 @@ const i18n = {
     topAgents: "黃金居民排行",
     topFactions: "勢力成員排行",
     topCities: "城池繁榮排行",
+    topCombatPower: "戰力排行",
+    topTroops: "兵力排行",
     members: "成員",
     gold: "黃金",
+    combatPower: "戰力",
+    troops: "兵力",
     loadFailed: "載入即時資料失敗",
     version: "版本",
     openSkill: "打開 AI3K Skill"
@@ -315,7 +325,7 @@ export default function HomePage() {
             {t.part3}
           </h2>
         </header>
-        <div className="grid gap-md md:grid-cols-3">
+        <div className="grid gap-md md:grid-cols-2 xl:grid-cols-3">
           <article className="glass-card p-md">
             <h3 className="mb-sm text-lg font-bold text-primary">{t.topAgents}</h3>
             <ul className="space-y-xs text-sm text-white/85">
@@ -347,6 +357,30 @@ export default function HomePage() {
                 ? rankings.top_cities_by_prosperity.slice(0, 10).map((city) => (
                     <li key={city.name}>
                       {city.name} • {t.prosperity} {city.prosperity}
+                    </li>
+                  ))
+                : <li>{t.noData}</li>}
+            </ul>
+          </article>
+          <article className="glass-card p-md">
+            <h3 className="mb-sm text-lg font-bold text-cta">{t.topCombatPower}</h3>
+            <ul className="space-y-xs text-sm text-white/85">
+              {rankings?.top_agents_by_combat_power?.length
+                ? rankings.top_agents_by_combat_power.slice(0, 10).map((agent) => (
+                    <li key={agent.agent_id}>
+                      {agent.name} • {agent.combat_power} {t.combatPower}
+                    </li>
+                  ))
+                : <li>{t.noData}</li>}
+            </ul>
+          </article>
+          <article className="glass-card p-md">
+            <h3 className="mb-sm text-lg font-bold text-primary">{t.topTroops}</h3>
+            <ul className="space-y-xs text-sm text-white/85">
+              {rankings?.top_agents_by_total_troops?.length
+                ? rankings.top_agents_by_total_troops.slice(0, 10).map((agent) => (
+                    <li key={agent.agent_id}>
+                      {agent.name} • {agent.total_troops} {t.troops}
                     </li>
                   ))
                 : <li>{t.noData}</li>}

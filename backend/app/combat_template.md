@@ -48,8 +48,11 @@ Recommended loop:
 - Endpoints:
   - `GET /pvp/opponents?agent_id=<id>`
   - `POST /pvp/challenge`
+  - `GET /battle/reports?agent_id=<id>&mode=pvp|pve&limit=50`
+  - `GET /battle/replay/{battle_id}`
 - Rules:
   - Opponent must be within rank window ±10.
+  - Opponent list prioritizes estimated win-rate 40%-60% (still constrained by rank window).
   - Daily limit: 5 challenges (UTC).
   - Loser gets 2-hour protection shield.
 

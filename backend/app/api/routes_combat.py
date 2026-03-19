@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, Query
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from ..api.deps import get_current_user
@@ -18,6 +19,8 @@ from ..services.chronicle import write_chronicle
 router = APIRouter(tags=["combat"])
 PVP_DAILY_LIMIT = 5
 PVP_PROTECTION_HOURS = 2
+MATCHMAKING_TARGET_MIN_WIN_RATE = 0.4
+MATCHMAKING_TARGET_MAX_WIN_RATE = 0.6
 
 
 def _get_owned_agent(db: Session, user_id: int, agent_id: int) -> Agent:
@@ -56,6 +59,66 @@ def _agent_troops(agent: Agent) -> dict:
 
 def _agent_power(agent: Agent) -> float:
     return combat.raw_power(_agent_troops(agent), agent.martial)
+
+
+def _split_losses(losses: dict[str, int], rounds: int = 3) -> list[dict[str, int]]:
+    weights = [0.5, 0.3, 0.2][: max(1, rounds)]
+    if len(weights) < rounds:
+        weights.extend([0.0] * (rounds - len(weights)))
+    out = [{t: 0 for t in ("infantry", "archer", "cavalry")} for _ in range(rounds)]
+    for troop in ("infantry", "archer", "cavalry"):
+        total = int(losses.get(troop, 0))
+        assigned = 0
+        for idx, weight in enumerate(weights):
+            amount = int(round(total * weight))
+            out[idx][troop] += amount
+            assigned += amount
+        remain = max(0, total - assigned)
+        idx = 0
+        while remain > 0 and idx < rounds:
+            out[idx][troop] += 1
+            remain -= 1
+            idx = (idx + 1) % rounds
+    return out
+
+
+def _dominant_label(troops: dict[str, int]) -> str:
+    mapping = {"infantry": "infantry_push", "archer": "archer_volley", "cavalry": "cavalry_charge"}
+    top_type = "infantry"
+    top_value = -1
+    for troop in ("infantry", "archer", "cavalry"):
+        value = troops.get(troop, 0)
+        if value > top_value:
+            top_type = troop
+            top_value = value
+    return mapping[top_type]
+
+
+def _parse_json_field(raw: str, fallback: dict | None = None) -> dict:
+    if not raw:
+        return fallback or {}
+    try:
+        value = json.loads(raw)
+        if isinstance(value, dict):
+            return value
+    except Exception:
+        return fallback or {}
+    return fallback or {}
+
+
+def _extract_action_result_by_battle_id(db: Session, battle_id: str) -> tuple[ActionLog | None, dict]:
+    candidates = (
+        db.query(ActionLog)
+        .filter(ActionLog.action_type.in_(["pve_challenge", "pvp_challenge"]))
+        .order_by(ActionLog.id.desc())
+        .limit(1000)
+        .all()
+    )
+    for log in candidates:
+        payload = _parse_json_field(log.result_json)
+        if payload.get("battle_id") == battle_id:
+            return log, payload
+    return None, {}
 
 
 def _rank_map(db: Session) -> dict[int, int]:
@@ -200,6 +263,7 @@ def pve_challenge(
                     "defender_power": defender_power,
                     "rewards": rewards,
                     "losses": attacker_losses,
+                    "enemy_losses": defender_losses,
                 }
             ),
         )
@@ -246,15 +310,11 @@ def pvp_opponents(
     )
     daily_used = daily_counter.count if daily_counter else 0
 
-    candidates = (
-        db.query(Agent)
-        .filter(Agent.owner_user_id != current_user.id)
-        .order_by(Agent.id.asc())
-        .limit(200)
-        .all()
-    )
-    opponents = []
+    candidates = db.query(Agent).filter(Agent.owner_user_id != current_user.id).order_by(Agent.id.asc()).limit(200).all()
+    preferred = []
+    fallback = []
     now = datetime.now(timezone.utc)
+    attacker_troops = _agent_troops(attacker)
     for agent in candidates:
         if _is_agent_protected(db, agent.id, now):
             continue
@@ -262,27 +322,53 @@ def pvp_opponents(
         rank = rank_map.get(agent.id, 0)
         if rank <= 0 or abs(rank - attacker_rank) > 10:
             continue
-        opponents.append(
-            {
-                "agent_id": agent.id,
-                "name": agent.name,
-                "role": agent.role,
-                "power": round(power, 2),
-                "rank": rank,
-                "city": agent.current_city,
-            }
+        defender_troops = _agent_troops(agent)
+        attacker_power_for_match = combat.total_power(attacker_troops, attacker.martial, defender_troops)
+        defender_power_for_match = combat.total_power(defender_troops, agent.martial, attacker_troops)
+        estimated_win_rate = combat.win_rate(attacker_power_for_match, defender_power_for_match)
+        entry = {
+            "agent_id": agent.id,
+            "name": agent.name,
+            "role": agent.role,
+            "power": round(power, 2),
+            "rank": rank,
+            "city": agent.current_city,
+            "estimated_win_rate": round(estimated_win_rate, 4),
+        }
+        if MATCHMAKING_TARGET_MIN_WIN_RATE <= estimated_win_rate <= MATCHMAKING_TARGET_MAX_WIN_RATE:
+            preferred.append(entry)
+        else:
+            fallback.append(entry)
+
+    preferred.sort(
+        key=lambda x: (
+            abs(0.5 - x["estimated_win_rate"]),
+            abs(x["power"] - round(attacker_power, 2)),
+            x["agent_id"],
         )
-        if len(opponents) >= 10:
-            break
+    )
+    fallback.sort(
+        key=lambda x: (
+            abs(0.5 - x["estimated_win_rate"]),
+            abs(x["power"] - round(attacker_power, 2)),
+            x["agent_id"],
+        )
+    )
+    opponents = (preferred + fallback)[:10]
 
     return {
         "success": True,
         "data": {
             "items": opponents,
             "attacker_rank": attacker_rank,
+            "attacker_power": round(attacker_power, 2),
             "daily_limit": PVP_DAILY_LIMIT,
             "daily_used": daily_used,
             "daily_remaining": max(0, PVP_DAILY_LIMIT - daily_used),
+            "matchmaking_target_win_rate": {
+                "min": MATCHMAKING_TARGET_MIN_WIN_RATE,
+                "max": MATCHMAKING_TARGET_MAX_WIN_RATE,
+            },
         },
     }
 
@@ -404,14 +490,123 @@ def pvp_challenge(
 
     return {
         "success": True,
-            "data": {
-                "battle_id": battle_id,
-                "attacker_win": attacker_win,
+        "data": {
+            "battle_id": battle_id,
+            "attacker_win": attacker_win,
             "attacker_power": round(attacker_power, 4),
             "defender_power": round(defender_power, 4),
-                "spoils": spoils,
-                "losses": {"attacker": attacker_losses, "defender": defender_losses},
-                "daily_used": daily_counter.count,
-                "daily_remaining": max(0, PVP_DAILY_LIMIT - daily_counter.count),
+            "spoils": spoils,
+            "losses": {"attacker": attacker_losses, "defender": defender_losses},
+            "daily_used": daily_counter.count,
+            "daily_remaining": max(0, PVP_DAILY_LIMIT - daily_counter.count),
+        },
+    }
+
+
+@router.get("/battle/reports")
+def battle_reports(
+    agent_id: int | None = Query(default=None),
+    mode: str | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ = current_user
+    query = db.query(BattleLog).order_by(BattleLog.id.desc())
+    if mode in {"pve", "pvp"}:
+        query = query.filter(BattleLog.request_id.like(f"{mode}_%"))
+    if agent_id is not None:
+        query = query.filter(or_(BattleLog.attacker_agent_id == agent_id, BattleLog.defender_agent_id == agent_id))
+    logs = query.limit(limit).all()
+    return {
+        "success": True,
+        "data": {
+            "items": [
+                {
+                    "battle_id": b.request_id,
+                    "mode": "pve" if b.request_id.startswith("pve_") else "pvp",
+                    "attacker_agent_id": b.attacker_agent_id,
+                    "defender_agent_id": b.defender_agent_id,
+                    "attacker_city": b.attacker_city,
+                    "defender_city": b.defender_city,
+                    "attacker_power": round(b.attack_power, 4),
+                    "defender_power": round(b.defense_power, 4),
+                    "outcome": b.outcome,
+                    "spoils": {"gold": b.loot_gold, "food": b.loot_food},
+                    "created_at": b.created_at.isoformat(),
+                    "replay_url": f"/api/battle/replay/{b.request_id}",
+                }
+                for b in logs
+            ]
+        },
+    }
+
+
+@router.get("/battle/replay/{battle_id}")
+def battle_replay(
+    battle_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ = current_user
+    battle = db.query(BattleLog).filter(BattleLog.request_id == battle_id).first()
+    if not battle:
+        raise AppError("INVALID_REQUEST", "Battle does not exist.", status_code=404)
+
+    _, result_payload = _extract_action_result_by_battle_id(db, battle_id)
+    mode = "pve" if battle_id.startswith("pve_") else "pvp"
+
+    attacker_losses = {"infantry": 0, "archer": 0, "cavalry": 0}
+    defender_losses = {"infantry": 0, "archer": 0, "cavalry": 0}
+    attacker_troops = {"infantry": 0, "archer": 0, "cavalry": 0}
+    defender_troops = {"infantry": 0, "archer": 0, "cavalry": 0}
+    if mode == "pve":
+        attacker_losses = result_payload.get("losses", attacker_losses)
+        defender_losses = result_payload.get("enemy_losses", defender_losses)
+    else:
+        losses = result_payload.get("losses", {})
+        attacker_losses = losses.get("attacker", attacker_losses)
+        defender_losses = losses.get("defender", defender_losses)
+
+    attacker = db.get(Agent, battle.attacker_agent_id) if battle.attacker_agent_id else None
+    defender = db.get(Agent, battle.defender_agent_id) if battle.defender_agent_id else None
+    if attacker:
+        attacker_troops = _agent_troops(attacker)
+    if defender:
+        defender_troops = _agent_troops(defender)
+
+    attacker_round_losses = _split_losses(attacker_losses, rounds=3)
+    defender_round_losses = _split_losses(defender_losses, rounds=3)
+    rounds = []
+    for idx in range(3):
+        rounds.append(
+            {
+                "round": idx + 1,
+                "attacker_action": _dominant_label(attacker_troops),
+                "defender_action": _dominant_label(defender_troops),
+                "casualties": {
+                    "attacker": attacker_round_losses[idx],
+                    "defender": defender_round_losses[idx],
+                },
+            }
+        )
+
+    return {
+        "success": True,
+        "data": {
+            "battle_id": battle_id,
+            "mode": mode,
+            "created_at": battle.created_at.isoformat(),
+            "summary": {
+                "attacker_agent_id": battle.attacker_agent_id,
+                "defender_agent_id": battle.defender_agent_id,
+                "attacker_city": battle.attacker_city,
+                "defender_city": battle.defender_city,
+                "attacker_power": round(battle.attack_power, 4),
+                "defender_power": round(battle.defense_power, 4),
+                "outcome": battle.outcome,
+                "spoils": {"gold": battle.loot_gold, "food": battle.loot_food},
             },
-        }
+            "rounds": rounds,
+        },
+    }

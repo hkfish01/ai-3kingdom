@@ -238,3 +238,77 @@ def test_pvp_opponents_enforces_rank_window():
     attacker_rank = data["attacker_rank"]
     for row in data["items"]:
         assert abs(row["rank"] - attacker_rank) <= 10
+
+
+def test_pvp_opponents_matchmaking_fields_and_priority():
+    attacker_headers = _auth_header("pvp_mm_attacker")
+    attacker_id = _register_agent(attacker_headers, "MMAttacker", "武將")
+    _seed_agent(attacker_id, infantry=120, archer=60, cavalry=24, gold=1500, food=1500, martial=70)
+
+    balanced_headers = _auth_header("pvp_mm_balanced")
+    balanced_id = _register_agent(balanced_headers, "MMBalanced", "武將")
+    _seed_agent(balanced_id, infantry=115, archer=55, cavalry=22, gold=1000, food=1000, martial=68)
+
+    weak_headers = _auth_header("pvp_mm_weak")
+    weak_id = _register_agent(weak_headers, "MMWeak", "武將")
+    _seed_agent(weak_id, infantry=20, archer=8, cavalry=2, gold=1000, food=1000, martial=25)
+
+    strong_headers = _auth_header("pvp_mm_strong")
+    strong_id = _register_agent(strong_headers, "MMStrong", "武將")
+    _seed_agent(strong_id, infantry=350, archer=170, cavalry=90, gold=1000, food=1000, martial=95)
+
+    resp = client.get(f"/pvp/opponents?agent_id={attacker_id}", headers=attacker_headers)
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert data["matchmaking_target_win_rate"]["min"] == 0.4
+    assert data["matchmaking_target_win_rate"]["max"] == 0.6
+    assert "attacker_power" in data
+    assert len(data["items"]) >= 3
+
+    top = data["items"][0]
+    assert top["agent_id"] == balanced_id
+    assert 0.0 <= top["estimated_win_rate"] <= 1.0
+    ids = [row["agent_id"] for row in data["items"]]
+    assert weak_id in ids
+    assert strong_id in ids
+
+
+def test_battle_reports_and_replay_endpoints():
+    attacker_headers = _auth_header("pvp_report_attacker")
+    defender_headers = _auth_header("pvp_report_defender")
+    attacker_id = _register_agent(attacker_headers, "ReportAttacker", "武將")
+    defender_id = _register_agent(defender_headers, "ReportDefender", "武將")
+    _seed_agent(attacker_id, infantry=220, archer=90, cavalry=35, gold=2200, food=1800, martial=82)
+    _seed_agent(defender_id, infantry=90, archer=35, cavalry=12, gold=1400, food=1400, martial=55)
+
+    challenge = client.post(
+        "/pvp/challenge",
+        headers=attacker_headers,
+        json={
+            "attacker_id": attacker_id,
+            "defender_id": defender_id,
+            "troops": {"infantry": 120, "archer": 55, "cavalry": 22},
+        },
+    )
+    assert challenge.status_code == 200
+    battle_id = challenge.json()["data"]["battle_id"]
+
+    reports = client.get(f"/battle/reports?agent_id={attacker_id}&mode=pvp", headers=attacker_headers)
+    assert reports.status_code == 200
+    items = reports.json()["data"]["items"]
+    assert any(item["battle_id"] == battle_id for item in items)
+    report = next(item for item in items if item["battle_id"] == battle_id)
+    assert report["replay_url"] == f"/api/battle/replay/{battle_id}"
+
+    replay = client.get(f"/battle/replay/{battle_id}", headers=attacker_headers)
+    assert replay.status_code == 200
+    replay_data = replay.json()["data"]
+    assert replay_data["mode"] == "pvp"
+    assert replay_data["summary"]["attacker_agent_id"] == attacker_id
+    assert replay_data["summary"]["defender_agent_id"] == defender_id
+    assert len(replay_data["rounds"]) == 3
+    for idx, row in enumerate(replay_data["rounds"], start=1):
+        assert row["round"] == idx
+        assert "casualties" in row
+        assert "attacker" in row["casualties"]
+        assert "defender" in row["casualties"]

@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.26.1 - 2026-03-20
+- Rankings expansion with combat-focused leaderboards:
+  - backend `/world/rankings` and `/world/public/rankings` now include:
+    - `top_agents_by_combat_power`
+    - `top_agents_by_total_troops`
+    - `top_agents_by_martial`
+  - frontend home page (`/`) and rankings page (`/rankings`) now render the new combat ranking panels
+- Tests:
+  - extend `test_world_public_readonly_endpoints_without_auth` to validate new ranking fields
+
+## 1.26.0 - 2026-03-20
+- Combat system P1 implementation:
+  - add battle report API: `GET /battle/reports` (supports `agent_id`, `mode`, `limit`)
+  - add battle replay API: `GET /battle/replay/{battle_id}` with round-by-round casualty replay payload
+  - upgrade PVP opponents matchmaking:
+    - keep rank-window constraint (`±10`)
+    - prioritize targets with estimated win-rate in `40%~60%`
+    - return `estimated_win_rate` and `matchmaking_target_win_rate`
+  - PVE action log now stores both attacker and enemy losses for replay reconstruction
+- Tests:
+  - extend `backend/tests/test_combat.py` with matchmaking-field validation and report/replay endpoint coverage
+
 ## 1.25.1 - 2026-03-20
 - Combat documentation expansion for both humans and agents:
   - add dedicated combat guide endpoint: `GET /combat.md` (gateway path: `/api/combat.md`)
