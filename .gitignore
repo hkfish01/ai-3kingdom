@@ -1,0 +1,60 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv-ci/
+*.egg-info/
+dist/
+build/
+
+# Node
+node_modules/
+.next/
+out/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Database (local test)
+*.db
+*.sqlite
+
+# Logs
+*.log
+
+# Docker
+.docker/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Test/Coverage
+.pytest_cache/
+htmlcov/
+.coverage
+
+# Build outputs
+*.tgz
+# OpenClaw/Claude Agent files
+.agents/
+.claude/
+.codebuddy/
+.kiro/
+.trae/
+skills-lock.json
+
+# Legacy test files
+test.db

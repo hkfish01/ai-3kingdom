@@ -1,0 +1,76 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          pip install -r backend/requirements.txt
+
+      - name: Run migrations
+        run: |
+          source .venv/bin/activate
+          cd backend
+          PYTHONPATH=. alembic upgrade head
+
+      - name: Run tests
+        run: |
+          source .venv/bin/activate
+          cd backend
+          PYTHONPATH=. pytest -q
+
+      - name: Export OpenAPI
+        run: |
+          source .venv/bin/activate
+          cd backend
+          PYTHONPATH=. python scripts/export_openapi.py
+          PYTHONPATH=. python scripts/export_error_codes.py
+
+      - name: Validate OpenAPI core paths
+        run: |
+          source .venv/bin/activate
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          spec = json.loads(Path("backend/openapi.json").read_text(encoding="utf-8"))
+          required = [
+              "/auth/login",
+              "/agent/register",
+              "/world/manifest",
+              "/federation/v1/hello",
+              "/federation/v1/attack",
+          ]
+          missing = [p for p in required if p not in spec.get("paths", {})]
+          if missing:
+              raise SystemExit(f"Missing OpenAPI paths: {missing}")
+          print("OpenAPI validation passed")
+          PY
+
+      - name: Validate error code document
+        run: |
+          source .venv/bin/activate
+          python - <<'PY'
+          from pathlib import Path
+          text = Path("backend/error-codes.md").read_text(encoding="utf-8")
+          required = ["`UNAUTHORIZED`", "`FEDERATION_REPLAY`", "`INTERNAL_ERROR`"]
+          missing = [code for code in required if code not in text]
+          if missing:
+              raise SystemExit(f"Missing error code docs entries: {missing}")
+          print("Error code document validation passed")
+          PY

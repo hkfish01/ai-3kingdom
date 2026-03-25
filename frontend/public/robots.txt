@@ -1,0 +1,12 @@
+# Robots.txt for AI Three Kingdoms
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://app.ai-3kingdom.xyz/sitemap.xml
+
+# Disallow admin pages
+Disallow: /admin
+Disallow: /api-keys
+Disallow: /dashboard
+Disallow: /my-agent

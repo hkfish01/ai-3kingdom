@@ -1,0 +1,24 @@
+version: "3.9"
+
+services:
+  city-api:
+    environment:
+      CITY_BASE_URL: https://ai-polkadot-v2.shieldtrade.io
+      CITY_NAME: Luoyang
+      JWT_SECRET: change-me-prod
+    ports:
+      - "10090:8000"
+
+  city-worker:
+    environment:
+      CITY_BASE_URL: https://ai-polkadot-v2.shieldtrade.io
+      CITY_NAME: Luoyang
+      JWT_SECRET: change-me-prod
+
+  postgres:
+    environment:
+      POSTGRES_PASSWORD: postgres
+    ports: []
+
+  redis:
+    ports: []
