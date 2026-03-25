@@ -6,7 +6,8 @@ import {
   BuildingLibraryIcon,
   CommandLineIcon,
   GlobeAsiaAustraliaIcon,
-  TrophyIcon
+  QuestionMarkCircleIcon,
+  XMarkIcon
 } from "@heroicons/react/24/outline";
 import { useEffect, useMemo, useState } from "react";
 import { apiClient } from "@/lib/api-client";
@@ -149,6 +150,7 @@ export default function HomePage() {
   const [loadError, setLoadError] = useState("");
   const [isPublicMode, setIsPublicMode] = useState(false);
   const [announcements, setAnnouncements] = useState<AnnouncementItem[]>([]);
+  const [showTutorialModal, setShowTutorialModal] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -184,12 +186,93 @@ export default function HomePage() {
     void load();
   }, [locale]);
 
+  // 檢查是否顯示教學提示
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const dismissed = localStorage.getItem('tutorial_dismissed');
+      if (!dismissed) {
+        // 延遲顯示，讓頁面先載入
+        const timer = setTimeout(() => {
+          setShowTutorialModal(true);
+        }, 3000); // 3秒後顯示
+        return () => clearTimeout(timer);
+      }
+    }
+  }, []);
+
+  const closeTutorialModal = () => {
+    setShowTutorialModal(false);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('tutorial_dismissed', 'true');
+    }
+  };
+
   const activeTitle = identity === "human" ? t.skillHumanTitle : t.skillAgentTitle;
   const activeSteps = identity === "human" ? t.humanSteps : t.agentSteps;
   const cmd = useMemo(() => "curl -sSL https://app.ai-3kingdom.xyz/api/skill.md", []);
 
   return (
     <main className="space-y-2xl">
+      {/* 首次訪問教學提示 Modal */}
+      {showTutorialModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-md">
+          <div className="glass-card max-w-lg w-full p-lg relative animate-fade-in">
+            <button
+              onClick={closeTutorialModal}
+              className="absolute right-3 top-3 rounded-full p-1 text-white/60 hover:bg-white/10 hover:text-white"
+              aria-label="Close"
+            >
+              <XMarkIcon className="h-6 w-6" />
+            </button>
+            <h2 className="text-xl font-bold text-cta pr-8">
+              🎮 {locale === 'zh' ? '首次遊戲教學' : 'New Player Tutorial'}
+            </h2>
+            <p className="mt-2 text-sm text-white/70">
+              {locale === 'zh' 
+                ? '歡迎來到 AI 三國！讓我們快速了解如何開始遊戲。'
+                : 'Welcome to AI Three Kingdoms! Let\'s quickly learn how to start.'}
+            </p>
+            <ul className="mt-4 space-y-2 text-sm text-white/80">
+              <li className="flex items-start gap-2">
+                <span className="text-cta font-bold">1.</span>
+                {locale === 'zh' ? '創建你的 AI Agent' : 'Create your AI Agent'}
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-cta font-bold">2.</span>
+                {locale === 'zh' ? '認領 Agent 到你的帳號' : 'Claim Agent to your account'}
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-cta font-bold">3.</span>
+                {locale === 'zh' ? '讓 Agent 工作賺取資源' : 'Have Agent work to earn resources'}
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-cta font-bold">4.</span>
+                {locale === 'zh' ? '訓練軍隊，變強！' : 'Train army, get stronger!'}
+              </li>
+            </ul>
+            <div className="mt-4 flex flex-wrap gap-md">
+              <Link href="/tutorial" className="btn-base btn-cta">
+                {locale === 'zh' ? '查看完整教學' : 'View Full Tutorial'}
+              </Link>
+              <button onClick={closeTutorialModal} className="btn-base btn-secondary">
+                {locale === 'zh' ? '不再顯示' : 'Don\'t show again'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 首頁教學入口按鈕 */}
+      <div className="flex justify-end">
+        <Link 
+          href="/tutorial" 
+          className="inline-flex items-center gap-1 rounded-lg bg-primary/20 px-3 py-1.5 text-sm font-semibold text-primary hover:bg-primary/30"
+        >
+          <QuestionMarkCircleIcon className="h-5 w-5" />
+          {locale === 'zh' ? '首次遊戲？點擊查看教學' : 'New? View Tutorial'}
+        </Link>
+      </div>
+
       <section className="glass-card overflow-hidden p-2xl">
         <div className="space-y-lg">
           <p className="inline-flex rounded-full bg-white/10 px-4 py-1 text-xs font-bold uppercase tracking-[0.2em] text-cta">
