@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.config import settings
 from app.db import SessionLocal
-from app.models import Agent, SystemState, User
+from app.models import Agent, City, SystemState, User
 
 
 client = TestClient(app)
@@ -139,13 +139,54 @@ def test_world_public_readonly_endpoints_without_auth():
 
     public_rankings = client.get("/world/public/rankings")
     assert public_rankings.status_code == 200
-    assert "top_agents_by_gold" in public_rankings.json()["data"]
+    ranking_data = public_rankings.json()["data"]
+    assert "top_agents_by_gold" in ranking_data
+    assert "top_agents_by_combat_power" in ranking_data
+    assert "top_agents_by_total_troops" in ranking_data
+    assert "top_agents_by_martial" in ranking_data
 
     private_state = client.get("/world/state")
     assert private_state.status_code == 401
 
     private_rankings = client.get("/world/rankings")
     assert private_rankings.status_code == 401
+
+
+def test_rankings_merge_luoyang_aliases():
+    db = SessionLocal()
+    try:
+        zh = db.query(City).filter(City.name == "洛阳").first()
+        if not zh:
+            zh = City(
+                name="洛阳",
+                base_url="http://city-luoyang-zh.test",
+                prosperity=2.5,
+                city_tax_rate=0.05,
+            )
+            db.add(zh)
+        else:
+            zh.prosperity = 2.5
+
+        en = db.query(City).filter(City.name == "Luoyang").first()
+        if not en:
+            en = City(
+                name="Luoyang",
+                base_url="http://city-luoyang-en.test",
+                prosperity=3.5,
+                city_tax_rate=0.05,
+            )
+            db.add(en)
+        else:
+            en.prosperity = 3.5
+        db.commit()
+    finally:
+        db.close()
+
+    resp = client.get("/world/public/rankings")
+    assert resp.status_code == 200
+    cities = resp.json()["data"]["top_cities_by_prosperity"]
+    luoyang_rows = [c for c in cities if c["name"] == "洛阳"]
+    assert len(luoyang_rows) == 1
 
 
 def test_city_roster_endpoint_with_positions():
@@ -157,6 +198,38 @@ def test_city_roster_endpoint_with_positions():
     assert "civil_hierarchy" in data
     assert "military_hierarchy" in data
     assert len(data["agents"]) >= 1
+
+
+def test_world_state_and_roster_fallback_to_city_with_data():
+    original_city_name = settings.city_name
+    original_city_location = settings.city_location
+    headers = _auth_header("fallback_city_user", "Aa1234!!")
+    agent_id = _register_agent(headers, "FallbackAgent", "平民")
+    work_resp = client.post("/action/work", headers=headers, json={"agent_id": agent_id, "task": "farm"})
+    assert work_resp.status_code == 200
+    try:
+        settings.city_name = "NoDataCity"
+        settings.city_location = "Unknown"
+
+        world_resp = client.get("/world/state", headers=headers)
+        assert world_resp.status_code == 200
+        world_data = world_resp.json()["data"]
+        assert world_data["agent_count"] >= 1
+        assert world_data["city"] != "NoDataCity"
+        assert world_data["city_location"] == world_data["city"]
+
+        roster_resp = client.get("/world/city/roster", headers=headers)
+        assert roster_resp.status_code == 200
+        roster_data = roster_resp.json()["data"]
+        assert roster_data["city_name"] == world_data["city"]
+        assert len(roster_data["agents"]) >= 1
+
+        chronicle_resp = client.get("/world/chronicle?limit=5&lang=zh", headers=headers)
+        assert chronicle_resp.status_code == 200
+        assert len(chronicle_resp.json()["data"]["entries"]) >= 1
+    finally:
+        settings.city_name = original_city_name
+        settings.city_location = original_city_location
 
 
 def test_central_roles_policy_pull_and_enforcement(monkeypatch):
