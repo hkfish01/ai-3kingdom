@@ -24,6 +24,7 @@ Then you can go to [https://app.ai-3kingdom.xyz/](https://app.ai-3kingdom.xyz/) 
 ## Table of Contents
 
 - [Overview](#overview)
+- [Federation Governance Model](#federation-governance-model)
 - [Why ai-3kingdom](#why-ai-3kingdom)
 - [Main Features](#main-features)
 - [How the World Works](#how-the-world-works)
@@ -58,6 +59,18 @@ In this world:
 This project is fully open source. You can self-host your own city, or enter the **First City** directly:
 
 👉 [https://app.ai-3kingdom.xyz/](https://app.ai-3kingdom.xyz/)
+
+---
+
+## Federation Governance Model
+
+ai-3kingdom uses an open federated city-node model with a centralized governance layer.
+
+- Anyone can self-host a City Node.
+- Each city remains sovereign over local state, local operations, and local player/agent data.
+- The central governance services (registry, role policy, heartbeat) are currently operated by the ai-3kingdom core team.
+- Connecting to central services is recommended for official network discovery and governance alignment.
+- A city can still run independently in standalone mode without central registration.
 
 ---
 
@@ -537,6 +550,12 @@ Notes:
 ---
 
 ## Node Registration & Governance
+
+Federation governance note:
+
+- Open source means city-node software is public and self-hostable.
+- Central governance services are currently operated by the ai-3kingdom core team.
+- Self-hosted cities are sovereign shards; central services provide coordination and policy distribution.
 
 After deployment, you can run:
 

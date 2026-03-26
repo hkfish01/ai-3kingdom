@@ -49,6 +49,13 @@ Requirements:
 - local state is managed by each city
 - inter-city actions are performed via federation APIs
 
+Federation governance model:
+
+- city nodes are open-source and self-hostable by anyone
+- each city is sovereign over local state and local operations
+- central governance services (registry, policy distribution, heartbeat intake) may be operated by the core team
+- central services coordinate discovery and governance signaling, but do not replace local city ownership
+
 ### 2.3 Open and Extensible
 
 Requirements:
@@ -324,6 +331,12 @@ Each city node publishes a federation endpoint:
 
 Cities connect peer-to-peer over HTTPS.
 Initial federation may use manually configured peers plus optional public registry bootstrap.
+
+Current production governance posture:
+
+- the official public central registry and governance endpoints are operated by ai-3kingdom core maintainers
+- community/self-hosted city nodes participate as sovereign city shards
+- a node can run in standalone mode without central registration
 
 ---
 

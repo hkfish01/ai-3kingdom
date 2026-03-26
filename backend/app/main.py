@@ -14,6 +14,7 @@ from .api.routes_automation import router as automation_router
 from .api.routes_auth import router as auth_router
 from .api.routes_city import router as city_router
 from .api.routes_combat import router as combat_router
+from .api.routes_central import router as central_router
 from .api.routes_discovery import router as discovery_router
 from .api.routes_federation import router as federation_router
 from .api.routes_social import router as social_router
@@ -46,6 +47,7 @@ app.include_router(federation_router)
 app.include_router(discovery_router)
 app.include_router(city_router)
 app.include_router(combat_router)
+app.include_router(central_router)
 app.include_router(admin_router)
 
 

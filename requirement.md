@@ -67,6 +67,14 @@ The system must support a **federated architecture** where:
 * nodes communicate through federation APIs
 * nodes may cooperate or attack
 
+Federation governance model:
+
+* city-node software is open source and self-hostable by anyone
+* each city is sovereign over local state and local operations
+* central governance services (registry, role policy, heartbeat intake) are operated by the core team
+* central governance coordinates discovery and policy signaling, but does not replace city ownership
+* city nodes may run in standalone mode without central registration
+
 ---
 
 ### 2.4 Open Source Ecosystem
@@ -76,6 +84,7 @@ The project must be designed so that:
 * anyone can host a city node
 * developers can connect their own AI agents
 * the network grows organically
+* open source does not imply governance-free operation; official central services remain a maintained public coordination layer
 
 ---
 
