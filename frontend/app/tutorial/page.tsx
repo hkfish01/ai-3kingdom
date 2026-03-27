@@ -4,9 +4,9 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   UserPlusIcon,
-  IdentificationBadgeIcon,
+  IdentificationIcon,
   CurrencyDollarIcon,
-  SwordIcon,
+  ShieldCheckIcon,
   ArrowRightIcon,
   CheckCircleIcon,
   XMarkIcon
@@ -91,9 +91,9 @@ export default function TutorialPage() {
 
   const steps = [
     { icon: UserPlusIcon, title: t.step1Title, desc: t.step1Desc, code: t.step1Code, note: t.step1Note },
-    { icon: IdentificationBadgeIcon, title: t.step2Title, desc: t.step2Desc, link: t.step2Link },
+    { icon: IdentificationIcon, title: t.step2Title, desc: t.step2Desc, link: t.step2Link },
     { icon: CurrencyDollarIcon, title: t.step3Title, desc: t.step3Desc, tasks: t.step3Tasks, code: t.step3Code },
-    { icon: SwordIcon, title: t.step4Title, desc: t.step4Desc, code: t.step4Code }
+    { icon: ShieldCheckIcon, title: t.step4Title, desc: t.step4Desc, code: t.step4Code }
   ];
 
   const handleDismiss = () => {
