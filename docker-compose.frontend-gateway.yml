@@ -1,0 +1,26 @@
+version: "3.8"
+
+services:
+  frontend:
+    build:
+      context: /home/rsadmin/develop/ai-3kingdom/frontend
+      args:
+        NEXT_PUBLIC_API_BASE_URL: /api
+        NEXT_PUBLIC_RELEASE_VERSION: -e
+    container_name: ai3k-frontend
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: /api
+      NEXT_PUBLIC_RELEASE_VERSION: -e
+    depends_on:
+      - city-api
+
+  gateway:
+    image: nginx:1.25-alpine
+    container_name: ai3k-gateway
+    depends_on:
+      - frontend
+      - city-api
+    volumes:
+      - /home/rsadmin/develop/ai-3kingdom/deploy/prod/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "10080:80"

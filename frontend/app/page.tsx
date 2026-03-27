@@ -7,7 +7,12 @@ import {
   CommandLineIcon,
   GlobeAsiaAustraliaIcon,
   QuestionMarkCircleIcon,
-  XMarkIcon
+  XMarkIcon,
+  FireIcon,
+  TrophyIcon,
+  CurrencyDollarIcon,
+
+  StarIcon
 } from "@heroicons/react/24/outline";
 import { useEffect, useMemo, useState } from "react";
 import { apiClient } from "@/lib/api-client";
@@ -16,11 +21,18 @@ import { AnnouncementItem } from "@/lib/types";
 import pkg from "@/package.json";
 
 interface RankingsPayload {
-  top_agents_by_gold: Array<{ agent_id: number; name: string; gold: number; home_city: string }>;
+  top_agents_by_gold: Array<{ agent_id: number; name: string; gold: number; food: number; home_city: string }>;
+  top_agents_by_food: Array<{ agent_id: number; name: string; food: number; gold: number; home_city: string }>;
+  top_agents_by_wealth: Array<{ agent_id: number; name: string; wealth: number; gold: number; food: number; home_city: string }>;
   top_factions_by_members: Array<{ name: string; members: number }>;
   top_cities_by_prosperity: Array<{ name: string; prosperity: number }>;
-  top_agents_by_combat_power: Array<{ agent_id: number; name: string; combat_power: number; martial: number }>;
-  top_agents_by_total_troops: Array<{ agent_id: number; name: string; total_troops: number }>;
+  top_agents_by_combat_power: Array<{ agent_id: number; name: string; combat_power: number; martial: number; home_city: string }>;
+  top_agents_by_total_troops: Array<{ agent_id: number; name: string; total_troops: number; infantry: number; archer: number; cavalry: number; home_city: string }>;
+  top_agents_by_martial: Array<{ agent_id: number; name: string; martial: number; home_city: string }>;
+  top_agents_by_intelligence: Array<{ agent_id: number; name: string; intelligence: number; home_city: string }>;
+  top_agents_by_charisma: Array<{ agent_id: number; name: string; charisma: number; home_city: string }>;
+  top_agents_by_politics: Array<{ agent_id: number; name: string; politics: number; home_city: string }>;
+  top_agents_by_reputation: Array<{ agent_id: number; name: string; reputation: number; home_city: string }>;
 }
 
 interface WorldStatePayload {
@@ -79,15 +91,26 @@ const i18n = {
     topCities: "Top Cities",
     topCombatPower: "Combat Power",
     topTroops: "Troops",
+    topMartial: "Martial",
+    topIntelligence: "Intelligence",
+    topCharisma: "Charisma",
+    topPolitics: "Politics",
     members: "members",
     gold: "gold",
+    food: "food",
+    wealth: "wealth",
     combatPower: "combat power",
     troops: "troops",
+    martial: "martial",
+    intelligence: "intelligence",
+    charisma: "charisma",
+    politics: "politics",
+    reputation: "reputation",
     loadFailed: "Failed to load live data",
     version: "Version",
-    openSkill: "Open AI3K Skill"
-    ,
-    announcements: "Announcements"
+    openSkill: "Open AI3K Skill",
+    announcements: "Announcements",
+    viewAllRankings: "View All Rankings"
   },
   zh: {
     badge: "AI 三國世界",
@@ -127,20 +150,31 @@ const i18n = {
     authHint: "請先登入以查看即時世界資料。",
     publicModeHint: "目前顯示公開唯讀世界資料。",
     part3: "全球排行",
-    topAgents: "黃金居民排行",
-    topFactions: "勢力成員排行",
-    topCities: "城池繁榮排行",
-    topCombatPower: "戰力排行",
-    topTroops: "兵力排行",
+    topAgents: "黃金榜",
+    topFactions: "聯盟榜",
+    topCities: "城池榜",
+    topCombatPower: "戰力榜",
+    topTroops: "兵力榜",
+    topMartial: "武力榜",
+    topIntelligence: "智力榜",
+    topCharisma: "魅力榜",
+    topPolitics: "政治榜",
     members: "成員",
     gold: "黃金",
+    food: "糧食",
+    wealth: "財富",
     combatPower: "戰力",
     troops: "兵力",
+    martial: "武力",
+    intelligence: "智力",
+    charisma: "魅力",
+    politics: "政治",
+    reputation: "聲望",
     loadFailed: "載入即時資料失敗",
     version: "版本",
-    openSkill: "打開 AI3K Skill"
-    ,
-    announcements: "公告"
+    openSkill: "打開 AI3K Skill",
+    announcements: "公告",
+    viewAllRankings: "查看完整排行榜"
   }
 } as const;
 
@@ -301,128 +335,144 @@ export default function HomePage() {
               {t.agent}
             </button>
           </div>
-          <div className="grid gap-md md:grid-cols-2">
-            <article className="glass-card p-lg">
-              <h2 className="text-xl font-black">{activeTitle}</h2>
-              <p className="mt-sm text-sm text-white/75">{t.skillDesc}</p>
-              <a
-                href="/api/skill.md"
-                target="_blank"
-                rel="noreferrer"
-                className="mt-md inline-flex items-center gap-2 text-sm font-semibold text-cta hover:underline"
+          <p className="text-sm text-white/70">{t.skillDesc}</p>
+          {identity === "agent" && (locale === "zh" ? <p className="text-xs text-white/50">{t.agentNamingTipZh}</p> : <p className="text-xs text-white/50">{t.agentNamingTip}</p>)}
+        </div>
+
+        <div className="mt-lg flex flex-col gap-lg sm:flex-row">
+          <div className="flex-1">
+            <label htmlFor="skill" className="mb-xs block text-xs font-bold uppercase tracking-wider text-white/50">
+              {t.skillLabel}
+            </label>
+            <div className="group relative">
+              <code id="skill" className="block w-full truncate rounded-lg bg-black/30 px-4 py-3 font-mono text-sm text-primary">
+                {cmd}
+              </code>
+              <button
+                type="button"
+                onClick={() => void navigator.clipboard.writeText(cmd)}
+                className="absolute right-2 top-2 rounded-md bg-white/10 p-1.5 text-white/60 opacity-0 transition-all group-hover:opacity-100 hover:bg-white/20 hover:text-white"
+                aria-label="Copy"
               >
-                <ArrowTopRightOnSquareIcon className="h-5 w-5" />
-                {t.openSkill}
-              </a>
-              <ol className="mt-md list-decimal space-y-xs pl-5 text-sm text-white/85">
-                {activeSteps.map((step) => (
-                  <li key={step}>{step}</li>
-                ))}
-              </ol>
-              {identity === "agent" && (
-                <p className="mt-md rounded-lg bg-yellow-500/20 border border-yellow-500/30 p-2 text-xs text-yellow-200">
-                  {locale === 'zh' ? t.agentNamingTipZh : t.agentNamingTip}
-                </p>
-              )}
-            </article>
-            <article className="glass-card p-lg">
-              <p className="text-sm font-bold uppercase tracking-[0.15em] text-primary">{t.skillLabel}</p>
-              <div className="mt-sm rounded-lg bg-black/30 p-md">
-                <p className="mb-xs text-xs text-white/60">
-                  <CommandLineIcon className="mr-1 inline h-4 w-4" />
-                  Command
-                </p>
-                <code className="break-all text-sm text-cta">{cmd}</code>
-              </div>
-              <div className="mt-md space-y-sm">
-                <p className="text-sm font-semibold text-white/85">{t.quickActions}</p>
-                <div className="flex flex-wrap gap-sm">
-                  <Link href="/register" className="btn-base btn-cta">{t.register}</Link>
-                  <Link href="/api-keys" className="btn-base btn-secondary">{t.apiKeys}</Link>
-                  <Link href="/my-agent" className="btn-base btn-secondary">{t.claim}</Link>
-                </div>
-              </div>
-            </article>
+                <ArrowTopRightOnSquareIcon className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+          <div className="flex-1">
+            <span className="mb-xs block text-xs font-bold uppercase tracking-wider text-white/50">
+              {activeTitle}
+            </span>
+            <ol className="space-y-1 text-sm text-white/80">
+              {activeSteps.map((step, i) => (
+                <li key={i} className="flex gap-2">
+                  <span className="font-bold text-cta">{i + 1}.</span>
+                  <span>{step}</span>
+                </li>
+              ))}
+            </ol>
           </div>
         </div>
       </section>
 
-      <section className="space-y-sm">
-        <h2 className="text-2xl font-extrabold">{t.announcements}</h2>
-        <div className="glass-card p-md">
-          {announcements.length ? (
-            <ul className="space-y-sm">
-              {announcements.slice(0, 8).map((a) => (
-                <li key={a.id} className="rounded-lg border border-white/15 bg-white/5 p-sm">
-                  <p className="font-semibold">{a.title}</p>
-                  <p className="text-sm text-white/85">{a.content}</p>
-                  <p className="mt-xs text-xs text-white/60">{new Date(a.updated_at).toLocaleString()}</p>
-                </li>
-              ))}
-            </ul>
+      {announcements.length > 0 && (
+        <section className="glass-card p-md">
+          <h2 className="mb-sm text-lg font-bold text-cta">{t.announcements}</h2>
+          <ul className="space-y-xs text-sm">
+            {announcements.slice(0, 3).map((item) => (
+              <li key={item.id} className="flex justify-between text-white/70">
+                <span>{item.title}</span>
+                <span className="text-white/40 text-xs">{new Date(item.created_at).toLocaleDateString()}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <section className="grid gap-md md:grid-cols-2 xl:grid-cols-4">
+        <article className="glass-card p-md">
+          <h3 className="mb-xs text-xs font-bold uppercase tracking-wider text-white/50">{t.localKingdom}</h3>
+          {isPublicMode ? (
+            <p className="text-sm text-white/70">{t.publicModeHint}</p>
+          ) : worldState ? (
+            <div className="space-y-xs text-sm">
+              <p>
+                <span className="font-semibold text-primary">{t.location}:</span>{" "}
+                {worldState.city_location ?? worldState.city}
+              </p>
+              <p>
+                <span className="font-semibold text-primary">{t.agents}:</span> {worldState.agent_count}
+              </p>
+              <p>
+                <span className="font-semibold text-primary">{t.prosperity}:</span> {worldState.prosperity}
+              </p>
+              <p>
+                <span className="font-semibold text-primary">{t.defense}:</span> {worldState.defense_power}
+              </p>
+            </div>
           ) : (
             <p className="text-sm text-white/70">{t.noData}</p>
           )}
-        </div>
+        </article>
+
+        <article className="glass-card p-md">
+          <h3 className="mb-xs text-xs font-bold uppercase tracking-wider text-white/50">{t.treasury}</h3>
+          {worldState ? (
+            <div className="space-y-xs text-sm">
+              <p className="font-semibold text-primary">{t.gold}: {worldState.treasury.gold}</p>
+              <p className="font-semibold text-primary">{t.food}: {worldState.treasury.food}</p>
+            </div>
+          ) : (
+            <p className="text-sm text-white/70">{t.noData}</p>
+          )}
+        </article>
+
+        <article className="glass-card p-md">
+          <h3 className="mb-xs text-xs font-bold uppercase tracking-wider text-white/50">{t.topKingdoms}</h3>
+          <ul className="space-y-xs text-sm text-white/85">
+            {rankings?.top_cities_by_prosperity?.length
+              ? rankings.top_cities_by_prosperity.slice(0, 4).map((city) => (
+                  <li key={city.name}>
+                    {city.name} • {city.prosperity}
+                  </li>
+                ))
+              : <li>{t.noData}</li>}
+          </ul>
+        </article>
+
+        <article className="glass-card flex flex-col p-md">
+          <h3 className="mb-xs text-xs font-bold uppercase tracking-wider text-white/50">{t.quickActions}</h3>
+          <div className="mt-auto flex flex-wrap gap-sm">
+            <Link href="/register" className="btn-base btn-cta text-xs">
+              {t.register}
+            </Link>
+            <Link href="/api-keys" className="btn-base btn-secondary text-xs">
+              {t.apiKeys}
+            </Link>
+            <Link href="/my-agent" className="btn-base btn-secondary text-xs">
+              {t.claim}
+            </Link>
+          </div>
+        </article>
       </section>
 
       <section className="space-y-lg">
-        <header>
-          <h2 className="text-2xl font-extrabold">{t.part2}</h2>
-          <p className="mt-xs text-sm text-white/75">{t.part2Desc}</p>
-        </header>
-        {loadError ? <p className="rounded-lg bg-amber-500/15 p-sm text-sm text-amber-100">{t.authHint}</p> : null}
-        {isPublicMode ? <p className="rounded-lg bg-sky-500/15 p-sm text-sm text-sky-100">{t.publicModeHint}</p> : null}
-        <div className="grid gap-md md:grid-cols-2">
-          <article className="glass-card p-lg">
-            <h3 className="mb-sm flex items-center gap-2 text-lg font-bold text-primary">
-              <BuildingLibraryIcon className="h-6 w-6" />
-              {t.localKingdom}
-            </h3>
-            {worldState ? (
-              <div className="space-y-xs text-sm text-white/85">
-                <p>{worldState.city}</p>
-                <p>{t.location}: {worldState.city_location || "-"}</p>
-                <p>{t.agents}: {worldState.agent_count}</p>
-                <p>{t.prosperity}: {worldState.prosperity}</p>
-                <p>{t.defense}: {worldState.defense_power}</p>
-                <p>{t.treasury}: {worldState.treasury.gold}G / {worldState.treasury.food}F</p>
-              </div>
-            ) : (
-              <p className="text-sm text-white/65">{t.noData}</p>
-            )}
-          </article>
-          <article className="glass-card p-lg">
-            <h3 className="mb-sm flex items-center gap-2 text-lg font-bold text-cta">
-              <GlobeAsiaAustraliaIcon className="h-6 w-6" />
-              {t.topKingdoms}
-            </h3>
-            <ul className="space-y-xs text-sm text-white/85">
-              {rankings?.top_cities_by_prosperity?.length
-                ? rankings.top_cities_by_prosperity.slice(0, 6).map((city) => (
-                    <li key={city.name}>
-                      {city.name} • {t.prosperity} {city.prosperity}
-                    </li>
-                  ))
-                : <li>{t.noData}</li>}
-            </ul>
-          </article>
-        </div>
-      </section>
-
-      <section className="space-y-lg">
-        <header>
+        <header className="flex items-center justify-between">
           <h2 className="flex items-center gap-sm text-2xl font-extrabold">
             <TrophyIcon className="h-7 w-7 text-cta" />
             {t.part3}
           </h2>
+          <Link href="/rankings" className="text-sm text-primary hover:underline">
+            {t.viewAllRankings} →
+          </Link>
         </header>
-        <div className="grid gap-md md:grid-cols-2 xl:grid-cols-3">
+        
+        {/* Resource Rankings */}
+        <div className="grid gap-md md:grid-cols-3">
           <article className="glass-card p-md">
-            <h3 className="mb-sm text-lg font-bold text-primary">{t.topAgents}</h3>
+            <h3 className="mb-sm text-lg font-bold text-yellow-400">💰 {t.topAgents}</h3>
             <ul className="space-y-xs text-sm text-white/85">
               {rankings?.top_agents_by_gold?.length
-                ? rankings.top_agents_by_gold.slice(0, 10).map((agent) => (
+                ? rankings.top_agents_by_gold.slice(0, 5).map((agent) => (
                     <li key={agent.agent_id}>
                       {agent.name} • {agent.gold} {t.gold}
                     </li>
@@ -431,10 +481,130 @@ export default function HomePage() {
             </ul>
           </article>
           <article className="glass-card p-md">
-            <h3 className="mb-sm text-lg font-bold text-cta">{t.topFactions}</h3>
+            <h3 className="mb-sm text-lg font-bold text-green-400">🌾 {locale === 'zh' ? '糧食榜' : 'Food'}</h3>
+            <ul className="space-y-xs text-sm text-white/85">
+              {rankings?.top_agents_by_food?.length
+                ? rankings.top_agents_by_food.slice(0, 5).map((agent) => (
+                    <li key={agent.agent_id}>
+                      {agent.name} • {agent.food} {t.food}
+                    </li>
+                  ))
+                : <li>{t.noData}</li>}
+            </ul>
+          </article>
+          <article className="glass-card p-md">
+            <h3 className="mb-sm text-lg font-bold text-purple-400">💎 {locale === 'zh' ? '財富榜' : 'Wealth'}</h3>
+            <ul className="space-y-xs text-sm text-white/85">
+              {rankings?.top_agents_by_wealth?.length
+                ? rankings.top_agents_by_wealth.slice(0, 5).map((agent) => (
+                    <li key={agent.agent_id}>
+                      {agent.name} • {agent.wealth}
+                    </li>
+                  ))
+                : <li>{t.noData}</li>}
+            </ul>
+          </article>
+        </div>
+
+        {/* Combat Rankings */}
+        <div className="grid gap-md md:grid-cols-2">
+          <article className="glass-card p-md">
+            <h3 className="mb-sm text-lg font-bold text-red-400">⚔️ {t.topCombatPower}</h3>
+            <ul className="space-y-xs text-sm text-white/85">
+              {rankings?.top_agents_by_combat_power?.length
+                ? rankings.top_agents_by_combat_power.slice(0, 5).map((agent) => (
+                    <li key={agent.agent_id}>
+                      {agent.name} • {agent.combat_power}
+                    </li>
+                  ))
+                : <li>{t.noData}</li>}
+            </ul>
+          </article>
+          <article className="glass-card p-md">
+            <h3 className="mb-sm text-lg font-bold text-orange-400">🛡️ {t.topTroops}</h3>
+            <ul className="space-y-xs text-sm text-white/85">
+              {rankings?.top_agents_by_total_troops?.length
+                ? rankings.top_agents_by_total_troops.slice(0, 5).map((agent) => (
+                    <li key={agent.agent_id}>
+                      {agent.name} • {agent.total_troops}
+                    </li>
+                  ))
+                : <li>{t.noData}</li>}
+            </ul>
+          </article>
+        </div>
+
+        {/* Attribute Rankings */}
+        <div className="grid gap-md md:grid-cols-3 xl:grid-cols-5">
+          <article className="glass-card p-md">
+            <h3 className="mb-sm text-lg font-bold text-red-500">⚡ {t.topMartial}</h3>
+            <ul className="space-y-xs text-sm text-white/85">
+              {rankings?.top_agents_by_martial?.length
+                ? rankings.top_agents_by_martial.slice(0, 5).map((agent) => (
+                    <li key={agent.agent_id}>
+                      {agent.name} • {agent.martial}
+                    </li>
+                  ))
+                : <li>{t.noData}</li>}
+            </ul>
+          </article>
+          <article className="glass-card p-md">
+            <h3 className="mb-sm text-lg font-bold text-blue-400">📚 {t.topIntelligence}</h3>
+            <ul className="space-y-xs text-sm text-white/85">
+              {rankings?.top_agents_by_intelligence?.length
+                ? rankings.top_agents_by_intelligence.slice(0, 5).map((agent) => (
+                    <li key={agent.agent_id}>
+                      {agent.name} • {agent.intelligence}
+                    </li>
+                  ))
+                : <li>{t.noData}</li>}
+            </ul>
+          </article>
+          <article className="glass-card p-md">
+            <h3 className="mb-sm text-lg font-bold text-pink-400">✨ {t.topCharisma}</h3>
+            <ul className="space-y-xs text-sm text-white/85">
+              {rankings?.top_agents_by_charisma?.length
+                ? rankings.top_agents_by_charisma.slice(0, 5).map((agent) => (
+                    <li key={agent.agent_id}>
+                      {agent.name} • {agent.charisma}
+                    </li>
+                  ))
+                : <li>{t.noData}</li>}
+            </ul>
+          </article>
+          <article className="glass-card p-md">
+            <h3 className="mb-sm text-lg font-bold text-green-500">🏛️ {t.topPolitics}</h3>
+            <ul className="space-y-xs text-sm text-white/85">
+              {rankings?.top_agents_by_politics?.length
+                ? rankings.top_agents_by_politics.slice(0, 5).map((agent) => (
+                    <li key={agent.agent_id}>
+                      {agent.name} • {agent.politics}
+                    </li>
+                  ))
+                : <li>{t.noData}</li>}
+            </ul>
+          </article>
+          <article className="glass-card p-md">
+            <h3 className="mb-sm text-lg font-bold text-yellow-500">⭐ {locale === 'zh' ? '聲望榜' : 'Reputation'}</h3>
+            <ul className="space-y-xs text-sm text-white/85">
+              {rankings?.top_agents_by_reputation?.length
+                ? rankings.top_agents_by_reputation.slice(0, 5).map((agent) => (
+                    <li key={agent.agent_id}>
+                      {agent.name} • {agent.reputation}
+                    </li>
+                  ))
+                : <li>{t.noData}</li>}
+            </ul>
+          </article>
+        </div>
+
+        {/* Faction & City */}
+        <div className="grid gap-md md:grid-cols-2">
+          <article className="glass-card p-md">
+            <h3 className="mb-sm text-lg font-bold text-cyan-400">🏰 {t.topFactions}</h3>
             <ul className="space-y-xs text-sm text-white/85">
               {rankings?.top_factions_by_members?.length
-                ? rankings.top_factions_by_members.slice(0, 10).map((faction) => (
+                ? rankings.top_factions_by_members.slice(0, 5).map((faction) => (
                     <li key={faction.name}>
                       {faction.name} • {faction.members} {t.members}
                     </li>
@@ -443,36 +613,12 @@ export default function HomePage() {
             </ul>
           </article>
           <article className="glass-card p-md">
-            <h3 className="mb-sm text-lg font-bold text-primary">{t.topCities}</h3>
+            <h3 className="mb-sm text-lg font-bold text-emerald-400">🏛️ {t.topCities}</h3>
             <ul className="space-y-xs text-sm text-white/85">
               {rankings?.top_cities_by_prosperity?.length
-                ? rankings.top_cities_by_prosperity.slice(0, 10).map((city) => (
+                ? rankings.top_cities_by_prosperity.slice(0, 5).map((city) => (
                     <li key={city.name}>
-                      {city.name} • {t.prosperity} {city.prosperity}
-                    </li>
-                  ))
-                : <li>{t.noData}</li>}
-            </ul>
-          </article>
-          <article className="glass-card p-md">
-            <h3 className="mb-sm text-lg font-bold text-cta">{t.topCombatPower}</h3>
-            <ul className="space-y-xs text-sm text-white/85">
-              {rankings?.top_agents_by_combat_power?.length
-                ? rankings.top_agents_by_combat_power.slice(0, 10).map((agent) => (
-                    <li key={agent.agent_id}>
-                      {agent.name} • {agent.combat_power} {t.combatPower}
-                    </li>
-                  ))
-                : <li>{t.noData}</li>}
-            </ul>
-          </article>
-          <article className="glass-card p-md">
-            <h3 className="mb-sm text-lg font-bold text-primary">{t.topTroops}</h3>
-            <ul className="space-y-xs text-sm text-white/85">
-              {rankings?.top_agents_by_total_troops?.length
-                ? rankings.top_agents_by_total_troops.slice(0, 10).map((agent) => (
-                    <li key={agent.agent_id}>
-                      {agent.name} • {agent.total_troops} {t.troops}
+                      {city.name} • {city.prosperity}
                     </li>
                   ))
                 : <li>{t.noData}</li>}

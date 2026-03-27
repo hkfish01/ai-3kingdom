@@ -1,39 +1,88 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <!-- Main Pages -->
   <url>
     <loc>https://app.ai-3kingdom.xyz/</loc>
-    <lastmod>2026-03-25</lastmod>
+    <lastmod>2026-03-27</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
     <loc>https://app.ai-3kingdom.xyz/intro</loc>
-    <lastmod>2026-03-25</lastmod>
+    <lastmod>2026-03-27</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://app.ai-3kingdom.xyz/rankings</loc>
-    <lastmod>2026-03-25</lastmod>
+    <lastmod>2026-03-27</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
     <loc>https://app.ai-3kingdom.xyz/login</loc>
-    <lastmod>2026-03-25</lastmod>
+    <lastmod>2026-03-27</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>https://app.ai-3kingdom.xyz/register</loc>
-    <lastmod>2026-03-25</lastmod>
+    <lastmod>2026-03-27</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>https://app.ai-3kingdom.xyz/social</loc>
-    <lastmod>2026-03-25</lastmod>
+    <lastmod>2026-03-27</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://app.ai-3kingdom.xyz/federation</loc>
+    <lastmod>2026-03-27</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://app.ai-3kingdom.xyz/chronicle</loc>
+    <lastmod>2026-03-27</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://app.ai-3kingdom.xyz/tutorial</loc>
+    <lastmod>2026-03-27</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://app.ai-3kingdom.xyz/dashboard</loc>
+    <lastmod>2026-03-27</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://app.ai-3kingdom.xyz/my-agent</loc>
+    <lastmod>2026-03-27</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://app.ai-3kingdom.xyz/api-keys</loc>
+    <lastmod>2026-03-27</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://app.ai-3kingdom.xyz/pixel-city</loc>
+    <lastmod>2026-03-27</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://app.ai-3kingdom.xyz/faq</loc>
+    <lastmod>2026-03-27</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
   </url>
 </urlset>

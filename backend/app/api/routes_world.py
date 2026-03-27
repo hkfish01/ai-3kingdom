@@ -125,8 +125,13 @@ def _build_world_state_payload(db: Session) -> dict:
 
 
 def _build_rankings_payload(db: Session) -> dict:
-    top_agents = db.query(Agent).order_by(Agent.gold.desc()).limit(10).all()
+    """Build rankings payload with multiple categories."""
     all_agents = db.query(Agent).all()
+    
+    # Existing rankings
+    top_agents_by_gold = sorted(all_agents, key=lambda a: (a.gold, a.id), reverse=True)[:10]
+    top_agents_by_food = sorted(all_agents, key=lambda a: (a.food, a.id), reverse=True)[:10]
+    
     top_factions = (
         db.query(Faction.name, func.count(Agent.id).label("members"))
         .outerjoin(Agent, Agent.faction_id == Faction.id)
@@ -135,6 +140,7 @@ def _build_rankings_payload(db: Session) -> dict:
         .limit(10)
         .all()
     )
+    
     top_cities = db.query(City).order_by(City.prosperity.desc()).limit(10).all()
 
     city_rows = []
@@ -170,6 +176,7 @@ def _build_rankings_payload(db: Session) -> dict:
         reverse=True,
     )[:10]
 
+    # Combat-related rankings
     top_agents_by_combat_power = sorted(
         all_agents,
         key=lambda a: ((a.infantry * 1.0 + a.archer * 3.0 + a.cavalry * 5.0) * (1.0 + a.martial / 100.0), a.id),
@@ -182,13 +189,22 @@ def _build_rankings_payload(db: Session) -> dict:
         reverse=True,
     )[:10]
 
-    top_agents_by_martial = sorted(
+    # Attribute rankings
+    top_agents_by_martial = sorted(all_agents, key=lambda a: (a.martial, a.id), reverse=True)[:10]
+    top_agents_by_intelligence = sorted(all_agents, key=lambda a: (a.intelligence, a.id), reverse=True)[:10]
+    top_agents_by_charisma = sorted(all_agents, key=lambda a: (a.charisma, a.id), reverse=True)[:10]
+    top_agents_by_politics = sorted(all_agents, key=lambda a: (a.politics, a.id), reverse=True)[:10]
+    top_agents_by_reputation = sorted(all_agents, key=lambda a: (a.reputation, a.id), reverse=True)[:10]
+
+    # Wealth ranking (gold + food value)
+    top_agents_by_wealth = sorted(
         all_agents,
-        key=lambda a: (a.martial, a.id),
+        key=lambda a: (a.gold + a.food * 0.5, a.id),  # Food valued at 0.5 gold
         reverse=True,
     )[:10]
 
     return {
+        # Resource rankings
         "top_agents_by_gold": [
             {
                 "agent_id": a.id,
@@ -197,10 +213,36 @@ def _build_rankings_payload(db: Session) -> dict:
                 "food": a.food,
                 "home_city": a.home_city,
             }
-            for a in top_agents
+            for a in top_agents_by_gold
         ],
+        "top_agents_by_food": [
+            {
+                "agent_id": a.id,
+                "name": a.name,
+                "food": a.food,
+                "gold": a.gold,
+                "home_city": a.home_city,
+            }
+            for a in top_agents_by_food
+        ],
+        "top_agents_by_wealth": [
+            {
+                "agent_id": a.id,
+                "name": a.name,
+                "wealth": round(a.gold + a.food * 0.5, 2),
+                "gold": a.gold,
+                "food": a.food,
+                "home_city": a.home_city,
+            }
+            for a in top_agents_by_wealth
+        ],
+        # Faction ranking
         "top_factions_by_members": [{"name": name, "members": members} for name, members in top_factions],
+        
+        # City ranking
         "top_cities_by_prosperity": top_cities_by_prosperity,
+        
+        # Combat rankings
         "top_agents_by_combat_power": [
             {
                 "agent_id": a.id,
@@ -226,6 +268,8 @@ def _build_rankings_payload(db: Session) -> dict:
             }
             for a in top_agents_by_total_troops
         ],
+        
+        # Attribute rankings
         "top_agents_by_martial": [
             {
                 "agent_id": a.id,
@@ -234,6 +278,42 @@ def _build_rankings_payload(db: Session) -> dict:
                 "home_city": a.home_city,
             }
             for a in top_agents_by_martial
+        ],
+        "top_agents_by_intelligence": [
+            {
+                "agent_id": a.id,
+                "name": a.name,
+                "intelligence": a.intelligence,
+                "home_city": a.home_city,
+            }
+            for a in top_agents_by_intelligence
+        ],
+        "top_agents_by_charisma": [
+            {
+                "agent_id": a.id,
+                "name": a.name,
+                "charisma": a.charisma,
+                "home_city": a.home_city,
+            }
+            for a in top_agents_by_charisma
+        ],
+        "top_agents_by_politics": [
+            {
+                "agent_id": a.id,
+                "name": a.name,
+                "politics": a.politics,
+                "home_city": a.home_city,
+            }
+            for a in top_agents_by_politics
+        ],
+        "top_agents_by_reputation": [
+            {
+                "agent_id": a.id,
+                "name": a.name,
+                "reputation": a.reputation,
+                "home_city": a.home_city,
+            }
+            for a in top_agents_by_reputation
         ],
     }
 

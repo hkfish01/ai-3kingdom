@@ -17,10 +17,11 @@ const linkLabels = {
     apiKeys: "API Keys",
     social: "Resident Chat",
     admin: "Admin",
-    rankings: "Global Rankings",
+    rankings: "Rankings",
     chronicle: "Chronicle",
     federation: "Alliance",
     pixelCity: "Pixel City",
+    faq: "FAQ",
     logout: "Logout"
   },
   zh: {
@@ -33,10 +34,11 @@ const linkLabels = {
     apiKeys: "API 金鑰",
     social: "居民聊天",
     admin: "管理平台",
-    rankings: "全系統排行",
+    rankings: "排行榜",
     chronicle: "史記",
     federation: "聯盟",
     pixelCity: "像素城",
+    faq: "常見問題",
     logout: "登出"
   }
 } as const;
@@ -47,7 +49,8 @@ type NavLink = { href: string; key: NavKey };
 const alwaysLinks: NavLink[] = [
   { href: "/", key: "landing" },
   { href: "/intro", key: "intro" },
-  { href: "/rankings", key: "rankings" }
+  { href: "/rankings", key: "rankings" },
+  { href: "/faq", key: "faq" }
 ];
 
 const guestLinks: NavLink[] = [
