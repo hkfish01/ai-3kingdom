@@ -1,0 +1,132 @@
+name: Deploy to Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      skip_backup:
+        description: "Skip database backup before deploy"
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  deploy:
+    name: Deploy to Production Server
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Get version
+        id: version
+        run: echo "version=$(cat VERSION)" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy via SSH through jump host
+        uses: appleboy/ssh-action@v1
+        env:
+          SKIP_BACKUP: ${{ inputs.skip_backup }}
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        with:
+          host: 192.168.16.201
+          username: dell
+          password: ${{ secrets.PROD_HOST_PASSWORD }}
+          proxy_host: lemon.territechnology.com
+          proxy_username: rsadmin
+          proxy_password: ${{ secrets.JUMP_HOST_PASSWORD }}
+          command_timeout: 15m
+          envs: SKIP_BACKUP,RELEASE_VERSION
+          script: |
+            set -euo pipefail
+
+            DEPLOY_DIR="$HOME/ai-3kingdom"
+            BACKUP_DIR="$DEPLOY_DIR/backups"
+            COMPOSE_FILE="deploy/prod/docker-compose.server.yml"
+            ENV_FILE="deploy/prod/.env"
+            REPO_URL="https://github.com/hkfish01/ai-3kingdom.git"
+
+            cd "$DEPLOY_DIR"
+
+            # ── Step 1: Backup database ─────────────────────
+            if [ "${SKIP_BACKUP}" != "true" ]; then
+              echo "▶ [1/5] Backing up database..."
+              mkdir -p "$BACKUP_DIR"
+              TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+              docker exec ai3k-postgres pg_dump -U postgres ai3k \
+                | gzip > "$BACKUP_DIR/ai3k_pre_deploy_${TIMESTAMP}.sql.gz"
+              echo "  ✓ Backup saved: ai3k_pre_deploy_${TIMESTAMP}.sql.gz"
+              # Keep only last 10 backups
+              ls -t "$BACKUP_DIR"/ai3k_pre_deploy_*.sql.gz 2>/dev/null \
+                | tail -n +11 | xargs rm -f 2>/dev/null || true
+            else
+              echo "▶ [1/5] Skipping database backup (user requested)"
+            fi
+
+            # ── Step 2: Pull latest code ────────────────────
+            echo "▶ [2/5] Syncing code..."
+            if [ ! -d .git ]; then
+              echo "  Initializing git repository (first time)..."
+              git init
+              git remote add origin "$REPO_URL"
+            fi
+            git fetch origin main
+            git reset --hard origin/main
+            echo "  ✓ Code synced to $(git rev-parse --short HEAD)"
+
+            # ── Step 3: Build & deploy ──────────────────────
+            echo "▶ [3/5] Building and deploying..."
+
+            # Ensure infra services are running
+            docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d postgres redis
+            echo "  Waiting for postgres to be ready..."
+            for i in $(seq 1 15); do
+              if docker exec ai3k-postgres pg_isready -U postgres > /dev/null 2>&1; then
+                break
+              fi
+              sleep 2
+            done
+
+            # Run database migrations
+            echo "  Running database migrations..."
+            docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" \
+              run --rm city-api alembic upgrade head
+
+            # Build and start all services
+            echo "  Building and starting all services..."
+            docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --build
+
+            # ── Step 4: Health check ────────────────────────
+            echo "▶ [4/5] Health check..."
+            sleep 10
+
+            HEALTH_OK=false
+            for i in 1 2 3 4 5; do
+              if curl -fsS --max-time 10 http://localhost:10090/health > /dev/null 2>&1; then
+                HEALTH_OK=true
+                echo "  ✓ Health check passed"
+                break
+              fi
+              echo "  Attempt $i/5 failed, retrying in 5s..."
+              sleep 5
+            done
+
+            if [ "$HEALTH_OK" != "true" ]; then
+              echo "  ✗ Health check failed after 5 attempts"
+              echo "  --- city-api logs ---"
+              docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" logs --tail=50 city-api
+              exit 1
+            fi
+
+            # ── Step 5: Cleanup ─────────────────────────────
+            echo "▶ [5/5] Cleaning up old Docker images..."
+            docker image prune -f > /dev/null 2>&1 || true
+
+            echo ""
+            echo "═══════════════════════════════════════"
+            echo "  ✓ Deployment complete!"
+            echo "  Version:  ${RELEASE_VERSION}"
+            echo "  Commit:   $(git rev-parse --short HEAD)"
+            echo "  Services:"
+            docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" ps --format "    {{.Name}}: {{.Status}}"
+            echo "═══════════════════════════════════════"
