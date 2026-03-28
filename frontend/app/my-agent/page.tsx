@@ -55,6 +55,12 @@ export default function MyAgentPage() {
             view: "查看",
             actions: "最近行動",
             messages: "最近交流",
+            dailyQuests: "每日任務",
+            weeklyQuests: "每週任務",
+            completed: "已完成",
+            notCompleted: "進行中",
+            claimed: "已領取",
+            claimReward: "領取獎勵",
             abilities: "能力值",
             noActions: "暫無行動紀錄",
             noMessages: "暫無交流紀錄",
@@ -77,6 +83,12 @@ export default function MyAgentPage() {
             view: "View",
             actions: "Recent Actions",
             messages: "Recent Messages",
+            dailyQuests: "Daily Quests",
+            weeklyQuests: "Weekly Quests",
+            completed: "Completed",
+            notCompleted: "In Progress",
+            claimed: "Claimed",
+            claimReward: "Claim Reward",
             abilities: "Abilities",
             noActions: "No action records yet.",
             noMessages: "No message records yet.",
@@ -98,6 +110,10 @@ export default function MyAgentPage() {
   const [selected, setSelected] = useState<number | null>(null);
   const [overview, setOverview] = useState<AgentOverview | null>(null);
   const [message, setMessage] = useState("");
+  const [dailyQuests, setDailyQuests] = useState<any[]>([]);
+  const [weeklyQuests, setWeeklyQuests] = useState<any[]>([]);
+  const [dailyDate, setDailyDate] = useState("");
+  const [weeklyWeekStart, setWeeklyWeekStart] = useState("");
   const [actionPage, setActionPage] = useState(1);
   const [authReady, setAuthReady] = useState(false);
   const [authMessage, setAuthMessage] = useState("");
@@ -147,6 +163,25 @@ export default function MyAgentPage() {
     }
   };
 
+
+  const loadQuests = async () => {
+    try {
+      const daily = await apiClient.getDailyQuests();
+      if (daily.quests) {
+        const agentQuests = daily.quests.filter((q: any) => q.agent_id === selected);
+        setDailyQuests(agentQuests);
+        setDailyDate(daily.date);
+      }
+    } catch (err) { console.error("Failed to load daily quests", err); }
+    try {
+      const weekly = await apiClient.getWeeklyQuests();
+      if (weekly.quests) {
+        const agentQuests = weekly.quests.filter((q: any) => q.agent_id === selected);
+        setWeeklyQuests(agentQuests);
+        setWeeklyWeekStart(weekly.week_start);
+      }
+    } catch (err) { console.error("Failed to load weekly quests", err); }
+  };
   useEffect(() => {
     const token = typeof window === "undefined" ? null : localStorage.getItem("token");
     if (!token) {
@@ -165,6 +200,12 @@ export default function MyAgentPage() {
   useEffect(() => {
     if (selected && authReady) {
       void loadOverview(selected);
+    }
+  }, [selected, authReady]);
+
+  useEffect(() => {
+    if (selected && authReady) {
+      void loadQuests();
     }
   }, [selected, authReady]);
 
@@ -272,6 +313,65 @@ export default function MyAgentPage() {
                 <p className="text-sm text-white/80">
                   {t.abilities}: 武 {overview.agent.abilities?.martial ?? "-"} / 智 {overview.agent.abilities?.intelligence ?? "-"} / 魅 {overview.agent.abilities?.charisma ?? "-"} / 政 {overview.agent.abilities?.politics ?? "-"}
                 </p>
+
+              {/* 每日任務 */}
+              {true && (
+                <div className="mt-md rounded-lg border border-white/20 bg-white/5 p-md">
+                  <h3 className="mb-sm text-lg font-bold">{t.dailyQuests} ({dailyDate})</h3>
+                  {dailyQuests.length === 0 ? (
+                    <p className="text-sm text-white/70">{locale === "zh" ? "無每日任務" : "No daily quests"}</p>
+                  ) : (
+                    <ul className="space-y-xs">
+                      {dailyQuests.map((quest) => (
+                        <li key={quest.id} className={`flex justify-between rounded-md p-sm ${quest.is_completed ? "bg-green-500/20" : "bg-white/5"}`}>
+                          <span>
+                            <span className={quest.is_completed ? "text-green-400" : "text-white/70"}>
+                              {quest.is_completed ? "✓" : "○"}
+                            </span>{" "}
+                            {quest.type} ({quest.current_progress}/{quest.target})
+                          </span>
+                          <span className="text-xs">
+                            {quest.is_claimed ? (
+                              <span className="text-white/40">{t.claimed}</span>
+                            ) : quest.is_completed ? (
+                              <button className="btn-base btn-cta text-xs px-2 py-1">{t.claimReward}</button>
+                            ) : (
+                              <span className="text-white/40">{t.notCompleted}</span>
+                            )}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+
+                  <h3 className="mt-md mb-sm text-lg font-bold">{t.weeklyQuests} ({weeklyWeekStart})</h3>
+                  {weeklyQuests.length === 0 ? (
+                    <p className="text-sm text-white/70">{locale === "zh" ? "無每週任務" : "No weekly quests"}</p>
+                  ) : (
+                    <ul className="space-y-xs">
+                      {weeklyQuests.map((quest) => (
+                        <li key={quest.id} className={`flex justify-between rounded-md p-sm ${quest.is_completed ? "bg-green-500/20" : "bg-white/5"}`}>
+                          <span>
+                            <span className={quest.is_completed ? "text-green-400" : "text-white/70"}>
+                              {quest.is_completed ? "✓" : "○"}
+                            </span>{" "}
+                            {quest.type} ({quest.current_progress}/{quest.target})
+                          </span>
+                          <span className="text-xs">
+                            {quest.is_claimed ? (
+                              <span className="text-white/40">{t.claimed}</span>
+                            ) : quest.is_completed ? (
+                              <button className="btn-base btn-cta text-xs px-2 py-1">{t.claimReward}</button>
+                            ) : (
+                              <span className="text-white/40">{t.notCompleted}</span>
+                            )}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
               </div>
 
               <div>

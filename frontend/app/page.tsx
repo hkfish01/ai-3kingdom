@@ -193,36 +193,25 @@ export default function HomePage() {
   useEffect(() => {
     const load = async () => {
       try {
+        // Use public endpoints directly - rankings are public data
         const [stateData, rankingData, announcementsData] = await Promise.all([
-          apiClient.getWorldState() as Promise<WorldStatePayload>,
-          apiClient.getRankings() as Promise<RankingsPayload>,
+          apiClient.getPublicWorldState() as Promise<WorldStatePayload>,
+          apiClient.getPublicRankings() as Promise<RankingsPayload>,
           apiClient.listPublicAnnouncements()
         ]);
         setWorldState(stateData);
         setRankings(rankingData);
         setAnnouncements(announcementsData.items ?? []);
-        setIsPublicMode(false);
+        setIsPublicMode(true);
         setLoadError("");
       } catch (error) {
-        try {
-          const [publicState, publicRankings, announcementsData] = await Promise.all([
-            apiClient.getPublicWorldState() as Promise<WorldStatePayload>,
-            apiClient.getPublicRankings() as Promise<RankingsPayload>,
-            apiClient.listPublicAnnouncements()
-          ]);
-          setWorldState(publicState);
-          setRankings(publicRankings);
-          setAnnouncements(announcementsData.items ?? []);
-          setIsPublicMode(true);
-          setLoadError("");
-        } catch (fallbackError) {
-          setLoadError(fallbackError instanceof Error ? fallbackError.message : t.loadFailed);
-        }
+        console.error("Failed to load world data:", error);
+        setLoadError(error instanceof Error ? error.message : t.loadFailed);
       }
     };
 
     void load();
-  }, [locale]);
+  }, [locale, t.loadFailed]);
 
   // 檢查是否顯示教學提示
   useEffect(() => {
@@ -377,11 +366,18 @@ export default function HomePage() {
       {announcements.length > 0 && (
         <section className="glass-card p-md">
           <h2 className="mb-sm text-lg font-bold text-cta">{t.announcements}</h2>
-          <ul className="space-y-xs text-sm">
+          <ul className="space-y-md text-sm">
             {announcements.slice(0, 3).map((item) => (
-              <li key={item.id} className="flex justify-between text-white/70">
-                <span>{item.title}</span>
-                <span className="text-white/40 text-xs">{new Date(item.created_at).toLocaleDateString()}</span>
+              <li key={item.id} className="flex justify-between items-start text-white/70">
+                <div className="flex-1">
+                  <div className="flex justify-between items-center">
+                    <span className="font-semibold">{item.title}</span>
+                  </div>
+                  {item.content && (
+                    <p className="mt-xs text-white/60 text-xs">{item.content}</p>
+                  )}
+                </div>
+                <span className="text-white/40 text-xs ml-2">{new Date(item.created_at).toLocaleDateString()}</span>
               </li>
             ))}
           </ul>
@@ -391,9 +387,7 @@ export default function HomePage() {
       <section className="grid gap-md md:grid-cols-2 xl:grid-cols-4">
         <article className="glass-card p-md">
           <h3 className="mb-xs text-xs font-bold uppercase tracking-wider text-white/50">{t.localKingdom}</h3>
-          {isPublicMode ? (
-            <p className="text-sm text-white/70">{t.publicModeHint}</p>
-          ) : worldState ? (
+          {worldState ? (
             <div className="space-y-xs text-sm">
               <p>
                 <span className="font-semibold text-primary">{t.location}:</span>{" "}

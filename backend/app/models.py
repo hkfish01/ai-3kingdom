@@ -285,3 +285,49 @@ class Announcement(Base):
     created_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, onupdate=utc_now)
+
+
+class DailyQuestTemplate(Base):
+    """系統預設的每日任務模板"""
+    __tablename__ = "daily_quest_templates"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    quest_type: Mapped[str] = mapped_column(String(64), index=True)
+    target: Mapped[int] = mapped_column(Integer)
+    reward_gold: Mapped[int] = mapped_column(Integer, default=0)
+    reward_food: Mapped[int] = mapped_column(Integer, default=0)
+    reward_reputation: Mapped[int] = mapped_column(Integer, default=0)
+    description_zh: Mapped[str] = mapped_column(String(255))
+    description_en: Mapped[str] = mapped_column(String(255))
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+
+
+class AgentDailyQuest(Base):
+    """玩家的每日任務進度"""
+    __tablename__ = "agent_daily_quests"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    agent_id: Mapped[int] = mapped_column(ForeignKey("agents.id"), index=True)
+    quest_type: Mapped[str] = mapped_column(String(64), index=True)
+    target: Mapped[int] = mapped_column(Integer)
+    current_progress: Mapped[int] = mapped_column(Integer, default=0)
+    is_completed: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_claimed: Mapped[bool] = mapped_column(Boolean, default=False)
+    quest_date: Mapped[str] = mapped_column(String(10), index=True)  # UTC date: YYYY-MM-DD
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+
+
+class AgentWeeklyQuest(Base):
+    """玩家的每週任務進度"""
+    __tablename__ = "agent_weekly_quests"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    agent_id: Mapped[int] = mapped_column(ForeignKey("agents.id"), index=True)
+    quest_type: Mapped[str] = mapped_column(String(64), index=True)
+    target: Mapped[int] = mapped_column(Integer)
+    current_progress: Mapped[int] = mapped_column(Integer, default=0)
+    is_completed: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_claimed: Mapped[bool] = mapped_column(Boolean, default=False)
+    week_start: Mapped[str] = mapped_column(String(10), index=True)  # UTC date: YYYY-MM-DD (Monday)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)

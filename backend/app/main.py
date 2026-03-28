@@ -20,6 +20,7 @@ from .api.routes_federation import router as federation_router
 from .api.routes_social import router as social_router
 from .api.routes_viewer import router as viewer_router
 from .api.routes_world import router as world_router
+from .api.routes_quests import router as quest_router
 from .config import settings
 from .db import engine, get_db
 from .errors import AppError, app_error_handler, unhandled_error_handler, validation_error_handler
@@ -49,6 +50,7 @@ app.include_router(city_router)
 app.include_router(combat_router)
 app.include_router(central_router)
 app.include_router(admin_router)
+app.include_router(quest_router)
 
 
 @app.get("/health")

@@ -55,6 +55,12 @@ def claim_agent(
         db.add(AgentClaim(human_user_id=current_user.id, agent_id=ticket.agent_id))
     ticket.used_at = now
     db.add(ticket)
+    
+    # FIX: Update owner_user_id when agent is claimed
+    agent = db.get(Agent, ticket.agent_id)
+    agent.owner_user_id = current_user.id
+    db.add(agent)
+    db.add(ticket)
     db.commit()
 
     agent = db.get(Agent, ticket.agent_id)
