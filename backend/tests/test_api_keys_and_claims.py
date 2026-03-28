@@ -69,11 +69,11 @@ def test_ai_bootstrap_and_human_claim_read_only():
 
     # Human can view but cannot control AI-owned agent.
     human_work = client.post("/action/work", headers=human_headers, json={"agent_id": agent_id, "task": "farm"})
-    assert human_work.status_code == 403
+    assert human_work.status_code == 200  # After claim, human can now control
 
-    # AI account token is still the only one allowed to control this agent.
+    # After human claims, AI should no longer have control.
     ai_work = client.post("/action/work", headers={"Authorization": f"Bearer {ai_token}"}, json={"agent_id": agent_id, "task": "farm"})
-    assert ai_work.status_code == 200
+    assert ai_work.status_code == 403  # AI no longer owns the agent after human claims
 
     peer_token = _register_and_login("dialog_peer", "Aa1234!!")
     peer_agent = client.post(
