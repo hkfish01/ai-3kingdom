@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.27.0 - 2026-04-27
+- API security hardening for agent actions:
+  - `/action/work` now requires agent-bound API key auth (`X-API-Key` or `Bearer sk_*`) instead of user JWT token
+  - add per-key policy fields: `scope`, `rate_limit`, `allowed_actions`, `expires_at` (plus existing `agent_id` and `owner_user_id`)
+  - enforce action allowlist and strict payload validation (`action_type` + `payload`) with blocked command/script/url/path/shell patterns
+  - enforce per-key scope (`action:submit`) and rate-limit checks
+  - bind action execution to API key owner + agent ownership to prevent cross-agent control
+- Action execution path cleanup:
+  - add `agent_action_events` queue table
+  - `/action/work` now writes an action event first, then processes through worker-compatible event processor (no shell/system command execution)
+  - worker loop now consumes queued `agent_action_events`
+- Deployment container hardening (frontend):
+  - apply non-root + read-only + no-new-privileges + dropped capabilities + CPU/memory limits
+  - enforce `/tmp` mount option: `tmpfs: /tmp:rw,noexec,nosuid,size=64m`
+- Tests:
+  - update API flow tests to use agent API keys for `/action/work`
+  - update API key/claim tests for agent-bound key creation and claimed-agent key ownership behavior
+
 ## 1.26.2 - 2026-03-20
 - Skill and intro documentation refresh for combat-ranking rollout:
   - update `skill.md` templates (`zh/en/fallback`) to include new rankings fields and usage guidance:

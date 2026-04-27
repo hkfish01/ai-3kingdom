@@ -98,8 +98,8 @@ class RegisterAgentRequest(BaseModel):
 
 
 class WorkActionRequest(BaseModel):
-    agent_id: int
-    task: str
+    action_type: str = Field(min_length=1, max_length=32)
+    payload: dict = Field(default_factory=dict)
 
 
 class TrainActionRequest(BaseModel):
@@ -184,7 +184,27 @@ class FederationMigrateRequest(BaseModel):
 
 class CreateApiKeyRequest(BaseModel):
     name: str = Field(min_length=2, max_length=128)
-    agent_id: int | None = None
+    agent_id: int
+    scope: list[str] = Field(default_factory=lambda: ["agent:read", "action:submit"])
+    rate_limit: str = Field(default="60/min", min_length=3, max_length=32)
+    allowed_actions: list[str] = Field(default_factory=lambda: ["farm", "trade", "move"])
+    expires_at: str | None = Field(default=None, min_length=10, max_length=64)
+
+    @field_validator("scope", "allowed_actions")
+    @classmethod
+    def validate_non_empty_list(cls, value: list[str]) -> list[str]:
+        out = [item.strip() for item in value if item and item.strip()]
+        if not out:
+            raise ValueError("List cannot be empty.")
+        return sorted(set(out))
+
+    @field_validator("rate_limit")
+    @classmethod
+    def validate_rate_limit(cls, value: str) -> str:
+        out = value.strip().lower()
+        if not re.match(r"^\d+/(min|hour|day)$", out):
+            raise ValueError("rate_limit must be like '60/min', '500/hour', or '1000/day'.")
+        return out
 
 
 class BootstrapAIAgentRequest(BaseModel):

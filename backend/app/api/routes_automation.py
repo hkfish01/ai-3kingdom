@@ -1,3 +1,4 @@
+import json
 from datetime import timedelta
 
 from fastapi import APIRouter, Depends
@@ -78,6 +79,10 @@ def bootstrap_ai_agent(payload: BootstrapAIAgentRequest, db: Session = Depends(g
         key_prefix=plain_key[:10],
         key_hash=hash_secret(plain_key),
         last4=plain_key[-4:],
+        scope_json=json.dumps(["agent:read", "action:submit"], ensure_ascii=False),
+        rate_limit="60/min",
+        allowed_actions_json=json.dumps(["farm", "trade", "move"], ensure_ascii=False),
+        expires_at=utc_now() + timedelta(days=30),
     )
     db.add(key)
 
@@ -119,6 +124,10 @@ def bootstrap_ai_agent(payload: BootstrapAIAgentRequest, db: Session = Depends(g
                 "name": key.name,
                 "key": plain_key,
                 "key_preview": f"{key.key_prefix}...{key.last4}",
+                "scope": ["agent:read", "action:submit"],
+                "rate_limit": key.rate_limit,
+                "allowed_actions": ["farm", "trade", "move"],
+                "expires_at": key.expires_at.isoformat() if key.expires_at else None,
             },
             "claim_code": claim_code,
             "claim_expires_at": ticket.expires_at.isoformat(),

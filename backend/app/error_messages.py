@@ -1,5 +1,12 @@
 ERROR_MESSAGES = {
     "UNAUTHORIZED": "Authentication is required to access this resource.",
+    "INVALID_API_KEY": "API key is invalid.",
+    "API_KEY_EXPIRED": "API key has expired.",
+    "RATE_LIMIT_EXCEEDED": "Rate limit exceeded.",
+    "INSUFFICIENT_SCOPE": "API key scope does not allow this operation.",
+    "ACTION_NOT_ALLOWED": "This API key is not allowed to run the requested action.",
+    "ACTION_TYPE_NOT_ALLOWED": "Action type is not in allowlist.",
+    "INVALID_ACTION_PAYLOAD": "Action payload is invalid.",
     "FORBIDDEN": "You do not have permission to perform this action.",
     "USER_NOT_FOUND": "The specified user does not exist.",
     "USERNAME_EXISTS": "Username already exists.",

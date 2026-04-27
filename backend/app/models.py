@@ -20,6 +20,8 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(255))
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
+    wallet_address: Mapped[str | None] = mapped_column(String(128), nullable=True, unique=True, index=True)
+    wallet_bound_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
     agents: Mapped[list["Agent"]] = relationship(back_populates="owner")
@@ -197,9 +199,30 @@ class ApiKey(Base):
     key_prefix: Mapped[str] = mapped_column(String(16), index=True)
     key_hash: Mapped[str] = mapped_column(String(128), unique=True, index=True)
     last4: Mapped[str] = mapped_column(String(8), default="")
+    scope_json: Mapped[str] = mapped_column(Text, default="[]")
+    rate_limit: Mapped[str] = mapped_column(String(32), default="60/min")
+    allowed_actions_json: Mapped[str] = mapped_column(Text, default="[]")
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class AgentActionEvent(Base):
+    __tablename__ = "agent_action_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    agent_id: Mapped[int] = mapped_column(ForeignKey("agents.id"), index=True)
+    api_key_id: Mapped[int] = mapped_column(ForeignKey("api_keys.id"), index=True)
+    owner_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    action_type: Mapped[str] = mapped_column(String(32), index=True)
+    payload_json: Mapped[str] = mapped_column(Text, default="{}")
+    status: Mapped[str] = mapped_column(String(16), default="queued", index=True)
+    result_json: Mapped[str] = mapped_column(Text, default="{}")
+    error_code: Mapped[str] = mapped_column(String(64), default="")
+    error_message: Mapped[str] = mapped_column(String(255), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, index=True)
+    processed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
 class AgentClaimTicket(Base):
@@ -331,3 +354,70 @@ class AgentWeeklyQuest(Base):
     is_claimed: Mapped[bool] = mapped_column(Boolean, default=False)
     week_start: Mapped[str] = mapped_column(String(10), index=True)  # UTC date: YYYY-MM-DD (Monday)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+
+
+class ChainAsset(Base):
+    __tablename__ = "chain_assets"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    uuid: Mapped[str] = mapped_column(String(36), unique=True, index=True)
+    chain_id: Mapped[str] = mapped_column(String(64), index=True)
+    chain_token_id: Mapped[str] = mapped_column(String(128), default="", index=True)
+    chain_tx_hash: Mapped[str] = mapped_column(String(128), default="")
+    asset_type: Mapped[str] = mapped_column(String(16), index=True)  # nft / ft
+    collection_id: Mapped[str] = mapped_column(String(64), default="", index=True)
+    owner_address: Mapped[str] = mapped_column(String(128), index=True)
+    name: Mapped[str] = mapped_column(String(128), default="")
+    token_uri: Mapped[str] = mapped_column(String(512), default="")
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+    status: Mapped[str] = mapped_column(String(16), default="active", index=True)  # active / burned / migrating
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, onupdate=utc_now)
+
+
+class ChainTransaction(Base):
+    __tablename__ = "chain_transactions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    chain_id: Mapped[str] = mapped_column(String(64), index=True)
+    tx_hash: Mapped[str] = mapped_column(String(128), unique=True, index=True)
+    from_address: Mapped[str] = mapped_column(String(128), default="", index=True)
+    to_address: Mapped[str] = mapped_column(String(128), default="", index=True)
+    action: Mapped[str] = mapped_column(String(32), index=True)  # mint / transfer / burn / list / buy / cancel
+    asset_uuid: Mapped[str] = mapped_column(String(36), default="", index=True)
+    amount: Mapped[str] = mapped_column(String(64), default="1")
+    status: Mapped[str] = mapped_column(String(16), default="pending", index=True)  # pending / confirmed / failed
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class ChainCollection(Base):
+    __tablename__ = "chain_collections"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    collection_id: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    chain_id: Mapped[str] = mapped_column(String(64), index=True)
+    name: Mapped[str] = mapped_column(String(128))
+    symbol: Mapped[str] = mapped_column(String(32))
+    description: Mapped[str] = mapped_column(Text, default="")
+    base_uri: Mapped[str] = mapped_column(String(512), default="")
+    tx_hash: Mapped[str] = mapped_column(String(128), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+
+
+class MarketListing(Base):
+    __tablename__ = "market_listings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    listing_id: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    chain_id: Mapped[str] = mapped_column(String(64), index=True)
+    seller: Mapped[str] = mapped_column(String(128), index=True)
+    token_id: Mapped[str] = mapped_column(String(128), index=True)
+    asset_uuid: Mapped[str] = mapped_column(String(36), default="", index=True)
+    price: Mapped[str] = mapped_column(String(64))
+    price_symbol: Mapped[str] = mapped_column(String(32))
+    tx_hash: Mapped[str] = mapped_column(String(128), default="")
+    status: Mapped[str] = mapped_column(String(16), default="active", index=True)  # active / sold / cancelled / expired
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, onupdate=utc_now)

@@ -13,11 +13,18 @@ def _register_and_login(username: str, password: str) -> str:
     return login.json()["data"]["token"]
 
 
+def _register_agent(headers: dict, name: str = "ApiKeyAgent", role: str = "平民") -> int:
+    resp = client.post("/agent/register", headers=headers, json={"name": name, "role": role})
+    assert resp.status_code == 200
+    return resp.json()["data"]["agent_id"]
+
+
 def test_api_key_persistence_and_revoke():
     token = _register_and_login("apikey_user", "Aa1234!!")
     headers = {"Authorization": f"Bearer {token}"}
+    agent_id = _register_agent(headers)
 
-    create_resp = client.post("/api-keys", headers=headers, json={"name": "OpenClaw Main Key"})
+    create_resp = client.post("/api-keys", headers=headers, json={"name": "OpenClaw Main Key", "agent_id": agent_id})
     assert create_resp.status_code == 200
     created_id = create_resp.json()["data"]["id"]
     assert create_resp.json()["data"]["key"].startswith("sk_")
@@ -48,7 +55,6 @@ def test_ai_bootstrap_and_human_claim_read_only():
     )
     assert bootstrap.status_code == 200
     data = bootstrap.json()["data"]
-    ai_token = data["token"]
     claim_code = data["claim_code"]
     agent_id = data["agent"]["agent_id"]
 
@@ -67,12 +73,21 @@ def test_ai_bootstrap_and_human_claim_read_only():
     assert overview.status_code == 200
     assert overview.json()["data"]["agent"]["id"] == agent_id
 
-    # Human can view but cannot control AI-owned agent.
-    human_work = client.post("/action/work", headers=human_headers, json={"agent_id": agent_id, "task": "farm"})
+    human_key_resp = client.post(
+        "/api-keys",
+        headers=human_headers,
+        json={"name": "Claimed Agent Key", "agent_id": agent_id, "allowed_actions": ["farm", "move"]},
+    )
+    assert human_key_resp.status_code == 200
+    human_api_headers = {"X-API-Key": human_key_resp.json()["data"]["key"]}
+
+    # Human can view and control with own agent-bound API key.
+    human_work = client.post("/action/work", headers=human_api_headers, json={"action_type": "farm", "payload": {}})
     assert human_work.status_code == 200  # After claim, human can now control
 
-    # After human claims, AI should no longer have control.
-    ai_work = client.post("/action/work", headers={"Authorization": f"Bearer {ai_token}"}, json={"agent_id": agent_id, "task": "farm"})
+    # After human claims, AI old key should no longer have control.
+    ai_api_key = data["api_key"]["key"]
+    ai_work = client.post("/action/work", headers={"X-API-Key": ai_api_key}, json={"action_type": "farm", "payload": {}})
     assert ai_work.status_code == 403  # AI no longer owns the agent after human claims
 
     peer_token = _register_and_login("dialog_peer", "Aa1234!!")

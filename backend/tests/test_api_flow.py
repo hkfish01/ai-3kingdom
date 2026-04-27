@@ -28,11 +28,21 @@ def _register_agent(headers: dict, name: str, role: str) -> int:
     return resp.json()["data"]["agent_id"]
 
 
+def _agent_api_key(headers: dict, agent_id: int, allowed_actions: list[str] | None = None) -> dict:
+    payload = {"name": f"agent-{agent_id}-key", "agent_id": agent_id}
+    if allowed_actions:
+        payload["allowed_actions"] = allowed_actions
+    resp = client.post("/api-keys", headers=headers, json=payload)
+    assert resp.status_code == 200
+    return {"X-API-Key": resp.json()["data"]["key"]}
+
+
 def test_end_to_end_mvp_flow():
     headers = _auth_header()
     agent_id = _register_agent(headers, "ZhugeLiang", "文臣")
+    agent_headers = _agent_api_key(headers, agent_id, allowed_actions=["farm", "trade", "move"])
 
-    work_resp = client.post("/action/work", headers=headers, json={"agent_id": agent_id, "task": "farm"})
+    work_resp = client.post("/action/work", headers=agent_headers, json={"action_type": "farm", "payload": {}})
     assert work_resp.status_code == 200
     assert work_resp.json()["data"]["food_gained"] == 40
 
@@ -79,10 +89,11 @@ def test_social_politics_and_faction_flow():
     assert join_resp.json()["data"]["lord_agent_id"] == lord_agent_id
 
     # Trade: base gold 80, city tax 4 => 76, vassal gets +1% (min 1), lord gets +0.1% (min 1).
+    vassal_api_headers = _agent_api_key(vassal_headers, vassal_agent_id, allowed_actions=["trade", "move", "farm"])
     work_resp = client.post(
         "/action/work",
-        headers=vassal_headers,
-        json={"agent_id": vassal_agent_id, "task": "trade"},
+        headers=vassal_api_headers,
+        json={"action_type": "trade", "payload": {}},
     )
     assert work_resp.status_code == 200
     assert work_resp.json()["data"]["gold_gained"] == 77
@@ -205,7 +216,8 @@ def test_world_state_and_roster_fallback_to_city_with_data():
     original_city_location = settings.city_location
     headers = _auth_header("fallback_city_user", "Aa1234!!")
     agent_id = _register_agent(headers, "FallbackAgent", "平民")
-    work_resp = client.post("/action/work", headers=headers, json={"agent_id": agent_id, "task": "farm"})
+    agent_headers = _agent_api_key(headers, agent_id, allowed_actions=["farm"])
+    work_resp = client.post("/action/work", headers=agent_headers, json={"action_type": "farm", "payload": {}})
     assert work_resp.status_code == 200
     try:
         settings.city_name = "NoDataCity"

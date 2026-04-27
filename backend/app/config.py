@@ -3,7 +3,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     app_name: str = "AI Three Kingdoms City Node"
-    app_version: str = "1.26.2"
+    app_version: str = "1.27.0"
     database_url: str = "sqlite:///./ai_three_kingdoms.db"
     jwt_secret: str = "change-me-in-prod"
     jwt_algorithm: str = "HS256"
@@ -36,6 +36,12 @@ class Settings(BaseSettings):
     smtp_password: str = ""
     smtp_from: str = ""
     smtp_use_tls: bool = True
+
+    # -- Blockchain / Chain Abstraction Layer --
+    chain_provider: str = "hyperledger"
+    chain_base_url: str = "https://chain.onlyoneledger.com/api"
+    chain_api_token: str = ""
+    chain_id: str = "hyperledger-fabric-1"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
