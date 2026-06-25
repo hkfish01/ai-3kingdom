@@ -234,14 +234,14 @@ export default function AdminDashboardPage() {
                     </div>
                     <div className="text-right">
                       {getStatusIcon(check.status)}
-                      {key === "agent_activity" && check.starving_agents !== undefined && check.starving_agents > 0 && (
+                      {key === "agent_activity" && (check as any).starving_agents !== undefined && (check as any).starving_agents > 0 && (
                         <p className="mt-1 text-xs text-yellow-400">
-                          {check.starving_agents} 飢餓
+                          {(check as any).starving_agents} 飢餓
                         </p>
                       )}
-                      {key === "battle_logs" && check.attacker_win_rate && (
+                      {key === "battle_logs" && (check as any).attacker_win_rate && (
                         <p className="mt-1 text-xs text-slate-400">
-                          攻方勝率: {check.attacker_win_rate}
+                          攻方勝率: {(check as any).attacker_win_rate}
                         </p>
                       )}
                     </div>
