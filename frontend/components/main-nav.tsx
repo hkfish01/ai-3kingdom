@@ -58,7 +58,7 @@ const guestLinks: NavLink[] = [
   { href: "/register", key: "register" }
 ];
 
-const authedLinks: NavLink[] = [
+  const authedLinks: NavLink[] = [
   { href: "/dashboard", key: "dashboard" },
   { href: "/my-agent", key: "myAgent" },
   { href: "/social", key: "social" },

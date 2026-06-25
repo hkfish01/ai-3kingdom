@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { adminApi } from "@/lib/admin-api";
-import AdminNav from "@/components/admin-nav";
 
 export default function AdminShell({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
@@ -51,7 +50,6 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-md">
       <div className="mx-auto max-w-6xl">
-        <AdminNav />
         {children}
       </div>
     </main>
