@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { adminApi } from "@/lib/admin-api";
 import { AdminUserRow } from "@/lib/types";
 import { useLocale } from "@/lib/locale";
+import AdminShell from "@/components/admin-shell";
 
 export default function AdminUsersPage() {
   const { locale } = useLocale();
@@ -134,74 +135,72 @@ export default function AdminUsersPage() {
   };
 
   return (
-    <main className="space-y-md">
-      <section className="glass-card p-md">
-        <div className="flex flex-wrap items-center justify-between gap-sm">
-          <h1 className="text-2xl font-bold">{t.title}</h1>
-          <button className="btn-base btn-secondary" onClick={() => void load()}>{t.refresh}</button>
-        </div>
-      </section>
-
-      {!loading && !allowed ? <p className="rounded-lg bg-red-500/20 p-sm text-sm">{t.denied}</p> : null}
-      {error ? <p className="rounded-lg bg-red-500/20 p-sm text-sm">{error}</p> : null}
-      {message ? <p className="rounded-lg bg-emerald-500/20 p-sm text-sm">{message}</p> : null}
-
-      {allowed ? (
+    <AdminShell>
+      <div className="space-y-md">
         <section className="glass-card p-md">
-          <form className="mb-sm flex flex-wrap gap-xs" onSubmit={(e) => void onSearch(e)}>
-            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t.search} />
-            <select value={isAdminFilter} onChange={(e) => setIsAdminFilter(e.target.value as "all" | "true" | "false")}>
-              <option value="all">{t.adminFilter}: {t.all}</option>
-              <option value="true">{t.adminFilter}: {t.yes}</option>
-              <option value="false">{t.adminFilter}: {t.no}</option>
-            </select>
-            <button type="submit" className="btn-base btn-secondary">{t.search}</button>
-          </form>
-
-          <div className="space-y-sm">
-            {items.map((u) => (
-              <article key={u.id} className="rounded-lg border border-white/15 bg-white/5 p-sm">
-                <p className="text-sm font-semibold">#{u.id}</p>
-                <div className="mt-xs grid gap-xs md:grid-cols-3">
-                  <input
-                    value={editing[u.id]?.username ?? ""}
-                    onChange={(e) => setEditing((prev) => ({ ...prev, [u.id]: { ...prev[u.id], username: e.target.value } }))}
-                  />
-                  <input
-                    value={editing[u.id]?.email ?? ""}
-                    onChange={(e) => setEditing((prev) => ({ ...prev, [u.id]: { ...prev[u.id], email: e.target.value } }))}
-                  />
-                  <label className="flex items-center gap-xs text-sm text-white/80">
-                    <input
-                      type="checkbox"
-                      checked={Boolean(editing[u.id]?.is_admin)}
-                      onChange={(e) => setEditing((prev) => ({ ...prev, [u.id]: { ...prev[u.id], is_admin: e.target.checked } }))}
-                    />
-                    {t.adminFilter}
-                  </label>
-                </div>
-                <form className="mt-xs flex flex-wrap gap-xs" onSubmit={(e) => void onReset(e, u.id)}>
-                  <input
-                    type="password"
-                    value={resetPwdMap[u.id] ?? ""}
-                    onChange={(e) => setResetPwdMap((prev) => ({ ...prev, [u.id]: e.target.value }))}
-                    placeholder={t.resetPassword}
-                  />
-                  <button type="submit" className="btn-base btn-secondary">{t.resetPassword}</button>
-                  <button type="button" className="btn-base btn-secondary" onClick={() => void onSave(u.id)}>{t.save}</button>
-                  <button type="button" className="btn-base btn-cta" onClick={() => void onDelete(u.id)}>{t.delete}</button>
-                </form>
-              </article>
-            ))}
-          </div>
-
-          <div className="mt-sm flex items-center justify-end gap-xs">
-            <button className="btn-base btn-secondary" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>{t.prev}</button>
-            <span className="text-sm text-white/80">{page} / {totalPages}</span>
-            <button className="btn-base btn-secondary" disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>{t.next}</button>
+          <div className="flex flex-wrap items-center justify-between gap-sm">
+            <h1 className="text-2xl font-bold">{t.title}</h1>
+            <button className="btn-base btn-secondary" onClick={() => void load()}>{t.refresh}</button>
           </div>
         </section>
-      ) : null}
-    </main>
+
+        {!loading && !allowed ? <p className="rounded-lg bg-red-500/20 p-sm text-sm">{t.denied}</p> : null}
+        {error ? <p className="rounded-lg bg-red-500/20 p-sm text-sm">{error}</p> : null}
+        {message ? <p className="rounded-lg bg-emerald-500/20 p-sm text-sm">{message}</p> : null}
+
+        {allowed ? (
+          <section className="glass-card p-md">
+            <form className="mb-sm flex flex-wrap gap-xs" onSubmit={(e) => void onSearch(e)}>
+              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t.search} />
+              <select value={isAdminFilter} onChange={(e) => setIsAdminFilter(e.target.value as "all" | "true" | "false")}>
+                <option value="all">{t.adminFilter}: {t.all}</option>
+                <option value="true">{t.adminFilter}: {t.yes}</option>
+                <option value="false">{t.adminFilter}: {t.no}</option>
+              </select>
+              <button type="submit" className="btn-base btn-secondary">{t.search}</button>
+            </form>
+
+            <div className="space-y-sm">
+              {items.map((u) => (
+                <article key={u.id} className="rounded-lg border border-white/15 bg-white/5 p-sm">
+                  <p className="text-sm font-semibold">#{u.id}</p>
+                  <div className="mt-xs grid gap-xs md:grid-cols-3">
+                    <input
+                      value={editing[u.id]?.username ?? ""}
+                      onChange={(e) => setEditing((prev) => ({ ...prev, [u.id]: { ...prev[u.id], username: e.target.value } }))}
+                    />
+                    <input
+                      value={editing[u.id]?.email ?? ""}
+                      onChange={(e) => setEditing((prev) => ({ ...prev, [u.id]: { ...prev[u.id], email: e.target.value } }))}
+                    />
+                    <label className="flex items-center gap-xs text-sm text-white/80">
+                      <input type="checkbox" checked={editing[u.id]?.is_admin ?? false} onChange={(e) => setEditing((prev) => ({ ...prev, [u.id]: { ...prev[u.id], is_admin: e.target.checked } }))} />
+                      {t.adminFilter}
+                    </label>
+                  </div>
+                  <form className="mt-xs flex flex-wrap gap-xs" onSubmit={(e) => void onReset(e, u.id)}>
+                    <input
+                      type="password"
+                      value={resetPwdMap[u.id] ?? ""}
+                      onChange={(e) => setResetPwdMap((prev) => ({ ...prev, [u.id]: e.target.value }))}
+                      placeholder={t.resetPassword}
+                    />
+                    <button type="submit" className="btn-base btn-secondary">{t.resetPassword}</button>
+                    <button type="button" className="btn-base btn-secondary" onClick={() => void onSave(u.id)}>{t.save}</button>
+                    <button type="button" className="btn-base btn-cta" onClick={() => void onDelete(u.id)}>{t.delete}</button>
+                  </form>
+                </article>
+              ))}
+            </div>
+
+            <div className="mt-sm flex items-center justify-end gap-xs">
+              <button className="btn-base btn-secondary" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>{t.prev}</button>
+              <span className="text-sm text-white/80">{page} / {totalPages}</span>
+              <button className="btn-base btn-secondary" disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>{t.next}</button>
+            </div>
+          </section>
+        ) : null}
+      </div>
+    </AdminShell>
   );
 }

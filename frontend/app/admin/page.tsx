@@ -1,11 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { ShieldCheckIcon } from "@heroicons/react/24/outline";
 import { adminApi } from "@/lib/admin-api";
 import { AnnouncementItem } from "@/lib/types";
 import { useLocale } from "@/lib/locale";
+import AdminShell from "@/components/admin-shell";
 
 export default function AdminPage() {
   const { locale } = useLocale();
@@ -122,61 +122,63 @@ export default function AdminPage() {
   };
 
   return (
-    <main className="space-y-lg">
-      <section className="glass-card p-lg">
-        <div className="flex items-center justify-between gap-sm">
-          <h1 className="flex items-center gap-sm text-3xl font-black">
-            <ShieldCheckIcon className="h-8 w-8 text-cta" aria-hidden="true" />
-            {t.title}
-          </h1>
-          <button className="btn-base btn-secondary" onClick={() => void load()}>{t.refresh}</button>
-        </div>
-      </section>
-
-      {loading ? <p className="text-sm text-white/75">Loading...</p> : null}
-      {!loading && !allowed ? <p className="rounded-lg bg-red-500/20 p-sm text-sm">{t.denied}</p> : null}
-      {error ? <p className="rounded-lg bg-red-500/20 p-sm text-sm">{error}</p> : null}
-      {message ? <p className="rounded-lg bg-emerald-500/20 p-sm text-sm">{message}</p> : null}
-
-      {allowed ? (
-        <section className="grid gap-md md:grid-cols-2">
-          <Link href="/admin/users" className="glass-card p-lg hover:bg-white/10">
-            <h2 className="text-xl font-bold text-primary">{t.users}</h2>
-          </Link>
-          <Link href="/admin/agents" className="glass-card p-lg hover:bg-white/10">
-            <h2 className="text-xl font-bold text-primary">{t.agents}</h2>
-          </Link>
-        </section>
-      ) : null}
-
-      {allowed ? (
-        <section className="glass-card p-md">
-          <h2 className="mb-sm text-xl font-bold text-primary">{t.announcements}</h2>
-          <form className="space-y-sm rounded-lg border border-white/15 bg-white/5 p-sm" onSubmit={(e) => void onCreate(e)}>
-            <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t.announcementTitle} required />
-            <textarea value={content} onChange={(e) => setContent(e.target.value)} placeholder={t.announcementContent} rows={3} required />
-            <label className="flex items-center gap-xs text-sm text-white/80">
-              <input type="checkbox" checked={published} onChange={(e) => setPublished(e.target.checked)} />
-              {t.published}
-            </label>
-            <button type="submit" className="btn-base btn-secondary">{t.createAnnouncement}</button>
-          </form>
-          <div className="mt-sm space-y-sm">
-            {announcements.map((a) => (
-              <div key={a.id} className="rounded-lg border border-white/15 bg-white/5 p-sm">
-                <p className="font-semibold">#{a.id} {a.title}</p>
-                <p className="mt-xs text-sm text-white/85">{a.content}</p>
-                <div className="mt-xs flex flex-wrap gap-xs">
-                  <button type="button" className="btn-base btn-secondary" onClick={() => void onToggle(a)}>
-                    {a.published ? t.unpublish : t.publish}
-                  </button>
-                  <button type="button" className="btn-base btn-cta" onClick={() => void onDelete(a.id)}>{t.delete}</button>
-                </div>
-              </div>
-            ))}
+    <AdminShell>
+      <div className="space-y-lg">
+        <section className="glass-card p-lg">
+          <div className="flex items-center justify-between gap-sm">
+            <h1 className="flex items-center gap-sm text-3xl font-black">
+              <ShieldCheckIcon className="h-8 w-8 text-cta" aria-hidden="true" />
+              {t.title}
+            </h1>
+            <button className="btn-base btn-secondary" onClick={() => void load()}>{t.refresh}</button>
           </div>
         </section>
-      ) : null}
-    </main>
+
+        {loading ? <p className="text-sm text-white/75">Loading...</p> : null}
+        {!loading && !allowed ? <p className="rounded-lg bg-red-500/20 p-sm text-sm">{t.denied}</p> : null}
+        {error ? <p className="rounded-lg bg-red-500/20 p-sm text-sm">{error}</p> : null}
+        {message ? <p className="rounded-lg bg-emerald-500/20 p-sm text-sm">{message}</p> : null}
+
+        {allowed ? (
+          <section className="grid gap-md md:grid-cols-2">
+            <a href="/admin/users" className="glass-card p-lg hover:bg-white/10">
+              <h2 className="text-xl font-bold text-primary">{t.users}</h2>
+            </a>
+            <a href="/admin/agents" className="glass-card p-lg hover:bg-white/10">
+              <h2 className="text-xl font-bold text-primary">{t.agents}</h2>
+            </a>
+          </section>
+        ) : null}
+
+        {allowed ? (
+          <section className="glass-card p-md">
+            <h2 className="mb-sm text-xl font-bold text-primary">{t.announcements}</h2>
+            <form className="space-y-sm rounded-lg border border-white/15 bg-white/5 p-sm" onSubmit={(e) => void onCreate(e)}>
+              <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t.announcementTitle} required />
+              <textarea value={content} onChange={(e) => setContent(e.target.value)} placeholder={t.announcementContent} rows={3} required />
+              <label className="flex items-center gap-xs text-sm text-white/80">
+                <input type="checkbox" checked={published} onChange={(e) => setPublished(e.target.checked)} />
+                {t.published}
+              </label>
+              <button type="submit" className="btn-base btn-secondary">{t.createAnnouncement}</button>
+            </form>
+            <div className="mt-sm space-y-sm">
+              {announcements.map((a) => (
+                <div key={a.id} className="rounded-lg border border-white/15 bg-white/5 p-sm">
+                  <p className="font-semibold">#{a.id} {a.title}</p>
+                  <p className="mt-xs text-sm text-white/85">{a.content}</p>
+                  <div className="mt-xs flex flex-wrap gap-xs">
+                    <button type="button" className="btn-base btn-secondary" onClick={() => void onToggle(a)}>
+                      {a.published ? t.unpublish : t.publish}
+                    </button>
+                    <button type="button" className="btn-base btn-cta" onClick={() => void onDelete(a.id)}>{t.delete}</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
+      </div>
+    </AdminShell>
   );
 }

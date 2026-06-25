@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { adminApi } from "@/lib/admin-api";
 import { AdminAgentRow } from "@/lib/types";
 import { useLocale } from "@/lib/locale";
+import AdminShell from "@/components/admin-shell";
 
 export default function AdminAgentsPage() {
   const { locale } = useLocale();
@@ -198,59 +199,63 @@ export default function AdminAgentsPage() {
   };
 
   return (
-    <main className="space-y-md">
-      <section className="glass-card p-md">
-        <div className="flex flex-wrap items-center justify-between gap-sm">
-          <h1 className="text-2xl font-bold">{t.title}</h1>
-          <button className="btn-base btn-secondary" onClick={() => void load()}>{t.refresh}</button>
-        </div>
-      </section>
-
-      {!loading && !allowed ? <p className="rounded-lg bg-red-500/20 p-sm text-sm">{t.denied}</p> : null}
-      {error ? <p className="rounded-lg bg-red-500/20 p-sm text-sm">{error}</p> : null}
-      {message ? <p className="rounded-lg bg-emerald-500/20 p-sm text-sm">{message}</p> : null}
-
-      {allowed ? (
+    <AdminShell>
+      <div className="space-y-md">
         <section className="glass-card p-md">
-          <div className="mb-sm flex flex-wrap gap-xs">
-            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t.search} />
-            <input value={ownerFilter} onChange={(e) => setOwnerFilter(e.target.value)} placeholder={t.owner} />
-            <input value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} placeholder={t.role} />
-            <button className="btn-base btn-secondary" onClick={() => void onSearch()}>{t.search}</button>
-          </div>
-
-          <div className="space-y-sm">
-            {items.map((a) => (
-              <article key={a.id} className="rounded-lg border border-white/15 bg-white/5 p-sm">
-                <p className="text-sm font-semibold">#{a.id} owner:{a.owner_user_id}</p>
-                <div className="mt-xs grid gap-xs md:grid-cols-3">
-                  <input value={editing[a.id]?.name ?? ""} onChange={(e) => setEditing((prev) => ({ ...prev, [a.id]: { ...prev[a.id], name: e.target.value } }))} />
-                  <input value={editing[a.id]?.role ?? ""} onChange={(e) => setEditing((prev) => ({ ...prev, [a.id]: { ...prev[a.id], role: e.target.value } }))} />
-                  <input value={editing[a.id]?.home_city ?? ""} onChange={(e) => setEditing((prev) => ({ ...prev, [a.id]: { ...prev[a.id], home_city: e.target.value } }))} />
-                  <input value={editing[a.id]?.current_city ?? ""} onChange={(e) => setEditing((prev) => ({ ...prev, [a.id]: { ...prev[a.id], current_city: e.target.value } }))} />
-                  <input value={String(editing[a.id]?.energy ?? 0)} onChange={(e) => setEditing((prev) => ({ ...prev, [a.id]: { ...prev[a.id], energy: Number(e.target.value) } }))} />
-                  <input value={String(editing[a.id]?.gold ?? 0)} onChange={(e) => setEditing((prev) => ({ ...prev, [a.id]: { ...prev[a.id], gold: Number(e.target.value) } }))} />
-                  <input value={String(editing[a.id]?.food ?? 0)} onChange={(e) => setEditing((prev) => ({ ...prev, [a.id]: { ...prev[a.id], food: Number(e.target.value) } }))} />
-                </div>
-                <p className="mt-xs text-sm text-white/80">{t.claimCode}: <span className="font-mono">{claimCodeMap[a.id] || "******"}</span></p>
-                <div className="mt-xs flex flex-wrap gap-xs">
-                  <button type="button" className="btn-base btn-secondary" onClick={() => void onRegenerate(a.id)}>{t.regenClaim}</button>
-                  <input type="datetime-local" value={claimExpiryMap[a.id] ?? ""} onChange={(e) => setClaimExpiryMap((prev) => ({ ...prev, [a.id]: e.target.value }))} />
-                  <button type="button" className="btn-base btn-secondary" onClick={() => void onSaveExpiry(a.id)}>{t.saveExpiry}</button>
-                  <button type="button" className="btn-base btn-secondary" onClick={() => void onSave(a.id)}>{t.save}</button>
-                  <button type="button" className="btn-base btn-cta" onClick={() => void onDelete(a.id)}>{t.delete}</button>
-                </div>
-              </article>
-            ))}
-          </div>
-
-          <div className="mt-sm flex items-center justify-end gap-xs">
-            <button className="btn-base btn-secondary" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>{t.prev}</button>
-            <span className="text-sm text-white/80">{page} / {totalPages}</span>
-            <button className="btn-base btn-secondary" disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>{t.next}</button>
+          <div className="flex flex-wrap items-center justify-between gap-sm">
+            <h1 className="text-2xl font-bold">{t.title}</h1>
+            <button className="btn-base btn-secondary" onClick={() => void load()}>{t.refresh}</button>
           </div>
         </section>
-      ) : null}
-    </main>
+
+        {!loading && !allowed ? <p className="rounded-lg bg-red-500/20 p-sm text-sm">{t.denied}</p> : null}
+        {error ? <p className="rounded-lg bg-red-500/20 p-sm text-sm">{error}</p> : null}
+        {message ? <p className="rounded-lg bg-emerald-500/20 p-sm text-sm">{message}</p> : null}
+
+        {allowed ? (
+          <section className="glass-card p-md">
+            <div className="mb-sm flex flex-wrap gap-xs">
+              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t.search} />
+              <input value={ownerFilter} onChange={(e) => setOwnerFilter(e.target.value)} placeholder={t.owner} />
+              <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)}>
+                <option value="all">{t.role}: {t.all}</option>
+              </select>
+              <button className="btn-base btn-secondary" onClick={() => void onSearch()}>{t.search}</button>
+            </div>
+
+            <div className="space-y-sm">
+              {items.map((a) => (
+                <article key={a.id} className="rounded-lg border border-white/15 bg-white/5 p-sm">
+                  <p className="text-sm font-semibold">#{a.id} owner:{a.owner_user_id}</p>
+                  <div className="mt-xs grid gap-xs md:grid-cols-3">
+                    <input value={editing[a.id]?.name ?? ""} onChange={(e) => setEditing((prev) => ({ ...prev, [a.id]: { ...prev[a.id], name: e.target.value } }))} />
+                    <input value={editing[a.id]?.role ?? ""} onChange={(e) => setEditing((prev) => ({ ...prev, [a.id]: { ...prev[a.id], role: e.target.value } }))} />
+                    <input value={editing[a.id]?.home_city ?? ""} onChange={(e) => setEditing((prev) => ({ ...prev, [a.id]: { ...prev[a.id], home_city: e.target.value } }))} />
+                    <input value={editing[a.id]?.current_city ?? ""} onChange={(e) => setEditing((prev) => ({ ...prev, [a.id]: { ...prev[a.id], current_city: e.target.value } }))} />
+                    <input value={String(editing[a.id]?.energy ?? 0)} onChange={(e) => setEditing((prev) => ({ ...prev, [a.id]: { ...prev[a.id], energy: Number(e.target.value) } }))} />
+                    <input value={String(editing[a.id]?.gold ?? 0)} onChange={(e) => setEditing((prev) => ({ ...prev, [a.id]: { ...prev[a.id], gold: Number(e.target.value) } }))} />
+                    <input value={String(editing[a.id]?.food ?? 0)} onChange={(e) => setEditing((prev) => ({ ...prev, [a.id]: { ...prev[a.id], food: Number(e.target.value) } }))} />
+                  </div>
+                  <p className="mt-xs text-sm text-white/80">{t.claimCode}: <span className="font-mono">{claimCodeMap[a.id] || "******"}</span></p>
+                  <div className="mt-xs flex flex-wrap gap-xs">
+                    <button type="button" className="btn-base btn-secondary" onClick={() => void onRegenerate(a.id)}>{t.regenClaim}</button>
+                    <input type="datetime-local" value={claimExpiryMap[a.id] ?? ""} onChange={(e) => setClaimExpiryMap((prev) => ({ ...prev, [a.id]: e.target.value }))} />
+                    <button type="button" className="btn-base btn-secondary" onClick={() => void onSaveExpiry(a.id)}>{t.saveExpiry}</button>
+                    <button type="button" className="btn-base btn-secondary" onClick={() => void onSave(a.id)}>{t.save}</button>
+                    <button type="button" className="btn-base btn-cta" onClick={() => void onDelete(a.id)}>{t.delete}</button>
+                  </div>
+                </article>
+              ))}
+            </div>
+
+            <div className="mt-sm flex items-center justify-end gap-xs">
+              <button className="btn-base btn-secondary" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>{t.prev}</button>
+              <span className="text-sm text-white/80">{page} / {totalPages}</span>
+              <button className="btn-base btn-secondary" disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>{t.next}</button>
+            </div>
+          </section>
+        ) : null}
+      </div>
+    </AdminShell>
   );
 }
