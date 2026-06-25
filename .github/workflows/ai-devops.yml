@@ -6,9 +6,6 @@ on:
     - cron: '0 * * * *'  # 每小時執行一次
   # 手動觸發
   workflow_dispatch:
-  # API 觸發: gh api -X POST repos/OWNER/REPO/dispatches -f event_type=ai-devops
-  repository_dispatch:
-    types: [ai-devops]
     inputs:
       mode:
         description: '執行模式'
@@ -23,6 +20,9 @@ on:
         description: '目標 (issue number 或 task name)'
         required: false
         type: string
+  # API 觸發: gh api -X POST repos/OWNER/REPO/dispatches -f event_type=ai-devops
+  repository_dispatch:
+    types: [ai-devops]
 
 env:
   KIMI_API_KEY: ${{ secrets.KIMI_API_KEY }}
