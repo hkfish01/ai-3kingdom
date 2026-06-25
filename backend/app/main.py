@@ -19,6 +19,7 @@ from .api.routes_discovery import router as discovery_router
 from .api.routes_federation import router as federation_router
 from .api.routes_social import router as social_router
 from .api.routes_viewer import router as viewer_router
+from .api.routes_devops import router as devops_router
 from .api.routes_world import router as world_router
 from .api.routes_quests import router as quest_router
 from .config import settings
@@ -51,6 +52,7 @@ app.include_router(combat_router)
 app.include_router(central_router)
 app.include_router(admin_router)
 app.include_router(quest_router)
+app.include_router(devops_router)
 
 
 @app.get("/health")

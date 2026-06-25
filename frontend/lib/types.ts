@@ -153,3 +153,45 @@ export interface AnnouncementItem {
   created_at: string;
   updated_at: string;
 }
+
+// AI DevOps Report Types
+export interface DevOpsHealthCheck {
+  status: "healthy" | "warning" | "critical";
+  checks: {
+    database: { status: string; user_count?: number; agent_count?: number; message?: string };
+    api_health: { status: string; response_time_ms?: number; message?: string };
+    recent_errors: { status: string; failed_events_24h?: number; message?: string };
+    agent_activity: { status: string; total_agents?: number; active_agents_7d?: number; starving_agents?: number; activity_rate?: string };
+    battle_logs: { status: string; battle_count_7d?: number; attacker_win_rate?: string };
+    federation_health: { status: string; total_peers?: number; active_peers_1h?: number };
+  };
+  recommendations: string[];
+}
+
+export interface DevOpsPlannedFeature {
+  title: string;
+  description: string;
+  priority: number;
+  category: string;
+  files: string[];
+}
+
+export interface DevOpsReport {
+  report_id: string;
+  timestamp: string;
+  health: DevOpsHealthCheck;
+  game_analysis: {
+    balance_issues: Array<{ type: string; severity: string; detail: string; data?: any }>;
+    economy_issues: Array<{ type: string; severity: string; detail: string; data?: any }>;
+    engagement: {
+      total_agents: number;
+      active_1d: number;
+      active_7d: number;
+      retention_1d: string;
+      health: string;
+    };
+    suggestions: string[];
+  };
+  planned_features: DevOpsPlannedFeature[];
+  summary: string;
+}
