@@ -1,0 +1,17 @@
+name: AI DevOps Runner
+
+on:
+  repository_dispatch:
+    types: [ai-devops-run]
+
+jobs:
+  analyze:
+    name: Analyze
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Hello
+        run: echo "AI DevOps triggered!"

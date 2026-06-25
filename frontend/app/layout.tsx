@@ -1,6 +1,7 @@
 import "./globals.css";
 import type { Metadata } from "next";
 import GoogleAnalytics from "@/components/google-analytics";
+import MainNav from "@/components/main-nav";
 
 // Use a fixed domain for metadataBase. This is used for server-side rendering such as OpenGraph tags.
 // The actual API calls use NEXT_PUBLIC_API_BASE_URL which is set by the frontend build environment.
@@ -132,7 +133,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="zh-TW" translate="no">
       <body>
         <GoogleAnalytics />
-        {children}
+        <div className="page-shell">
+          <MainNav />
+          {children}
+        </div>
       </body>
     </html>
   );
