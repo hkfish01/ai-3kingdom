@@ -13,14 +13,18 @@ import {
   UserGroupIcon,
 } from "@heroicons/react/24/outline";
 import { adminApi } from "@/lib/admin-api";
-import type { DevOpsReport } from "@/lib/types";
+import type { DevOpsReport, DevOpsReportHistoryItem } from "@/lib/types";
 import AdminShell from "@/components/admin-shell";
 
 export default function AdminDashboardPage() {
   const [report, setReport] = useState<DevOpsReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [triggering, setTriggering] = useState(false);
+  const [history, setHistory] = useState<DevOpsReportHistoryItem[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
 
   const loadReport = async () => {
     setLoading(true);
@@ -35,13 +39,26 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const loadHistory = async () => {
+    setHistoryLoading(true);
+    try {
+      const data = await adminApi.getDevOpsReportHistory();
+      setHistory(data);
+    } catch {
+      // silent fail for history
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
   const triggerCheck = async () => {
     setTriggering(true);
     setError("");
+    setSuccess("");
     try {
       const result = await adminApi.triggerDevOpsCheck();
       await loadReport();
-      alert(`Check completed: ${result.summary}`);
+      setSuccess(result.summary ?? "生成完成");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to trigger check");
     } finally {
@@ -51,6 +68,7 @@ export default function AdminDashboardPage() {
 
   useEffect(() => {
     void loadReport();
+    void loadHistory();
   }, []);
 
   const getStatusColor = (status: string) => {
@@ -90,8 +108,76 @@ export default function AdminDashboardPage() {
 
         {/* Error State */}
         {error && (
-          <div className="mb-6 rounded-lg bg-red-500/20 p-4 text-red-400">
+          <div className="mb-4 rounded-lg bg-red-500/20 p-4 text-red-400">
             {error}
+          </div>
+        )}
+
+        {/* Success State */}
+        {success && (
+          <div className="mb-4 rounded-lg bg-emerald-500/20 p-4 text-emerald-400">
+            {success}
+          </div>
+        )}
+
+        {/* Report History */}
+        {!loading && (
+          <div className="mb-6 rounded-xl bg-slate-800 p-4 shadow-lg">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-lg font-bold text-white">報告歷史</h2>
+              <button
+                onClick={() => void loadHistory()}
+                disabled={historyLoading}
+                className="text-xs text-slate-400 hover:text-white disabled:opacity-50"
+              >
+                {historyLoading ? "載入中..." : "刷新"}
+              </button>
+            </div>
+            {historyLoading ? (
+              <div className="flex items-center justify-center py-4">
+                <div className="h-6 w-6 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
+              </div>
+            ) : history.length === 0 ? (
+              <p className="text-sm text-slate-500">暫無歷史報告</p>
+            ) : (
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {history.map((item) => {
+                  const isActive = item.report_id === report?.report_id;
+                  return (
+                    <button
+                      key={item.report_id}
+                      onClick={() => setSelectedReportId(item.report_id)}
+                      className={`min-w-[160px] flex-shrink-0 rounded-lg border p-3 text-left text-xs transition ${
+                        isActive
+                          ? "border-indigo-500 bg-indigo-500/20 text-white"
+                          : "border-slate-600 bg-slate-700/50 text-slate-300 hover:border-slate-500 hover:bg-slate-700"
+                      }`}
+                    >
+                      <div className="mb-1 flex items-center gap-1">
+                        <span className={`h-2 w-2 rounded-full ${
+                          item.health_status === "healthy" ? "bg-emerald-400"
+                          : item.health_status === "warning" ? "bg-yellow-400"
+                          : "bg-red-400"
+                        }`} />
+                        <span className="font-semibold">{item.health_status === "healthy" ? "健康" : item.health_status === "warning" ? "警告" : "危險"}</span>
+                      </div>
+                      <p className="truncate text-slate-400">
+                        {new Date(item.timestamp).toLocaleString("zh-TW", {
+                          timeZone: "Asia/Taipei",
+                          month: "numeric",
+                          day: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </p>
+                      <p className="mt-1 line-clamp-2 leading-tight text-slate-400">
+                        {item.summary.replace(/\|/g, " ")}
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 
@@ -122,10 +208,10 @@ export default function AdminDashboardPage() {
                   <UserGroupIcon className="h-6 w-6 text-indigo-400" />
                 </div>
                 <p className="text-2xl font-bold text-white">
-                  {report.game_analysis.engagement.active_1d}
+                  {report.game_analysis.engagement_metrics.active_1d}
                 </p>
                 <p className="text-sm text-slate-400">
-                  / {report.game_analysis.engagement.total_agents} 總計
+                  / {report.game_analysis.engagement_metrics.total_agents} 總計
                 </p>
               </div>
 
@@ -136,7 +222,7 @@ export default function AdminDashboardPage() {
                   <ArrowTrendingUpIcon className="h-6 w-6 text-emerald-400" />
                 </div>
                 <p className="text-2xl font-bold text-emerald-400">
-                  {report.game_analysis.engagement.retention_1d}
+                  {report.game_analysis.engagement_metrics.retention_1d}
                 </p>
               </div>
 
@@ -227,19 +313,19 @@ export default function AdminDashboardPage() {
                   <div className="grid grid-cols-3 gap-4">
                     <div className="rounded-lg bg-slate-700/50 p-3 text-center">
                       <p className="text-2xl font-bold text-white">
-                        {report.game_analysis.engagement.active_1d}
+                        {report.game_analysis.engagement_metrics.active_1d}
                       </p>
                       <p className="text-xs text-slate-400">24h 活躍</p>
                     </div>
                     <div className="rounded-lg bg-slate-700/50 p-3 text-center">
                       <p className="text-2xl font-bold text-white">
-                        {report.game_analysis.engagement.active_7d}
+                        {report.game_analysis.engagement_metrics.active_7d}
                       </p>
                       <p className="text-xs text-slate-400">7d 活躍</p>
                     </div>
                     <div className="rounded-lg bg-slate-700/50 p-3 text-center">
                       <p className="text-2xl font-bold text-white">
-                        {report.game_analysis.engagement.total_agents}
+                        {report.game_analysis.engagement_metrics.total_agents}
                       </p>
                       <p className="text-xs text-slate-400">總玩家</p>
                     </div>

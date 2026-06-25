@@ -234,6 +234,8 @@ export const adminApi = {
     summary: string;
   }>("/admin/devops/trigger", { method: "POST" }),
 
+  getDevOpsReportHistory: () => adminRequest<DevOpsReportHistoryItem[]>("/admin/devops/report/history"),
+
   // Daily Reset
   triggerDailyReset: () => adminRequest<{ success: boolean; data: any }>("/admin/daily-reset", { method: "POST" })
 };

@@ -26,7 +26,7 @@ from ..models import (
     User,
     utc_now,
 )
-from ..services.system_state import get_state, set_state
+from ..services.system_state import append_to_list, get_list, get_state, set_state
 
 
 class HealthStatus(Enum):
@@ -1109,6 +1109,16 @@ class AIDevOpsOrchestrator:
         if len(report_json) > 10000:
             report_json = report_json[:10000] + "... (truncated)"
         set_state(self.db, f"devops_report_{report_id}", report_json)
+
+        # 加入歷史列表
+        history_item = json.dumps({
+            "report_id": report_id,
+            "timestamp": report["timestamp"],
+            "health_status": report["health"]["status"],
+            "summary": report["summary"],
+        })
+        append_to_list(self.db, "devops_report_history", history_item, max_size=30)
+
         self.db.commit()
 
     def _generate_summary(self, health, analysis, plan_count: int) -> str:
@@ -1167,3 +1177,17 @@ def get_latest_devops_report(db: Session) -> dict | None:
         return json.loads(report_json)
     except json.JSONDecodeError:
         return None
+
+
+def get_devops_report_history(db: Session, limit: int = 10) -> list[dict]:
+    """
+    獲取歷史報告列表（摘要）
+    """
+    raw_list = get_list(db, "devops_report_history")
+    results = []
+    for item in raw_list[:limit]:
+        try:
+            results.append(json.loads(item))
+        except json.JSONDecodeError:
+            continue
+    return results

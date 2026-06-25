@@ -5,17 +5,26 @@ AI DevOps API Routes
 """
 
 from fastapi import APIRouter, Depends
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ..db import get_db
 from ..models import User
 from ..services.ai_devops import (
+    get_devops_report_history,
     get_latest_devops_report,
     run_ai_devops_daily,
 )
 from .deps import get_current_admin
 
 router = APIRouter(prefix="/admin/devops", tags=["devops"])
+
+
+class ReportHistoryItem(BaseModel):
+    report_id: str
+    timestamp: str
+    health_status: str
+    summary: str
 
 
 @router.get("/report")
@@ -25,9 +34,6 @@ def get_devops_report(
 ):
     """
     獲取最新的 AI DevOps 報告
-
-    返回最近一次 AI DevOps 每日檢查的完整報告，
-    包括系統健康狀況、遊戲數據分析、以及建議的功能開發計劃。
     """
     report = get_latest_devops_report(db)
 
@@ -44,6 +50,19 @@ def get_devops_report(
         "success": True,
         "data": report,
     }
+
+
+@router.get("/report/history", response_model=list[ReportHistoryItem])
+def get_devops_report_history_endpoint(
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(get_current_admin),
+    limit: int = 10,
+):
+    """
+    獲取歷史報告列表
+    """
+    history = get_devops_report_history(db, limit=limit)
+    return history
 
 
 @router.post("/trigger")

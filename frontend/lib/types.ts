@@ -183,15 +183,25 @@ export interface DevOpsReport {
   game_analysis: {
     balance_issues: Array<{ type: string; severity: string; detail: string; data?: any }>;
     economy_issues: Array<{ type: string; severity: string; detail: string; data?: any }>;
-    engagement: {
+    engagement_metrics: {
       total_agents: number;
       active_1d: number;
       active_7d: number;
+      active_30d: number;
       retention_1d: string;
+      retention_7d: string;
+      actions_per_day_7d: string;
       health: string;
     };
     suggestions: string[];
   };
   planned_features: DevOpsPlannedFeature[];
+  summary: string;
+}
+
+export interface DevOpsReportHistoryItem {
+  report_id: string;
+  timestamp: string;
+  health_status: string;
   summary: string;
 }
