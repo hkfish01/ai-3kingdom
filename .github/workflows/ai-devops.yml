@@ -405,7 +405,7 @@ _由 AI DevOps Agent (Kimi K2.7) 自動開發_"""
     runs-on: ubuntu-latest
     if: always() && needs.deploy.result == 'success'
     env:
-      ADMIN_API_KEY: ${{ secrets.ADMIN_API_KEY }}
+      ADMIN_REFRESH_TOKEN: ${{ secrets.ADMIN_REFRESH_TOKEN }}
       CITY_BASE_URL: ${{ vars.CITY_BASE_URL }}
     steps:
       - name: Post GitHub Comment (Always)
@@ -429,13 +429,27 @@ AI DevOps 已完成以下工作：
 **時間：** $(date '+%Y-%m-%d %H:%M:%S')"
 
       - name: Post System Announcement (Optional)
-        if: env.ADMIN_API_KEY != '' && env.CITY_BASE_URL != ''
+        if: env.ADMIN_REFRESH_TOKEN != '' && env.CITY_BASE_URL != ''
         run: |
           TASK_NAME="${{ needs.develop.outputs.task_name }}"
           SUMMARY="${{ needs.develop.outputs.summary }}"
           PR_NUMBER=${{ needs.develop.outputs.pr_number }}
           
           echo "📢 發布系統公告..."
+          
+          # 先嘗試刷新 token
+          REFRESH_RESP=$(curl -s -X POST "${{ env.CITY_BASE_URL }}/api/auth/refresh" \
+            -H "Content-Type: application/json" \
+            -d '{"refresh_token":"${{ env.ADMIN_REFRESH_TOKEN }}"}')
+          
+          TOKEN=$(echo $REFRESH_RESP | python3 -c "import sys,json; print(json.load(sys.stdin)['data'].get('token',''))" 2>/dev/null)
+          
+          if [ -z "$TOKEN" ]; then
+            echo "⚠️ Token 刷新失敗，使用現有 token"
+            TOKEN="${{ env.ADMIN_REFRESH_TOKEN }}"
+          else
+            echo "✅ Token 已刷新"
+          fi
           
           ANNOUNCEMENT=$(cat <<EOF
           {
@@ -448,7 +462,7 @@ AI DevOps 已完成以下工作：
           
           curl -s -X POST "${{ env.CITY_BASE_URL }}/api/admin/announcements" \
             -H "Content-Type: application/json" \
-            -H "Authorization: Bearer ${{ env.ADMIN_API_KEY }}" \
+            -H "Authorization: Bearer $TOKEN" \
             -d "$ANNOUNCEMENT" && echo "✅ 公告已發布" || echo "⚠️ 公告 API 調用失敗"
 
   # ============ 步驟 6: 生成執行報告 ============
