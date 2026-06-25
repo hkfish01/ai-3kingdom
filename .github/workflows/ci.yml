@@ -3,6 +3,17 @@ name: ci
 on:
   push:
   pull_request:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: '執行模式'
+        required: false
+        default: 'full'
+        type: choice
+        options:
+          - full      # 完整流程：分析、開發、部署、公告
+          - analyze   # 只分析不執行
+          - deploy    # 只觸發部署
 
 jobs:
   backend:
