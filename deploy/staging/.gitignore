@@ -1,4 +1,0 @@
-# Staging environment (contains secrets)
-.env
-.env.local
-.env.*.local

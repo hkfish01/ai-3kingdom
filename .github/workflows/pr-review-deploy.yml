@@ -1,4 +1,4 @@
-name: PR Review & Staging Deploy
+name: PR Review
 
 on:
   pull_request:
@@ -6,29 +6,6 @@ on:
     branches: [main]
 
 jobs:
-  # ============ AI DevOps 自動代碼生成 ============
-  ai-devops-generate:
-    name: AI DevOps Code Generation
-    runs-on: ubuntu-latest
-    if: contains(github.event.pull_request.labels.*.name, 'ai-devops')
-    
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      
-      - name: Run AI DevOps
-        env:
-          KIMI_API_KEY: ${{ secrets.KIMI_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          python3 scripts/ai-devops/ai_devops.py
-        continue-on-error: true
-
   # ============ 代碼審查 ============
   code-review:
     name: Code Review
@@ -43,38 +20,10 @@ jobs:
         run: |
           python3 scripts/ai-devops/cursor_reviewer.py --pr ${{ github.event.pull_request.number }}
 
-  # ============ Staging 部署（需審批）===========
-  staging-deploy:
-    name: Deploy to Staging
-    needs: code-review
-    runs-on: ubuntu-latest
-    environment: 
-      name: staging
-      url: https://staging.ai3k.example.com
-    
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      
-      - name: Deploy to Staging via SSH
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.STAGING_HOST }}
-          username: ${{ secrets.STAGING_USER }}
-          password: ${{ secrets.STAGING_PASSWORD }}
-          script: |
-            set -euo pipefail
-            cd ~/ai-3kingdom-staging
-            git fetch origin
-            git reset --hard origin/${{ github.head_ref }}
-            docker compose -f deploy/staging/docker-compose.yml up -d --build
-
   # ============ PR 狀態更新 ============
   update-pr-status:
     name: Update PR Status
-    needs: [code-review, staging-deploy]
+    needs: code-review
     runs-on: ubuntu-latest
     if: always()
     
@@ -84,11 +33,11 @@ jobs:
         with:
           script: |
             const pr = context.payload.pull_request;
-            const status = needs.staging-deploy.result === 'success' ? '✅ Staging 部署成功' : '⚠️ Staging 部署失敗';
+            const reviewResult = needs.code-review.result === 'success' ? '✅ 代碼審查完成' : '⚠️ 代碼審查失敗';
             
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: pr.number,
-              body: `## PR 審批狀態\n\n${status}\n\n**Commit:** \`${{ github.sha }}\`\n**Branch:** \`${{ github.head_ref }}\`\n\n按 "Merge" 按鈕即可部署到 Production。`
+              body: `## PR 審批狀態\n\n${reviewResult}\n\n**Commit:** \`${{ github.sha }}\`\n**Branch:** \`${{ github.head_ref }}\`\n\n請在服務器上更新 .env 文件，然後執行部署。`
             });
