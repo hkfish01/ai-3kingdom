@@ -8,6 +8,7 @@ import {
   ApiResponse,
   AuthMe,
   DevOpsReport,
+  DevOpsReportHistoryItem,
   FederationPeer,
   FederationStatus,
   RegisterPayload,
