@@ -66,13 +66,21 @@ def main():
     code, recent_commits, _ = run_cmd("git log --oneline -10")
     code, git_status, _ = run_cmd("git status --porcelain")
     
+    # Check issues
+    code, issues_out, _ = run_cmd("gh issue list --state open --json number --jq 'length'")
+    open_issues = int(issues_out.strip() or 0)
+    
     nl = "\n"
     context = f"""Current system status:
 - Uncommitted changes: {len([l for l in git_status.strip().split(nl) if l])} files
 - Latest commit: {recent_commits.strip().split(nl)[0] if recent_commits.strip() else 'N/A'}
+- Open issues: {open_issues}
 
 Recent 5 commits:
 {recent_commits.strip()}"""
+
+    # Always execute to analyze - let the AI decide
+    print(f"System status: {len([l for l in git_status.strip().split(nl) if l])} uncommitted, {open_issues} open issues")
 
     print("AI analyzing system...")
     response = call_kimi(context)

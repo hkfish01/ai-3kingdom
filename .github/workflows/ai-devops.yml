@@ -62,7 +62,7 @@ jobs:
           open_issues = int(issues_out.stdout.strip() or 0)
 
           print(f"Uncommitted: {git_changes}, Open issues: {open_issues}")
-          has_work = git_changes > 0 or open_issues > 3
+          has_work = git_changes > 0 or open_issues > 0
 
           with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
               f.write(f"has_tasks={str(has_work).lower()}\n")
