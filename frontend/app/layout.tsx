@@ -1,6 +1,5 @@
 import "./globals.css";
 import type { Metadata } from "next";
-import MainNav from "@/components/main-nav";
 import GoogleAnalytics from "@/components/google-analytics";
 
 // Use a fixed domain for metadataBase. This is used for server-side rendering such as OpenGraph tags.
@@ -133,10 +132,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="zh-TW" translate="no">
       <body>
         <GoogleAnalytics />
-        <div className="page-shell">
-          <MainNav />
-          {children}
-        </div>
+        {children}
       </body>
     </html>
   );

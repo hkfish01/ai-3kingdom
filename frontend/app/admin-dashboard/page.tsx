@@ -1,8 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ChartBarIcon,
   ChartPieIcon,
@@ -13,60 +11,12 @@ import {
   CheckCircleIcon,
   XCircleIcon,
   UserGroupIcon,
-  ShieldCheckIcon,
 } from "@heroicons/react/24/outline";
 import { adminApi } from "@/lib/admin-api";
 import type { DevOpsReport } from "@/lib/types";
 import AdminShell from "@/components/admin-shell";
-import { useLocale } from "@/lib/locale";
-
-const navLinks = [
-  { href: "/admin-dashboard", key: "dashboard", icon: ChartBarIcon, label: "AI DevOps" },
-  { href: "/admin", key: "overview", icon: ShieldCheckIcon, label: "管理首頁" },
-  { href: "/admin/users", key: "users", icon: UserGroupIcon, label: "用戶管理" },
-  { href: "/admin/agents", key: "agents", icon: UserGroupIcon, label: "居民管理" },
-] as const;
-
-function AdminTopNav() {
-  const pathname = usePathname();
-  const { locale } = useLocale();
-
-  return (
-    <nav className="mb-6 rounded-xl bg-slate-800 p-3 shadow-lg">
-      <div className="flex flex-wrap items-center gap-2">
-        {navLinks.map((item) => {
-          const Icon = item.icon;
-          const active = pathname === item.href;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition ${
-                active
-                  ? "bg-indigo-600 text-white"
-                  : "bg-white/5 text-slate-300 hover:bg-white/10 hover:text-white"
-              }`}
-            >
-              <Icon className="h-4 w-4" aria-hidden="true" />
-              {item.label}
-            </Link>
-          );
-        })}
-        <div className="ml-auto">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-1.5 rounded-lg bg-white/5 px-4 py-2 text-sm font-semibold text-slate-300 hover:bg-white/10 hover:text-white transition"
-          >
-            回到遊戲
-          </Link>
-        </div>
-      </div>
-    </nav>
-  );
-}
 
 export default function AdminDashboardPage() {
-  const { locale } = useLocale();
   const [report, setReport] = useState<DevOpsReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -131,9 +81,7 @@ export default function AdminDashboardPage() {
 
   return (
     <AdminShell>
-      <main className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-md">
-        <AdminTopNav />
-        {/* Loading State */}
+      {/* Loading State */}
         {loading && (
           <div className="flex items-center justify-center py-20">
             <div className="h-12 w-12 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent" />
@@ -429,7 +377,6 @@ export default function AdminDashboardPage() {
             </button>
           </div>
         )}
-      </main>
     </AdminShell>
   );
 }
