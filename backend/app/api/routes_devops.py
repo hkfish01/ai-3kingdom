@@ -52,7 +52,7 @@ def get_devops_report(
     }
 
 
-@router.get("/report/history", response_model=list[ReportHistoryItem])
+@router.get("/report/history")
 def get_devops_report_history_endpoint(
     db: Session = Depends(get_db),
     current_admin: User = Depends(get_current_admin),
@@ -62,7 +62,10 @@ def get_devops_report_history_endpoint(
     獲取歷史報告列表
     """
     history = get_devops_report_history(db, limit=limit)
-    return history
+    return {
+        "success": True,
+        "data": history,
+    }
 
 
 @router.post("/trigger")
