@@ -197,6 +197,13 @@ export const adminApi = {
       claim_used_at?: string | null;
     }>(`/admin/agents/${agentId}/claim-code/regenerate`, { method: "POST" }),
 
+  adminUpdateAgentClaimExpiry: (agentId: number, payload: { expires_at: string }) =>
+    adminRequest<{
+      agent_id: number;
+      claim_code?: string | null;
+      claim_expires_at: string;
+    }>(`/admin/agents/${agentId}/claim-code/expiry`, { method: "PATCH", body: JSON.stringify(payload) }),
+
   // Announcement Management
   adminCreateAnnouncement: (payload: { title: string; content: string; published: boolean }) =>
     adminRequest<{ id: number; title: string; content: string; published: boolean }>("/admin/announcements", {
