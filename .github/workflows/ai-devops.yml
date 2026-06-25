@@ -107,8 +107,11 @@ jobs:
 
       - name: Merge PR
         run: |
-          gh pr merge ${{ needs.develop.outputs.pr_number }} --squash --delete-branch --auto
-          gh pr edit ${{ needs.develop.outputs.pr_number }} --add-label "ai-devops,automated"
+          PR_NUM=${{ needs.develop.outputs.pr_number }}
+          if [ -n "$PR_NUM" ] && [ "$PR_NUM" != "0" ]; then
+            gh pr merge $PR_NUM --squash --delete-branch --auto || true
+            gh pr edit $PR_NUM --add-label "ai-devops,automated" || true
+          fi
 
   deploy:
     name: Deploy
@@ -120,23 +123,6 @@ jobs:
           sleep 10
           gh workflow run "Deploy to Production" --repo $GITHUB_REPOSITORY
 
-      - name: Wait for Deploy
-        run: |
-          sleep 30
-          for i in {1..40}; do
-            STATUS=$(gh run list --workflow "Deploy to Production" --limit 1 --jq '.[0].status + " " + (.[0].conclusion // "")')
-            echo "Check $i/40: $STATUS"
-            if echo "$STATUS" | grep -q "completed success"; then
-              echo "Deploy success!"
-              exit 0
-            elif echo "$STATUS" | grep -q "completed failure"; then
-              echo "Deploy failed"
-              exit 1
-            fi
-            sleep 30
-          done
-          echo "Deploy timeout"
-
   announce:
     name: Announce
     needs: deploy
@@ -147,6 +133,7 @@ jobs:
       CITY_BASE_URL: ${{ vars.CITY_BASE_URL }}
     steps:
       - name: Post Comment
+        if: needs.develop.outputs.pr_number != '0' && needs.develop.outputs.pr_number != ''
         run: |
           gh pr comment ${{ needs.develop.outputs.pr_number }} --body "## Deploy Complete
 
