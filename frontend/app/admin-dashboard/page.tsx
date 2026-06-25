@@ -148,7 +148,7 @@ export default function AdminDashboardPage() {
         )}
 
         {/* Main Content */}
-        {!loading && report && (
+        {!loading && report && report.health && report.game_analysis && (
           <>
             {/* Summary Cards */}
             <div className="mb-8 grid gap-6 md:grid-cols-4">
@@ -413,7 +413,7 @@ export default function AdminDashboardPage() {
         )}
 
         {/* No Report State */}
-        {!loading && !report && !error && (
+        {!loading && (!report || !report.health) && !error && (
           <div className="flex flex-col items-center justify-center py-20">
             <BellIcon className="mb-4 h-16 w-16 text-slate-600" />
             <h2 className="mb-2 text-xl font-semibold text-white">尚無報告</h2>
