@@ -398,17 +398,38 @@ _由 AI DevOps Agent (Kimi K2.7) 自動開發_"""
           
           echo "⚠️ 部署監控超時"
 
-  # ============ 步驟 5: 發布系統公告 ============
+  # ============ 步驟 5: 發布系統公告（可選） ============
   announce:
     name: 📢 Post Announcement
     needs: deploy
     runs-on: ubuntu-latest
     if: always() && needs.deploy.result == 'success'
+    env:
+      ADMIN_API_KEY: ${{ secrets.ADMIN_API_KEY }}
+      CITY_BASE_URL: ${{ vars.CITY_BASE_URL }}
     steps:
-      - name: Post System Announcement
-        env:
-          CITY_BASE_URL: ${{ vars.CITY_BASE_URL }}
-          ADMIN_API_KEY: ${{ secrets.ADMIN_API_KEY }}
+      - name: Post GitHub Comment (Always)
+        run: |
+          PR_NUMBER=${{ needs.develop.outputs.pr_number }}
+          TASK_NAME="${{ needs.develop.outputs.task_name }}"
+          SUMMARY="${{ needs.develop.outputs.summary }}"
+          
+          gh pr comment $PR_NUMBER --body "## ✅ 部署完成
+
+AI DevOps 已完成以下工作：
+
+| 步驟 | 狀態 |
+|------|------|
+| 代碼開發 | ✅ |
+| PR 創建與合併 | ✅ |
+| 生產環境部署 | ✅ |
+| 系統公告 | 📋 |
+
+**任務：** ${TASK_NAME}
+**時間：** $(date '+%Y-%m-%d %H:%M:%S')"
+
+      - name: Post System Announcement (Optional)
+        if: env.ADMIN_API_KEY != '' && env.CITY_BASE_URL != ''
         run: |
           TASK_NAME="${{ needs.develop.outputs.task_name }}"
           SUMMARY="${{ needs.develop.outputs.summary }}"
@@ -416,32 +437,19 @@ _由 AI DevOps Agent (Kimi K2.7) 自動開發_"""
           
           echo "📢 發布系統公告..."
           
-          # 構建公告內容
           ANNOUNCEMENT=$(cat <<EOF
           {
             "title": "🤖 AI DevOps 更新：${TASK_NAME}",
             "content": "## 系統更新公告\n\n**更新內容：** ${SUMMARY}\n\n**部署時間：** $(date '+%Y-%m-%d %H:%M:%S')\n\n**PR：** #${PR_NUMBER}\n\n---\n_此公告由 AI DevOps Agent 自動發布_",
-            "type": "system_update",
-            "priority": "normal"
+            "type": "system_update"
           }
           EOF
           )
           
-          echo "公告內容：$ANNOUNCEMENT"
-          
-          # 嘗試發布公告（如果 API 可用）
-          if [ -n "$CITY_BASE_URL" ] && [ -n "$ADMIN_API_KEY" ]; then
-            curl -X POST "$CITY_BASE_URL/api/admin/announcements" \
-              -H "Content-Type: application/json" \
-              -H "Authorization: Bearer $ADMIN_API_KEY" \
-              -d "$ANNOUNCEMENT" \
-              2>/dev/null && echo "✅ 公告已發布" || echo "⚠️ 公告 API 調用失敗（可能服務未啟動）"
-          else
-            echo "⚠️ CITY_BASE_URL 或 ADMIN_API_KEY 未設定"
-          fi
-          
-          # 在 GitHub 發布評論
-          gh pr comment $PR_NUMBER --body "## ✅ 部署完成\n\nAI DevOps 已完成以下工作：\n\n- ✅ 代碼開發\n- ✅ PR 創建與合併\n- ✅ 生產環境部署\n- 📢 系統公告已發布\n\n**任務：** ${TASK_NAME}\n**時間：** $(date '+%Y-%m-%d %H:%M:%S')"
+          curl -s -X POST "${{ env.CITY_BASE_URL }}/api/admin/announcements" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ env.ADMIN_API_KEY }}" \
+            -d "$ANNOUNCEMENT" && echo "✅ 公告已發布" || echo "⚠️ 公告 API 調用失敗"
 
   # ============ 步驟 6: 生成執行報告 ============
   report:
