@@ -41,13 +41,14 @@ jobs:
           TARGET_PASS: ${{ secrets.PROD_HOST_PASSWORD }}
         run: |
           set +H
-          export SSHPASS_JUMP=${JUMP_PASS}
-          export SSHPASS_TARGET=${TARGET_PASS}
 
-          TARGET_SSH="sshpass -e -o StrictHostKeyChecking=no -o ProxyJump=${JUMP_USER}@${JUMP_HOST} -tt ${TARGET_USER}@${TARGET_HOST}"
+          # Jump host: rsadmin@lemon -> then ssh to target
+          JUMP_SSH="sshpass -p '${JUMP_PASS}' ssh -o StrictHostKeyChecking=no -o ProxyJump=${JUMP_USER}@${JUMP_HOST} -tt ${TARGET_USER}@${TARGET_HOST}"
+          # Direct to target (via ProxyJump alias)
+          TARGET_SSH="sshpass -p '${TARGET_PASS}' ssh -o StrictHostKeyChecking=no -o ProxyJump=${JUMP_USER}@${JUMP_HOST} -tt ${TARGET_USER}@${TARGET_HOST}"
 
           run() {
-            printf '%s\n' "$1" | SSHPASS_TARGET=${TARGET_PASS} ${TARGET_SSH} bash
+            printf '%s\n' "$1" | ${TARGET_SSH} bash
           }
 
           echo "▶ Deploying via SSH ProxyJump: ${JUMP_USER}@${JUMP_HOST} -> ${TARGET_USER}@${TARGET_HOST}"
