@@ -26,48 +26,88 @@ jobs:
         id: version
         run: echo "version=$(cat VERSION)" >> "$GITHUB_OUTPUT"
 
-      - name: Deploy via SSH through jump host
-        uses: appleboy/ssh-action@v1
+      - name: Install sshpass
+        run: sudo apt-get update && sudo apt-get install -y sshpass
+
+      - name: Deploy via SSH ProxyJump
         env:
           SKIP_BACKUP: ${{ inputs.skip_backup }}
           RELEASE_VERSION: ${{ steps.version.outputs.version }}
-        with:
-          host: 192.168.16.201
-          username: dell
-          password: ${{ secrets.PROD_HOST_PASSWORD }}
-          proxy_host: lemon.territechnology.com
-          proxy_username: rsadmin
-          proxy_password: ${{ secrets.JUMP_HOST_PASSWORD }}
-          command_timeout: 15m
-          envs: SKIP_BACKUP,RELEASE_VERSION
-          script: |
+          JUMP_HOST: lemon.territechnology.com
+          JUMP_USER: rsadmin
+          JUMP_PASS: ${{ secrets.JUMP_HOST_PASSWORD }}
+          TARGET_HOST: 192.168.16.201
+          TARGET_USER: dell
+          TARGET_PASS: ${{ secrets.PROD_HOST_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          # ── Helper: wait for postgres ─────────────────────────
+          wait_postgres() {
+            for i in $(seq 1 15); do
+              if docker exec ai3k-postgres pg_isready -U postgres > /dev/null 2>&1; then
+                echo "  ✓ Postgres is ready"
+                break
+              fi
+              echo "  Waiting for postgres... ($i/15)"
+              sleep 2
+            done
+          }
+
+          # ── Helper: health check ──────────────────────────────
+          health_check() {
+            for i in 1 2 3 4 5; do
+              if curl -fsS --max-time 10 http://localhost:10090/health > /dev/null 2>&1; then
+                echo "  ✓ Health check passed"
+                return 0
+              fi
+              echo "  Attempt $i/5 failed, retrying in 5s..."
+              sleep 5
+            done
+            echo "  ✗ Health check failed after 5 attempts"
+            return 1
+          }
+
+          DEPLOY_DIR="$HOME/ai-3kingdom"
+          BACKUP_DIR="$DEPLOY_DIR/backups"
+          COMPOSE_FILE="deploy/prod/docker-compose.server.yml"
+          ENV_FILE="deploy/prod/.env"
+          REPO_URL="https://github.com/hkfish01/ai-3kingdom.git"
+
+          echo "▶ Deploying via SSH ProxyJump: ${JUMP_USER}@${JUMP_HOST} → ${TARGET_USER}@${TARGET_HOST}"
+
+          # ── Step 1: Backup database ─────────────────────────
+          if [ "${SKIP_BACKUP}" != "true" ]; then
+            echo "▶ [1/5] Backing up database..."
+            mkdir -p "$BACKUP_DIR"
+            TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+            sshpass -p "${JUMP_PASS}" ssh -o StrictHostKeyChecking=no \
+              -o ProxyJump="${JUMP_USER}@${JUMP_HOST}" \
+              -tt "${TARGET_USER}@${TARGET_HOST}" \
+              "docker exec ai3k-postgres pg_dump -U postgres ai3k | gzip" \
+              | sshpass -p "${JUMP_PASS}" ssh -o StrictHostKeyChecking=no \
+              -o ProxyJump="${JUMP_USER}@${JUMP_HOST}" \
+              -tt "${TARGET_USER}@${TARGET_HOST}" \
+              "cat > ${BACKUP_DIR}/ai3k_pre_deploy_${TIMESTAMP}.sql.gz"
+            echo "  ✓ Backup saved: ai3k_pre_deploy_${TIMESTAMP}.sql.gz"
+            # Keep only last 10 backups
+            sshpass -p "${JUMP_PASS}" ssh -o StrictHostKeyChecking=no \
+              -o ProxyJump="${JUMP_USER}@${JUMP_HOST}" \
+              -tt "${TARGET_USER}@${TARGET_HOST}" \
+              "ls -t ${BACKUP_DIR}/ai3k_pre_deploy_*.sql.gz 2>/dev/null | tail -n +11 | xargs rm -f 2>/dev/null || true"
+          else
+            echo "▶ [1/5] Skipping database backup (user requested)"
+          fi
+
+          # ── Step 2: Pull latest code ────────────────────────
+          echo "▶ [2/5] Syncing code..."
+          sshpass -p "${TARGET_PASS}" ssh -o StrictHostKeyChecking=no \
+            -o ProxyJump="${JUMP_USER}@${JUMP_HOST}" \
+            -tt "${TARGET_USER}@${TARGET_HOST}" bash -s << 'REMOTE_SCRIPT'
             set -euo pipefail
-
             DEPLOY_DIR="$HOME/ai-3kingdom"
-            BACKUP_DIR="$DEPLOY_DIR/backups"
-            COMPOSE_FILE="deploy/prod/docker-compose.server.yml"
-            ENV_FILE="deploy/prod/.env"
             REPO_URL="https://github.com/hkfish01/ai-3kingdom.git"
-
             cd "$DEPLOY_DIR"
-
-            # ── Step 1: Backup database ─────────────────────
-            if [ "${SKIP_BACKUP}" != "true" ]; then
-              echo "▶ [1/5] Backing up database..."
-              mkdir -p "$BACKUP_DIR"
-              TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-              docker exec ai3k-postgres pg_dump -U postgres ai3k \
-                | gzip > "$BACKUP_DIR/ai3k_pre_deploy_${TIMESTAMP}.sql.gz"
-              echo "  ✓ Backup saved: ai3k_pre_deploy_${TIMESTAMP}.sql.gz"
-              # Keep only last 10 backups
-              ls -t "$BACKUP_DIR"/ai3k_pre_deploy_*.sql.gz 2>/dev/null \
-                | tail -n +11 | xargs rm -f 2>/dev/null || true
-            else
-              echo "▶ [1/5] Skipping database backup (user requested)"
-            fi
-
-            # ── Step 2: Pull latest code ────────────────────
-            echo "▶ [2/5] Syncing code..."
             if [ ! -d .git ]; then
               echo "  Initializing git repository (first time)..."
               git init
@@ -76,60 +116,74 @@ jobs:
             git fetch origin main
             git reset --hard origin/main
             echo "  ✓ Code synced to $(git rev-parse --short HEAD)"
+REMOTE_SCRIPT
 
-            # ── Step 3: Build & deploy ──────────────────────
-            echo "▶ [3/5] Building and deploying..."
+          # ── Step 3: Build & deploy ─────────────────────────
+          echo "▶ [3/5] Building and deploying..."
+          sshpass -p "${TARGET_PASS}" ssh -o StrictHostKeyChecking=no \
+            -o ProxyJump="${JUMP_USER}@${JUMP_HOST}" \
+            -tt "${TARGET_USER}@${TARGET_HOST}" bash -s << 'REMOTE_SCRIPT'
+            set -euo pipefail
+            DEPLOY_DIR="$HOME/ai-3kingdom"
+            COMPOSE_FILE="deploy/prod/docker-compose.server.yml"
+            ENV_FILE="deploy/prod/.env"
+            cd "$DEPLOY_DIR"
 
-            # Ensure infra services are running
             docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d postgres redis
-            echo "  Waiting for postgres to be ready..."
-            for i in $(seq 1 15); do
-              if docker exec ai3k-postgres pg_isready -U postgres > /dev/null 2>&1; then
-                break
-              fi
-              sleep 2
-            done
+            wait_postgres() {
+              for i in $(seq 1 15); do
+                if docker exec ai3k-postgres pg_isready -U postgres > /dev/null 2>&1; then
+                  echo "  ✓ Postgres is ready"
+                  break
+                fi
+                echo "  Waiting for postgres... ($i/15)"
+                sleep 2
+              done
+            }
+            wait_postgres
 
-            # Run database migrations
             echo "  Running database migrations..."
             docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" \
               run --rm city-api alembic upgrade head
 
-            # Build and start all services
             echo "  Building and starting all services..."
             docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --build
+            echo "  ✓ Services rebuilt and started"
+REMOTE_SCRIPT
 
-            # ── Step 4: Health check ────────────────────────
-            echo "▶ [4/5] Health check..."
-            sleep 10
-
-            HEALTH_OK=false
-            for i in 1 2 3 4 5; do
-              if curl -fsS --max-time 10 http://localhost:10090/health > /dev/null 2>&1; then
-                HEALTH_OK=true
-                echo "  ✓ Health check passed"
-                break
-              fi
-              echo "  Attempt $i/5 failed, retrying in 5s..."
-              sleep 5
-            done
-
-            if [ "$HEALTH_OK" != "true" ]; then
+          # ── Step 4: Health check ────────────────────────────
+          echo "▶ [4/5] Health check..."
+          sleep 10
+          sshpass -p "${TARGET_PASS}" ssh -o StrictHostKeyChecking=no \
+            -o ProxyJump="${JUMP_USER}@${JUMP_HOST}" \
+            -tt "${TARGET_USER}@${TARGET_HOST}" bash -s << 'REMOTE_SCRIPT'
+            health_check() {
+              for i in 1 2 3 4 5; do
+                if curl -fsS --max-time 10 http://localhost:10090/health > /dev/null 2>&1; then
+                  echo "  ✓ Health check passed"
+                  return 0
+                fi
+                echo "  Attempt $i/5 failed, retrying in 5s..."
+                sleep 5
+              done
               echo "  ✗ Health check failed after 5 attempts"
-              echo "  --- city-api logs ---"
-              docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" logs --tail=50 city-api
-              exit 1
-            fi
+              docker compose -f "deploy/prod/docker-compose.server.yml" \
+                --env-file "deploy/prod/.env" logs --tail=50 city-api || true
+              return 1
+            }
+            health_check
+REMOTE_SCRIPT
 
-            # ── Step 5: Cleanup ─────────────────────────────
-            echo "▶ [5/5] Cleaning up old Docker images..."
-            docker image prune -f > /dev/null 2>&1 || true
+          # ── Step 5: Cleanup ─────────────────────────────────
+          echo "▶ [5/5] Cleaning up old Docker images..."
+          sshpass -p "${TARGET_PASS}" ssh -o StrictHostKeyChecking=no \
+            -o ProxyJump="${JUMP_USER}@${JUMP_HOST}" \
+            -tt "${TARGET_USER}@${TARGET_HOST}" \
+            "docker image prune -f > /dev/null 2>&1 || true"
 
-            echo ""
-            echo "═══════════════════════════════════════"
-            echo "  ✓ Deployment complete!"
-            echo "  Version:  ${RELEASE_VERSION}"
-            echo "  Commit:   $(git rev-parse --short HEAD)"
-            echo "  Services:"
-            docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" ps --format "    {{.Name}}: {{.Status}}"
-            echo "═══════════════════════════════════════"
+          echo ""
+          echo "═══════════════════════════════════════"
+          echo "  ✓ Deployment complete!"
+          echo "  Version:  ${RELEASE_VERSION}"
+          echo "  Commit:   $(git rev-parse --short HEAD)"
+          echo "═══════════════════════════════════════"
