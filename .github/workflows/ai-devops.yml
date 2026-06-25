@@ -1,26 +1,23 @@
 name: AI DevOps - Autonomous Agent
 
 on:
-  # 定期自動執行（建議每小時或每天）
   schedule:
-    - cron: '0 * * * *'  # 每小時執行一次
-  # 手動觸發
+    - cron: '0 * * * *'
   workflow_dispatch:
     inputs:
       mode:
-        description: '執行模式'
+        description: 'Execution mode'
         required: true
         default: 'full'
         type: choice
         options:
-          - full      # 完整流程：分析、開發、部署、公告
-          - analyze   # 只分析不執行
-          - deploy    # 只觸發部署
+          - full
+          - analyze
+          - deploy
       target:
-        description: '目標 (issue number 或 task name)'
+        description: 'Target (issue or task name)'
         required: false
         type: string
-  # API 觸發: gh api -X POST repos/OWNER/REPO/dispatches -f event_type=ai-devops
   repository_dispatch:
     types: [ai-devops]
 
@@ -29,81 +26,58 @@ env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
-  # ============ 步驟 1: 分析系統狀態 ============
   analyze:
-    name: 📊 Analyze System
+    name: Analyze System
     runs-on: ubuntu-latest
     outputs:
       has_tasks: ${{ steps.analyze.outputs.has_tasks }}
-      tasks_json: ${{ steps.analyze.outputs.tasks_json }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      
+
       - name: Analyze System
         id: analyze
         run: |
-          python3 << 'EOF'
-          import json
+          python3 << 'PYEOF'
           import subprocess
           import os
 
           def run_cmd(cmd):
-              result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-              return result.returncode, result.stdout, result.stderr
+              r = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+              return r.returncode, r.stdout, r.stderr
 
-          status = {}
-
-          # Git status
           code, out, _ = run_cmd("git status --porcelain")
-          status["git_changes"] = len([l for l in out.strip().split('\n') if l])
+          git_changes = len([l for l in out.strip().split('\n') if l])
 
-          # Recent commits
-          code, out, _ = run_cmd("git log --oneline -10")
-          status["recent_commits"] = out.strip().split('\n')
+          code, commits, _ = run_cmd("git log --oneline -10")
+          issues_out = subprocess.run("gh issue list --state open --json number --jq length",
+                                    shell=True, capture_output=True, text=True)
+          open_issues = int(issues_out.stdout.strip() or 0)
 
-          # Open issues
-          code, out, _ = run_cmd("gh issue list --state open --json number,title --jq '.[] | \"#\(.number) \(.title)\"'")
-          status["open_issues"] = [l for l in out.strip().split('\n') if l]
+          print(f"Uncommitted: {git_changes}, Open issues: {open_issues}")
+          has_work = git_changes > 0 or open_issues > 3
 
-          # Open PRs
-          code, out, _ = run_cmd("gh pr list --state open --json number,title --jq '.[] | \"#\(.number) \(.title)\"'")
-          status["open_prs"] = [l for l in out.strip().split('\n') if l]
-
-          # Print status
-          print("=== 系統狀態 ===")
-          print(f"未提交變更: {status['git_changes']} 個")
-          print(f"Open Issues: {len(status['open_issues'])} 個")
-          print(f"Open PRs: {len(status['open_prs'])} 個")
-          print(f"\n最近 5 個 Commit:")
-          for c in status['recent_commits'][:5]:
-              print(f"  {c}")
-
-          # Save status
           with open(os.environ['GITHUB_ENV'], 'a') as f:
-              # 只有當有明顯任務時才設置 has_tasks=true
-              has_work = status['git_changes'] > 0 or len(status['open_issues']) > 3
               f.write(f"has_tasks={str(has_work).lower()}\n")
-              f.write(f"tasks_json={json.dumps(status)}\n")
-          EOF
+          PYEOF
 
-  # ============ 步驟 2: AI 決策與開發 ============
   develop:
-    name: 🧠 AI Decision & Development
+    name: AI Development
     needs: analyze
     if: needs.analyze.outputs.has_tasks == 'true'
     runs-on: ubuntu-latest
     outputs:
-      branch_name: ${{ steps.develop.outputs.branch_name }}
-      task_name: ${{ steps.develop.outputs.task_name }}
-      pr_number: ${{ steps.develop.outputs.pr_number }}
+      branch_name: ${{ steps.dev.outputs.branch_name }}
+      task_name: ${{ steps.dev.outputs.task_name }}
+      pr_number: ${{ steps.dev.outputs.pr_number }}
+      summary: ${{ steps.dev.outputs.summary }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -116,392 +90,108 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: AI Development
-        id: develop
+      - name: Run AI Agent
+        id: dev
         env:
           KIMI_API_KEY: ${{ secrets.KIMI_API_KEY }}
-        run: |
-          python3 << 'EOF'
-          import os
-          import json
-          import re
-          import subprocess
-          import urllib.request
-          import urllib.error
-          from datetime import datetime
+        run: python3 .github/scripts/ai-devops-agent.py
 
-          REPO_ROOT = os.environ['GITHUB_WORKSPACE']
-          KIMI_API_KEY = os.environ.get('KIMI_API_KEY', '')
-          GITHUB_REPO = os.environ['GITHUB_REPOSITORY']
-
-          def run_cmd(cmd, cwd=REPO_ROOT):
-              result = subprocess.run(cmd, cwd=cwd, shell=True, capture_output=True, text=True)
-              return result.returncode, result.stdout, result.stderr
-
-          def http_request(endpoint, payload):
-              data = json.dumps(payload).encode("utf-8")
-              req = urllib.request.Request(endpoint, data=data, headers={
-                  "Content-Type": "application/json",
-                  "Authorization": f"Bearer {KIMI_API_KEY}"
-              }, method="POST")
-              try:
-                  with urllib.request.urlopen(req, timeout=300) as response:
-                      return json.loads(response.read().decode("utf-8"))
-              except Exception as e:
-                  print(f"HTTP 錯誤: {e}")
-                  return None
-
-          def call_kimi(prompt, system_prompt=""):
-              messages = []
-              if system_prompt:
-                  messages.append({"role": "system", "content": system_prompt})
-              messages.append({"role": "user", "content": prompt})
-              
-              payload = {
-                  "model": "kimi-k2.7-code",
-                  "messages": messages,
-                  "temperature": 0.7,
-                  "max_tokens": 8192
-              }
-              
-              response = http_request("https://api.moonshot.cn/v1/chat/completions", payload)
-              if response and "choices" in response:
-                  return response["choices"][0]["message"]["content"]
-              return None
-
-          # 讀取系統狀態
-          code, recent_commits, _ = run_cmd("git log --oneline -10")
-          code, git_status, _ = run_cmd("git status --porcelain")
-
-          context = f"""
-當前系統狀態：
-- 未提交的變更: {len([l for l in git_status.strip().split(chr(10)) if l])} 個文件
-- 最新 Commit: {recent_commits.strip().split(chr(10))[0] if recent_commits.strip() else 'N/A'}
-
-最近 5 個 Commit：
-{chr(10).join(recent_commits.strip().split(chr(10))[:5])}
-
-作為 AI DevOps 代理，請分析以上狀態並決定：
-1. 是否需要修復任何明顯問題？
-2. 是否可以添加任何有價值的改進？
-3. 選擇一個最具價值的任務來執行。
-
-返回 JSON：
-{{
-    "execute": true/false,
-    "task_name": "任務英文名",
-    "description": "任務中文描述",
-    "files_to_modify": ["file1", "file2"],
-    "reason": "選擇這個任務的原因"
-}}
-"""
-
-          print("🧠 AI 分析系統...")
-          response = call_kimi(context)
-
-          if not response:
-              print("❌ Kimi API 調用失敗")
-              exit(1)
-
-          try:
-              json_match = re.search(r'```json\s*(.+?)\s*```', response, re.DOTALL)
-              if json_match:
-                  decision = json.loads(json_match.group(1))
-              else:
-                  decision = json.loads(response)
-          except:
-              print("❌ 解析決策失敗")
-              exit(1)
-
-          if not decision.get("execute", False):
-              print("✅ AI 判斷：無需執行任務")
-              exit(0)
-
-          task_name = decision["task_name"]
-          print(f"📋 任務：{task_name}")
-          print(f"   原因：{decision.get('reason', '')}")
-
-          # 讀取需要修改的文件
-          context_files = {}
-          for file_path in decision.get("files_to_modify", [])[:3]:
-              full_path = os.path.join(REPO_ROOT, file_path)
-              if os.path.exists(full_path):
-                  with open(full_path, 'r') as f:
-                      content = f.read()[:3000]
-                      context_files[file_path] = content
-                      print(f"   📄 讀取: {file_path}")
-
-          context_str = "\n\n".join([f"=== {p} ===\n{c}" for p, c in context_files.items()])
-
-          # 生成代碼
-          code_prompt = f"""任務：{task_name}
-描述：{decision['description']}
-
-現有代碼：
-{context_str if context_str else '無現有代碼（新建功能）'}
-
-請生成代碼變更，返回 JSON：
-{{
-    "files": [
-        {{
-            "file_path": "路徑/文件名",
-            "action": "create/modify/delete",
-            "content": "完整文件內容"
-        }}
-    ],
-    "commit_message": "commit 訊息",
-    "summary": "變更摘要"
-}}
-"""
-
-          print("🔧 AI 生成代碼...")
-          code_response = call_kimi(code_prompt)
-
-          if not code_response:
-              print("❌ 代碼生成失敗")
-              exit(1)
-
-          try:
-              json_match = re.search(r'```json\s*(.+?)\s*```', code_response, re.DOTALL)
-              if json_match:
-                  code_data = json.loads(json_match.group(1))
-              else:
-                  code_data = json.loads(code_response)
-          except:
-              print("❌ 解析代碼失敗")
-              exit(1)
-
-          # 創建分支
-          branch_name = f"ai-devops/{task_name.lower().replace(' ', '-').replace('_', '-')}"
-          print(f"🌿 創建分支: {branch_name}")
-          
-          run_cmd("git checkout -b " + branch_name)
-
-          # 應用代碼變更
-          for file_change in code_data.get("files", []):
-              file_path = os.path.join(REPO_ROOT, file_change["file_path"])
-              action = file_change.get("action", "modify")
-              
-              if action == "delete":
-                  if os.path.exists(file_path):
-                      os.remove(file_path)
-                      print(f"   🗑️ 刪除: {file_change['file_path']}")
-              else:
-                  os.makedirs(os.path.dirname(file_path), exist_ok=True)
-                  with open(file_path, 'w') as f:
-                      f.write(file_change.get("content", ""))
-                  print(f"   ✅ {'創建' if action == 'create' else '更新'}: {file_change['file_path']}")
-
-          # 提交
-          run_cmd("git add -A")
-          commit_msg = code_data.get("commit_message", f"feat: {task_name}")
-          run_cmd(f'git commit -m "{commit_msg}"')
-          
-          # 推送
-          run_cmd(f"git push -u origin {branch_name}")
-          print(f"   📤 推送分支")
-
-          # 創建 PR
-          pr_body = f"""## 🤖 AI DevOps 自動生成
-
-### 任務：{task_name}
-### 原因：{decision.get('reason', '')}
-
-**變更摘要：** {code_data.get('summary', '')}
-
----
-_由 AI DevOps Agent (Kimi K2.7) 自動開發_"""
-
-          code, pr_out, _ = run_cmd(f'gh pr create --title "🤖 {task_name}" --body "{pr_body.replace(chr(10), "\\n")}" --base main')
-          
-          pr_number = None
-          if code == 0:
-              pr_match = re.search(r'pull/(\d+)', pr_out)
-              if pr_match:
-                  pr_number = int(pr_match.group(1))
-
-          if not pr_number:
-              code, out, _ = run_cmd(f'gh pr list --head {branch_name} --json number --jq ".[0].number"')
-              if code == 0 and out.strip():
-                  pr_number = int(out.strip())
-
-          print(f"✅ PR #{pr_number} 已創建" if pr_number else "❌ PR 創建失敗")
-
-          # 保存輸出
-          with open(os.environ['GITHUB_ENV'], 'a') as f:
-              f.write(f"branch_name={branch_name}\n")
-              f.write(f"task_name={task_name}\n")
-              f.write(f"pr_number={pr_number or 0}\n")
-              f.write(f"summary={code_data.get('summary', '')}\n")
-
-          EOF
-
-  # ============ 步驟 3: 合併 PR ============
   merge:
-    name: 🔀 Merge PR
+    name: Merge PR
     needs: develop
     if: needs.develop.outputs.pr_number != ''
     runs-on: ubuntu-latest
     steps:
-      - name: Merge Pull Request
-        run: |
-          PR_NUMBER=${{ needs.develop.outputs.pr_number }}
-          BRANCH_NAME=${{ needs.develop.outputs.branch_name }}
-          
-          echo "🔀 合併 PR #$PR_NUMBER"
-          
-          # 添加標籤
-          gh pr edit $PR_NUMBER --add-label "ai-devops,automated"
-          
-          # 合併 PR
-          gh pr merge $PR_NUMBER --squash --delete-branch --auto
-          
-          echo "✅ PR #$PR_NUMBER 已合併"
+      - name: Checkout
+        uses: actions/checkout@v4
 
-  # ============ 步驟 4: 觸發部署 ============
+      - name: Merge PR
+        run: |
+          gh pr merge ${{ needs.develop.outputs.pr_number }} --squash --delete-branch --auto
+          gh pr edit ${{ needs.develop.outputs.pr_number }} --add-label "ai-devops,automated"
+
   deploy:
-    name: 🚀 Deploy to Production
+    name: Deploy
     needs: merge
     runs-on: ubuntu-latest
     steps:
-      - name: Trigger Deployment
+      - name: Trigger Deploy
         run: |
-          echo "🚀 �發部署..."
-          
-          # 等待一下確保 main 分支已更新
           sleep 10
-          
-          # 觸發部署 workflow
           gh workflow run "Deploy to Production" --repo $GITHUB_REPOSITORY
-          
-          echo "✅ 部署已觸發"
 
-      - name: Wait for Deployment
+      - name: Wait for Deploy
         run: |
-          echo "⏳ 等待部署完成..."
-          
-          # 等待部署 workflow 啟動
           sleep 30
-          
-          # 監控部署狀態
           for i in {1..40}; do
-            STATUS=$(gh run list --workflow "Deploy to Production" --limit 1 --json status,conclusion --jq '.[0] | "\(.status) \(.conclusion)"')
-            echo "檢查 $i/40: $STATUS"
-            
+            STATUS=$(gh run list --workflow "Deploy to Production" --limit 1 --jq '.[0].status + " " + (.[0].conclusion // "")')
+            echo "Check $i/40: $STATUS"
             if echo "$STATUS" | grep -q "completed success"; then
-              echo "✅ 部署成功！"
+              echo "Deploy success!"
               exit 0
             elif echo "$STATUS" | grep -q "completed failure"; then
-              echo "❌ 部署失敗"
+              echo "Deploy failed"
               exit 1
             fi
-            
             sleep 30
           done
-          
-          echo "⚠️ 部署監控超時"
+          echo "Deploy timeout"
 
-  # ============ 步驟 5: 發布系統公告（可選） ============
   announce:
-    name: 📢 Post Announcement
+    name: Announce
     needs: deploy
-    runs-on: ubuntu-latest
     if: always() && needs.deploy.result == 'success'
+    runs-on: ubuntu-latest
     env:
       ADMIN_REFRESH_TOKEN: ${{ secrets.ADMIN_REFRESH_TOKEN }}
       CITY_BASE_URL: ${{ vars.CITY_BASE_URL }}
     steps:
-      - name: Post GitHub Comment (Always)
+      - name: Post Comment
         run: |
-          PR_NUMBER=${{ needs.develop.outputs.pr_number }}
-          TASK_NAME="${{ needs.develop.outputs.task_name }}"
-          SUMMARY="${{ needs.develop.outputs.summary }}"
-          
-          gh pr comment $PR_NUMBER --body "## ✅ 部署完成
+          gh pr comment ${{ needs.develop.outputs.pr_number }} --body "## Deploy Complete
 
-AI DevOps 已完成以下工作：
+AI DevOps completed:
 
-| 步驟 | 狀態 |
-|------|------|
-| 代碼開發 | ✅ |
-| PR 創建與合併 | ✅ |
-| 生產環境部署 | ✅ |
-| 系統公告 | 📋 |
+| Step | Status |
+|------|--------|
+| Development | OK |
+| PR Merge | OK |
+| Deploy | OK |
 
-**任務：** ${TASK_NAME}
-**時間：** $(date '+%Y-%m-%d %H:%M:%S')"
+**Task:** ${{ needs.develop.outputs.task_name }}
+**Time:** $(date '+%Y-%m-%d %H:%M:%S')"
 
-      - name: Post System Announcement (Optional)
+      - name: Post System Announcement
         if: env.ADMIN_REFRESH_TOKEN != '' && env.CITY_BASE_URL != ''
         run: |
-          TASK_NAME="${{ needs.develop.outputs.task_name }}"
-          SUMMARY="${{ needs.develop.outputs.summary }}"
-          PR_NUMBER=${{ needs.develop.outputs.pr_number }}
-          
-          echo "📢 發布系統公告..."
-          
-          # 先嘗試刷新 token
-          REFRESH_RESP=$(curl -s -X POST "${{ env.CITY_BASE_URL }}/api/auth/refresh" \
+          REFRESH=$(curl -s -X POST "${{ env.CITY_BASE_URL }}/api/auth/refresh" \
             -H "Content-Type: application/json" \
             -d '{"refresh_token":"${{ env.ADMIN_REFRESH_TOKEN }}"}')
-          
-          TOKEN=$(echo $REFRESH_RESP | python3 -c "import sys,json; print(json.load(sys.stdin)['data'].get('token',''))" 2>/dev/null)
-          
+          TOKEN=$(echo $REFRESH | python3 -c "import sys,json; print(json.load(sys.stdin)['data'].get('token',''))" 2>/dev/null || echo "")
           if [ -z "$TOKEN" ]; then
-            echo "⚠️ Token 刷新失敗，使用現有 token"
-            TOKEN="${{ env.ADMIN_REFRESH_TOKEN }}"
+            echo "Token refresh failed"
           else
-            echo "✅ Token 已刷新"
+            echo "Token refreshed"
           fi
-          
-          ANNOUNCEMENT=$(cat <<EOF
-          {
-            "title": "🤖 AI DevOps 更新：${TASK_NAME}",
-            "content": "## 系統更新公告\n\n**更新內容：** ${SUMMARY}\n\n**部署時間：** $(date '+%Y-%m-%d %H:%M:%S')\n\n**PR：** #${PR_NUMBER}\n\n---\n_此公告由 AI DevOps Agent 自動發布_",
-            "type": "system_update"
-          }
-          EOF
-          )
-          
           curl -s -X POST "${{ env.CITY_BASE_URL }}/api/admin/announcements" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer $TOKEN" \
-            -d "$ANNOUNCEMENT" && echo "✅ 公告已發布" || echo "⚠️ 公告 API 調用失敗"
+            -d '{"title":"AI DevOps: ${{ needs.develop.outputs.task_name }}","content":"Update deployed","type":"system_update"}'
 
-  # ============ 步驟 6: 生成執行報告 ============
   report:
-    name: 📊 Generate Report
+    name: Report
     needs: [develop, merge, deploy, announce]
     runs-on: ubuntu-latest
     if: always()
     steps:
-      - name: Generate Execution Report
+      - name: Generate Report
         run: |
-          echo "## 🤖 AI DevOps 執行報告" > $GITHUB_STEP_SUMMARY
+          echo "## AI DevOps Report" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**執行時間：** $(date '+%Y-%m-%d %H:%M:%S')" >> $GITHUB_STEP_SUMMARY
-          echo "**觸發方式：** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 任務狀態" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| 步驟 | 狀態 |" >> $GITHUB_STEP_SUMMARY
-          echo "|------|------|" >> $GITHUB_STEP_SUMMARY
-          echo "| 分析系統 | ${{ needs.analyze.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| AI 開發 | ${{ needs.develop.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| 合併 PR | ${{ needs.merge.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| 部署 | ${{ needs.deploy.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| 發布公告 | ${{ needs.announce.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          
-          if [ "${{ needs.deploy.result }}" == "success" ]; then
-            echo "### ✅ 全部完成" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "**任務：** ${{ needs.develop.outputs.task_name }}" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "### ⚠️ 需要關注" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "某些步驟可能需要手動檢查。" >> $GITHUB_STEP_SUMMARY
-          fi
-          
-          echo ""
-          cat $GITHUB_STEP_SUMMARY
+          echo "| Step | Result |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Analyze | ${{ needs.analyze.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Develop | ${{ needs.develop.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Merge | ${{ needs.merge.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Deploy | ${{ needs.deploy.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Announce | ${{ needs.announce.result }} |" >> $GITHUB_STEP_SUMMARY
