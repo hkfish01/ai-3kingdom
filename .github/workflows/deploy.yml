@@ -42,16 +42,11 @@ jobs:
         run: |
           set +H
 
-          # Jump host: rsadmin@lemon -> then ssh to target
-          JUMP_SSH="sshpass -p '${JUMP_PASS}' ssh -o StrictHostKeyChecking=no -o ProxyJump=${JUMP_USER}@${JUMP_HOST} -tt ${TARGET_USER}@${TARGET_HOST}"
-          # Direct to target (via ProxyJump alias)
-          TARGET_SSH="sshpass -p '${TARGET_PASS}' ssh -o StrictHostKeyChecking=no -o ProxyJump=${JUMP_USER}@${JUMP_HOST} -tt ${TARGET_USER}@${TARGET_HOST}"
+          SSH_BASE="sshpass -p '${JUMP_PASS}' ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ProxyJump=${JUMP_USER}@${JUMP_HOST} -tt ${TARGET_USER}@${TARGET_HOST}"
 
           run() {
-            printf '%s\n' "$1" | ${TARGET_SSH} bash
+            printf '%s\n' "$1" | ${SSH_BASE} bash
           }
-
-          echo "▶ Deploying via SSH ProxyJump: ${JUMP_USER}@${JUMP_HOST} -> ${TARGET_USER}@${TARGET_HOST}"
 
           # ── Step 1: Backup database ─────────────────────────
           if [ "${SKIP_BACKUP}" != "true" ]; then
