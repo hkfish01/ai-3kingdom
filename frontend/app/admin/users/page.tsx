@@ -125,7 +125,7 @@ export default function AdminUsersPage() {
     setError("");
     setMessage("");
     try {
-      await adminApi.adminResetUserPassword(id, { new_password: pwd });
+      await adminApi.adminResetUserPassword(id, pwd);
       setResetPwdMap((prev) => ({ ...prev, [id]: "" }));
       setMessage(t.done);
     } catch (err) {
