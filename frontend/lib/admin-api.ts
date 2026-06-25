@@ -232,7 +232,7 @@ export const adminApi = {
     message: string;
     report_id: string;
     summary: string;
-  }>("/admin/devops/trigger"),
+  }>("/admin/devops/trigger", { method: "POST" }),
 
   // Daily Reset
   triggerDailyReset: () => adminRequest<{ success: boolean; data: any }>("/admin/daily-reset", { method: "POST" })
