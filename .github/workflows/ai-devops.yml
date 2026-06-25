@@ -4,8 +4,11 @@ on:
   # 定期自動執行（建議每小時或每天）
   schedule:
     - cron: '0 * * * *'  # 每小時執行一次
-  # 也可手動觸發 (同步更新: 2026-06-25)
+  # 手動觸發
   workflow_dispatch:
+  # API 觸發: gh api -X POST repos/OWNER/REPO/dispatches -f event_type=ai-devops
+  repository_dispatch:
+    types: [ai-devops]
     inputs:
       mode:
         description: '執行模式'
