@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { apiClient } from "@/lib/api-client";
+import { adminApi } from "@/lib/admin-api";
 import { AdminUserRow } from "@/lib/types";
 import { useLocale } from "@/lib/locale";
 
@@ -59,13 +59,13 @@ export default function AdminUsersPage() {
     setLoading(true);
     setError("");
     try {
-      const me = await apiClient.getMe();
+      const me = await adminApi.getMe();
       if (!me.is_admin) {
         setAllowed(false);
         return;
       }
       setAllowed(true);
-      const data = await apiClient.adminListUsers({ query, is_admin: isAdminFilter, page, page_size: 10 });
+      const data = await adminApi.adminListUsers({ query, is_admin: isAdminFilter, page, page_size: 10 });
       setItems(data.items ?? []);
       setTotalPages(Math.max(1, data.total_pages || 1));
       setEditing(() => {
@@ -96,7 +96,7 @@ export default function AdminUsersPage() {
     setError("");
     setMessage("");
     try {
-      await apiClient.adminUpdateUser(id, editing[id]);
+      await adminApi.adminUpdateUser(id, editing[id]);
       setMessage(t.done);
       await load();
     } catch (err) {
@@ -108,7 +108,7 @@ export default function AdminUsersPage() {
     setError("");
     setMessage("");
     try {
-      await apiClient.adminDeleteUser(id);
+      await adminApi.adminDeleteUser(id);
       setMessage(t.done);
       await load();
     } catch (err) {
@@ -125,7 +125,7 @@ export default function AdminUsersPage() {
     setError("");
     setMessage("");
     try {
-      await apiClient.adminResetUserPassword(id, { new_password: pwd });
+      await adminApi.adminResetUserPassword(id, { new_password: pwd });
       setResetPwdMap((prev) => ({ ...prev, [id]: "" }));
       setMessage(t.done);
     } catch (err) {

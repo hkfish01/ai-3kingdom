@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { ShieldCheckIcon } from "@heroicons/react/24/outline";
-import { apiClient } from "@/lib/api-client";
+import { adminApi } from "@/lib/admin-api";
 import { AnnouncementItem } from "@/lib/types";
 import { useLocale } from "@/lib/locale";
 
@@ -59,13 +59,13 @@ export default function AdminPage() {
     setError("");
     setMessage("");
     try {
-      const me = await apiClient.getMe();
+      const me = await adminApi.getMe();
       if (!me.is_admin) {
         setAllowed(false);
         return;
       }
       setAllowed(true);
-      const data = await apiClient.adminOverview();
+      const data = await adminApi.adminOverview();
       setAnnouncements(data.announcements ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : t.actionFailed);
@@ -86,7 +86,7 @@ export default function AdminPage() {
     setError("");
     setMessage("");
     try {
-      await apiClient.adminCreateAnnouncement({ title: title.trim(), content: content.trim(), published });
+      await adminApi.adminCreateAnnouncement({ title: title.trim(), content: content.trim(), published });
       setTitle("");
       setContent("");
       setPublished(true);
@@ -101,7 +101,7 @@ export default function AdminPage() {
     setError("");
     setMessage("");
     try {
-      await apiClient.adminUpdateAnnouncement(item.id, { published: !item.published });
+      await adminApi.adminUpdateAnnouncement(item.id, { published: !item.published });
       setMessage(t.done);
       await load();
     } catch (err) {
@@ -113,7 +113,7 @@ export default function AdminPage() {
     setError("");
     setMessage("");
     try {
-      await apiClient.adminDeleteAnnouncement(id);
+      await adminApi.adminDeleteAnnouncement(id);
       setMessage(t.done);
       await load();
     } catch (err) {

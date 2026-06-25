@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { apiClient } from "@/lib/api-client";
+import { adminApi } from "@/lib/admin-api";
 import { AdminAgentRow } from "@/lib/types";
 import { useLocale } from "@/lib/locale";
 
@@ -77,13 +77,13 @@ export default function AdminAgentsPage() {
     setLoading(true);
     setError("");
     try {
-      const me = await apiClient.getMe();
+      const me = await adminApi.getMe();
       if (!me.is_admin) {
         setAllowed(false);
         return;
       }
       setAllowed(true);
-      const data = await apiClient.adminListAgents({
+      const data = await adminApi.adminListAgents({
         query,
         role: roleFilter,
         owner_user_id: ownerFilter ? Number(ownerFilter) : undefined,
@@ -137,7 +137,7 @@ export default function AdminAgentsPage() {
     setError("");
     setMessage("");
     try {
-      await apiClient.adminUpdateAgent(id, {
+      await adminApi.adminUpdateAgent(id, {
         name: row.name,
         role: row.role,
         home_city: row.home_city,
@@ -157,7 +157,7 @@ export default function AdminAgentsPage() {
     setError("");
     setMessage("");
     try {
-      await apiClient.adminDeleteAgent(id);
+      await adminApi.adminDeleteAgent(id);
       setMessage(t.done);
       await load();
     } catch (err) {
@@ -169,7 +169,7 @@ export default function AdminAgentsPage() {
     setError("");
     setMessage("");
     try {
-      const data = await apiClient.adminRegenerateAgentClaimCode(id);
+      const data = await adminApi.adminRegenerateAgentClaimCode(id);
       setClaimCodeMap((prev) => ({ ...prev, [id]: data.claim_code }));
       setClaimExpiryMap((prev) => ({ ...prev, [id]: toLocalDateTimeInput(data.claim_expires_at) }));
       setMessage(t.done);
@@ -186,7 +186,7 @@ export default function AdminAgentsPage() {
     setError("");
     setMessage("");
     try {
-      const data = await apiClient.adminUpdateAgentClaimExpiry(id, { expires_at: new Date(localValue).toISOString() });
+      const data = await adminApi.adminUpdateAgentClaimExpiry(id, { expires_at: new Date(localValue).toISOString() });
       setClaimExpiryMap((prev) => ({ ...prev, [id]: toLocalDateTimeInput(data.claim_expires_at) }));
       if (data.claim_code) {
         setClaimCodeMap((prev) => ({ ...prev, [id]: data.claim_code ?? "" }));
