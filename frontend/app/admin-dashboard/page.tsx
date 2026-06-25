@@ -140,42 +140,62 @@ export default function AdminDashboardPage() {
             ) : history.length === 0 ? (
               <p className="text-sm text-slate-500">暫無歷史報告</p>
             ) : (
-              <div className="flex gap-2 overflow-x-auto pb-1">
-                {history.map((item) => {
-                  const isActive = item.report_id === report?.report_id;
-                  return (
-                    <button
-                      key={item.report_id}
-                      onClick={() => setSelectedReportId(item.report_id)}
-                      className={`min-w-[160px] flex-shrink-0 rounded-lg border p-3 text-left text-xs transition ${
-                        isActive
-                          ? "border-indigo-500 bg-indigo-500/20 text-white"
-                          : "border-slate-600 bg-slate-700/50 text-slate-300 hover:border-slate-500 hover:bg-slate-700"
-                      }`}
-                    >
-                      <div className="mb-1 flex items-center gap-1">
-                        <span className={`h-2 w-2 rounded-full ${
-                          item.health_status === "healthy" ? "bg-emerald-400"
-                          : item.health_status === "warning" ? "bg-yellow-400"
-                          : "bg-red-400"
-                        }`} />
-                        <span className="font-semibold">{item.health_status === "healthy" ? "健康" : item.health_status === "warning" ? "警告" : "危險"}</span>
-                      </div>
-                      <p className="truncate text-slate-400">
-                        {new Date(item.timestamp).toLocaleString("zh-TW", {
-                          timeZone: "Asia/Taipei",
-                          month: "numeric",
-                          day: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </p>
-                      <p className="mt-1 line-clamp-2 leading-tight text-slate-400">
-                        {item.summary.replace(/\|/g, " ")}
-                      </p>
-                    </button>
-                  );
-                })}
+              <div className="overflow-hidden rounded-lg border border-slate-700">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-700/50">
+                    <tr>
+                      <th className="px-4 py-2 text-left font-medium text-slate-400">狀態</th>
+                      <th className="px-4 py-2 text-left font-medium text-slate-400">時間</th>
+                      <th className="px-4 py-2 text-left font-medium text-slate-400">摘要</th>
+                      <th className="px-4 py-2 text-left font-medium text-slate-400">報告 ID</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-700">
+                    {history.map((item) => {
+                      const isActive = item.report_id === report?.report_id;
+                      return (
+                        <tr
+                          key={item.report_id}
+                          onClick={() => setSelectedReportId(item.report_id)}
+                          className={`cursor-pointer transition ${
+                            isActive
+                              ? "bg-indigo-500/10"
+                              : "hover:bg-slate-700/30"
+                          }`}
+                        >
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              <span className={`h-2 w-2 rounded-full ${
+                                item.health_status === "healthy" ? "bg-emerald-400"
+                                : item.health_status === "warning" ? "bg-yellow-400"
+                                : "bg-red-400"
+                              }`} />
+                              <span className={item.health_status === "healthy" ? "text-emerald-400" : item.health_status === "warning" ? "text-yellow-400" : "text-red-400"}>
+                                {item.health_status === "healthy" ? "健康" : item.health_status === "warning" ? "警告" : "危險"}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-slate-400">
+                            {new Date(item.timestamp).toLocaleString("zh-TW", {
+                              timeZone: "Asia/Taipei",
+                              year: "numeric",
+                              month: "2-digit",
+                              day: "2-digit",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </td>
+                          <td className="px-4 py-3 text-slate-300">
+                            {item.summary}
+                          </td>
+                          <td className="px-4 py-3 font-mono text-xs text-slate-500">
+                            {item.report_id}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>
