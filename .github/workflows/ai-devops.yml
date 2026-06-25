@@ -137,13 +137,7 @@ jobs:
         run: |
           gh pr comment ${{ needs.develop.outputs.pr_number }} --body "## Deploy Complete
 
-AI DevOps completed:
-
-| Step | Status |
-|------|--------|
-| Development | OK |
-| PR Merge | OK |
-| Deploy | OK |
+AI DevOps completed development, PR merge, and deploy.
 
 **Task:** ${{ needs.develop.outputs.task_name }}
 **Time:** $(date '+%Y-%m-%d %H:%M:%S')"
