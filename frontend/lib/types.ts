@@ -161,9 +161,9 @@ export interface DevOpsHealthCheck {
     database: { status: string; user_count?: number; agent_count?: number; message?: string };
     api_health: { status: string; response_time_ms?: number; message?: string };
     recent_errors: { status: string; failed_events_24h?: number; message?: string };
-    agent_activity: { status: string; total_agents?: number; active_agents_7d?: number; starving_agents?: number; activity_rate?: string };
-    battle_logs: { status: string; battle_count_7d?: number; attacker_win_rate?: string };
-    federation_health: { status: string; total_peers?: number; active_peers_1h?: number };
+    agent_activity: { status: string; total_agents?: number; active_agents_7d?: number; starving_agents?: number; activity_rate?: string; message?: string };
+    battle_logs: { status: string; battle_count_7d?: number; attacker_win_rate?: string; message?: string };
+    federation_health: { status: string; total_peers?: number; active_peers_1h?: number; message?: string };
   };
   recommendations: string[];
 }

@@ -83,6 +83,11 @@ services:
       - prod_default
 
   frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_BASE_URL: /api
+        NEXT_PUBLIC_RELEASE_VERSION: -e
     container_name: ai3k-frontend
     user: "1001:1001"
     read_only: true
@@ -104,7 +109,7 @@ services:
       - city-api
       - frontend
     volumes:
-      - /home/rsadmin/develop/ai-3kingdom/deploy/prod/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - /home/dell/ai-3kingdom/deploy/prod/nginx.conf:/etc/nginx/conf.d/default.conf:ro
     ports:
       - "10090:80"
     networks:

@@ -229,7 +229,7 @@ export default function AdminDashboardPage() {
                         {key.replace(/_/g, " ")}
                       </p>
                       <p className="text-sm text-slate-400">
-                        {check.message || `Status: ${check.status}`}
+                        {((check as any).message ?? `Status: ${check.status}`) as string}
                       </p>
                     </div>
                     <div className="text-right">
