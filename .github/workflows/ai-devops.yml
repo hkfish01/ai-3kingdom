@@ -2,7 +2,7 @@ name: AI DevOps Runner
 
 on:
   schedule:
-    - cron: '0 9 * * *'
+    - cron: '0 1 * * *'  # 香港時間每天早上 9:00 (UTC 1:00)
   workflow_dispatch:
     inputs:
       mode:
