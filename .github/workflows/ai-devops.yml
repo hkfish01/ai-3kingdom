@@ -1,36 +1,33 @@
-name: AI DevOps Runner
+name: AI DevOps
 
 on:
   schedule:
-    - cron: '0 1 * * *'  # 香港時間每天早上 9:00 (UTC 1:00)
+    - cron: '0 1 * * *'  # HKT 09:00
   workflow_dispatch:
     inputs:
       mode:
         description: 'Execution mode'
         required: true
-        default: 'full'
+        default: 'review'
         type: choice
         options:
-          - full
-          - analyze
-          - deploy
-      target:
-        description: 'Target'
-        required: false
-        type: string
+          - review
+          - generate
   repository_dispatch:
     types: [ai-devops]
 
 env:
   KIMI_API_KEY: ${{ secrets.KIMI_API_KEY }}
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  GITHUB_REPOSITORY: ${{ github.repository }}
 
 jobs:
-  analyze:
-    name: Analyze
+  review:
+    name: Review
     runs-on: ubuntu-latest
     outputs:
-      has_tasks: ${{ steps.analyze.outputs.has_tasks }}
+      approve: ${{ steps.decision.outputs.approve }}
+      approved_pr_number: ${{ steps.decision.outputs.approved_pr_number }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -42,98 +39,29 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Analyze System
-        id: analyze
-        run: |
-          python3 << 'PYEOF'
-          import subprocess
-          import os
-
-          def run_cmd(cmd):
-              r = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-              return r.returncode, r.stdout, r.stderr
-
-          code, out, _ = run_cmd("git status --porcelain")
-          git_changes = len([l for l in out.strip().split('\n') if l])
-
-          code, commits, _ = run_cmd("git log --oneline -10")
-          issues_out = subprocess.run("gh issue list --state open --json number --jq length",
-                                    shell=True, capture_output=True, text=True)
-          open_issues = int(issues_out.stdout.strip() or 0)
-
-          print(f"Uncommitted: {git_changes}, Open issues: {open_issues}")
-          has_work = git_changes > 0 or open_issues > 0
-
-          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
-              f.write(f"has_tasks={str(has_work).lower()}\n")
-          PYEOF
-
-  develop:
-    name: Develop
-    needs: analyze
-    if: needs.analyze.outputs.has_tasks == 'true'
-    runs-on: ubuntu-latest
-    outputs:
-      branch: ${{ steps.dev.outputs.branch }}
-      task: ${{ steps.dev.outputs.task }}
-      pr_num: ${{ steps.dev.outputs.pr_num }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Run Agent
-        id: dev
+      - name: Review AI DevOps PRs
+        id: decision
         env:
-          KIMI_API_KEY: ${{ secrets.KIMI_API_KEY }}
-        run: python3 .github/scripts/ai-devops-agent.py
-
-  merge:
-    name: Merge
-    needs: develop
-    if: needs.develop.outputs.pr_num != ''
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Merge PR
-        run: |
-          PR_NUM=${{ needs.develop.outputs.pr_num }}
-          if [ -n "$PR_NUM" ] && [ "$PR_NUM" != "0" ]; then
-            gh pr merge $PR_NUM --squash --delete-branch --auto || true
-          fi
+          GITHUB_OUTPUT: ${{ github.output }}
+          GITHUB_ENV: ${{ github.env }}
+        run: python3 .github/scripts/ai-devops-agent.py --mode review
 
   deploy:
     name: Deploy
-    needs: merge
+    needs: review
+    if: ${{ needs.review.outputs.approve == 'true' && needs.review.outputs.approved_pr_number != '0' }}
     runs-on: ubuntu-latest
     steps:
-      - name: Trigger Deploy
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Merge approved PR
+        env:
+          PR_NUMBER: ${{ needs.review.outputs.approved_pr_number }}
+        run: |
+          gh pr merge "$PR_NUMBER" --squash --delete-branch
+
+      - name: Trigger deployment
         run: |
           sleep 10
-          gh workflow run "Deploy to Production" --repo $GITHUB_REPOSITORY
-
-  report:
-    name: Report
-    needs: [develop, merge, deploy]
-    runs-on: ubuntu-latest
-    if: always()
-    steps:
-      - name: Generate Report
-        run: |
-          echo "## AI DevOps Report" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Step | Result |" >> $GITHUB_STEP_SUMMARY
-          echo "|------|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Analyze | ${{ needs.analyze.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Develop | ${{ needs.develop.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Merge | ${{ needs.merge.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Deploy | ${{ needs.deploy.result }} |" >> $GITHUB_STEP_SUMMARY
+          gh workflow run "Deploy to Production" --repo "$GITHUB_REPOSITORY"
