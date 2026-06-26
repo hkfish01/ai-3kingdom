@@ -22,10 +22,14 @@
         <key>Minute</key>
         <integer>0</integer>
     </dict>
-    <key>EnvironmentVariables</key>
-    <dict>
-        <key>PATH</key>
-        <string>/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
-    </dict>
+        <key>EnvironmentVariables</key>
+        <dict>
+            <key>PATH</key>
+            <string>/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+            <key>OBSIDIAN_VAULT</key>
+            <string>/Volumes/1.5T/AI-DATA/AI-Knowledge-Vault/01-projects/ai-3kingdom</string>
+            <key>KIMI_API_KEY</key>
+            <string>__REPLACE_WITH_YOUR_KEY__</string>
+        </dict>
 </dict>
 </plist>

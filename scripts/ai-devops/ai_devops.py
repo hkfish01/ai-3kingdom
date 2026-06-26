@@ -22,6 +22,10 @@ from typing import List, Dict, Optional
 REPO_ROOT = Path(__file__).parent.parent.parent.resolve()
 GITHUB_REPO = "hkfish01/ai-3kingdom"
 KIMI_API_KEY = os.environ.get("KIMI_API_KEY", "")
+OBSIDIAN_VAULT = Path(os.environ.get(
+    "OBSIDIAN_VAULT",
+    "/Volumes/1.5T/AI-DATA/AI-Knowledge-Vault/01-projects/ai-3kingdom"
+))
 
 def run_cmd(cmd, cwd=REPO_ROOT, timeout=60):
     """執行 shell 命令"""
@@ -489,6 +493,111 @@ def post_github_comment(pr_number: int, message: str):
         "--body", message
     ])
 
+
+def write_obsidian_daily_report(report: Dict):
+    """寫入每日報告到 Obsidian"""
+    if not OBSIDIAN_VAULT.exists():
+        print("  ⚠️ Obsidian vault 不存在，跳過寫入")
+        return
+
+    daily_dir = OBSIDIAN_VAULT / "00-daily"
+    daily_dir.mkdir(parents=True, exist_ok=True)
+
+    date_str = datetime.now().strftime("%Y-%m-%d")
+    filename = daily_dir / f"{date_str}.md"
+
+    # 構建每日報告內容
+    content = f"""# AI DevOps 每日報告 — {date_str}
+
+> 自動生成 by AI DevOps Agent
+
+## 執行摘要
+
+- **執行時間：** {report.get("timestamp", datetime.now().strftime("%Y-%m-%d %H:%M"))}
+- **成功任務：** {report.get("completed_count", 0)}/{report.get("total_count", 0)}
+
+"""
+
+    tasks = report.get("tasks", [])
+    if tasks:
+        content += "## 已完成任務\n\n"
+        for task in tasks:
+            status_emoji = "✅" if task.get("status") == "success" else "❌"
+            content += f"- {status_emoji} **{task.get('name', 'N/A')}**\n"
+            if task.get("pr"):
+                content += f"  - PR: #{task['pr']}\n"
+            if task.get("summary"):
+                content += f"  - {task['summary']}\n"
+    else:
+        content += "## 任務狀態\n\n- 沒有需要處理的任務\n"
+
+    content += f"""
+## 系統狀態
+
+- 未提交變更：{report.get("git_changes", 0)} 個文件
+- Open Issues：{report.get("open_issues", 0)} 個
+- Open PRs：{report.get("open_prs", 0)} 個
+
+---
+
+_由 AI DevOps Agent 自動記錄_
+"""
+
+    try:
+        filename.write_text(content, encoding="utf-8")
+        print(f"  📓 已寫入每日報告到 Obsidian: {filename.name}")
+    except Exception as e:
+        print(f"  ⚠️ 寫入 Obsidian 失敗: {e}")
+
+
+def write_obsidian_optimization(suggestion: Dict):
+    """寫入優化建議到 Obsidian"""
+    if not OBSIDIAN_VAULT.exists():
+        return
+
+    opt_dir = OBSIDIAN_VAULT / "03-optimization"
+    opt_dir.mkdir(parents=True, exist_ok=True)
+
+    date_str = datetime.now().strftime("%Y-%m-%d")
+    slug = suggestion.get("name", "untitled").lower().replace(" ", "-").replace("_", "-")
+    filename = opt_dir / f"{date_str}—{slug}.md"
+
+    content = f"""# {suggestion.get("name", "優化建議")}
+
+> 生成時間：{datetime.now().strftime("%Y-%m-%d %H:%M")}
+
+## 類型
+- 類別：{suggestion.get("category", "general")}
+- 優先級：{suggestion.get("priority", "medium")}
+
+## 建議內容
+{suggestion.get("description", "無描述")}
+
+## 預期影響
+{suggestion.get("impact", "待評估")}
+
+## 關聯檔案
+"""
+    for f in suggestion.get("files", []):
+        content += f"- `ai-3kingdom/{f}`\n"
+
+    content += """
+## 狀態
+- [ ] 待評估
+- [ ] 已採納
+- [ ] 已拒絕
+
+---
+
+_由 AI DevOps Agent 自動記錄_
+"""
+
+    try:
+        filename.write_text(content, encoding="utf-8")
+        print(f"  📓 已寫入優化建議: {filename.name}")
+    except Exception as e:
+        print(f"  ⚠️ 寫入失敗: {e}")
+
 def main():
     print("=" * 60)
     print("🤖 AI DevOps 自主代理")
@@ -580,6 +689,18 @@ def main():
             print(f"   - {item['task']} (PR #{item['pr']})")
     else:
         print("\n❌ 沒有任務成功完成")
+    
+    # ====== 寫入 Obsidian ======
+    daily_report = {
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "total_count": len(tasks),
+        "completed_count": len(completed_tasks),
+        "tasks": completed_tasks,
+        "git_changes": len(status["git_status"].get("changes", [])),
+        "open_issues": len(status["open_issues"]),
+        "open_prs": len(status["prs"]),
+    }
+    write_obsidian_daily_report(daily_report)
     
     # 發布總結評論
     if completed_tasks:
