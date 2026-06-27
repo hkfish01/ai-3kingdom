@@ -19,7 +19,10 @@ from pathlib import Path
 from datetime import datetime
 from typing import List, Dict, Optional
 
-REPO_ROOT = Path(__file__).parent.parent.parent.resolve()
+REPO_ROOT = Path(os.environ.get(
+    "AI_DEVOPS_REPO_ROOT",
+    Path(__file__).parent.parent.parent.resolve()
+)).resolve()
 GITHUB_REPO = "hkfish01/ai-3kingdom"
 KIMI_API_KEY = os.environ.get("KIMI_API_KEY", "")
 OBSIDIAN_VAULT = Path(os.environ.get(
@@ -84,14 +87,14 @@ def call_kimi(prompt: str, system_prompt: str = "") -> Optional[str]:
     messages.append({"role": "user", "content": prompt})
     
     payload = {
-        "model": "kimi-k2.7-code",
+        "model": "kimi-for-coding",
         "messages": messages,
-        "temperature": 0.7,
+        "temperature": 1,
         "max_tokens": 8192
     }
     
     response = http_request(
-        "https://api.moonshot.cn/v1/chat/completions",
+        "https://api.kimi.com/coding/v1/chat/completions",
         payload
     )
     
