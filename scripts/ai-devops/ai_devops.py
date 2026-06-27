@@ -34,6 +34,8 @@ def run_cmd(cmd, cwd=REPO_ROOT, timeout=60):
             cmd, cwd=cwd, capture_output=True, text=True, timeout=timeout
         )
         return result.returncode, result.stdout, result.stderr
+    except FileNotFoundError as e:
+        return -1, "", f"Command not found: {e}"
     except subprocess.TimeoutExpired:
         return -1, "", "Command timeout"
     except Exception as e:
@@ -41,8 +43,15 @@ def run_cmd(cmd, cwd=REPO_ROOT, timeout=60):
 
 def check_gh_auth():
     """檢查 GitHub CLI 認證狀態"""
-    code, out, _ = run_cmd(["gh", "auth", "status"])
-    return code == 0
+    try:
+        code, out, _ = run_cmd(["gh", "auth", "status"])
+        return code == 0
+    except FileNotFoundError:
+        print("  ❌ gh 命令未找到，請確保 gh CLI 已安裝並在 PATH 中")
+        return False
+    except Exception as e:
+        print(f"  ❌ 檢查 gh 認證失敗: {e}")
+        return False
 
 def http_request(endpoint, payload):
     """發送 HTTP 請求到 Kimi API"""
@@ -607,8 +616,8 @@ def main():
         print("❌ GitHub CLI 未登入，請先執行: gh auth login")
         sys.exit(1)
     
-    if not KIMI_API_KEY:
-        print("❌ KIMI_API_KEY 環境變量未設定")
+    if not KIMI_API_KEY or KIMI_API_KEY in ("", "__REPLACE_WITH_YOUR_KEY__"):
+        print("❌ KIMI_API_KEY 未設定或仍為 placeholder")
         sys.exit(1)
     
     print(f"\n📁 Repo: {REPO_ROOT}")

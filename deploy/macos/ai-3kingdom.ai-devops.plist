@@ -2,34 +2,33 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>Label</key>
-    <string>ai-3kingdom.ai-devops</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>/usr/bin/python3</string>
-        <string>/Volumes/1.5T/develop/GitHub/ai-3kingdom/scripts/ai-devops/ai_devops.py</string>
-    </array>
-    <key>WorkingDirectory</key>
-    <string>/Volumes/1.5T/develop/GitHub/ai-3kingdom</string>
-    <key>StandardOutPath</key>
-    <string>/Volumes/1.5T/develop/GitHub/ai-3kingdom/scripts/ai-devops/logs/ai_devops.log</string>
-    <key>StandardErrorPath</key>
-    <string>/Volumes/1.5T/develop/GitHub/ai-3kingdom/scripts/ai-devops/logs/ai_devops.log</string>
-    <key>StartCalendarInterval</key>
-    <dict>
-        <key>Hour</key>
-        <integer>8</integer>
-        <key>Minute</key>
-        <integer>0</integer>
-    </dict>
-        <key>EnvironmentVariables</key>
-        <dict>
-            <key>PATH</key>
-            <string>/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
-            <key>OBSIDIAN_VAULT</key>
-            <string>/Volumes/1.5T/AI-DATA/AI-Knowledge-Vault/01-projects/ai-3kingdom</string>
-            <key>KIMI_API_KEY</key>
-            <string>__REPLACE_WITH_YOUR_KEY__</string>
-        </dict>
+	<key>Label</key>
+	<string>ai-3kingdom.ai-devops</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/bin/bash</string>
+		<string>-c</string>
+		<string>/usr/bin/python3 /Users/terry/scripts/ai_devops.py >> /Users/terry/scripts/logs/ai_devops.log 2>&1</string>
+	</array>
+	<key>WorkingDirectory</key>
+	<string>/Users/terry</string>
+	<key>StartCalendarInterval</key>
+	<dict>
+		<key>Hour</key>
+		<integer>8</integer>
+		<key>Minute</key>
+		<integer>0</integer>
+	</dict>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>PATH</key>
+		<string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+		<key>HOME</key>
+		<string>/Users/terry</string>
+		<key>OBSIDIAN_VAULT</key>
+		<string>/Volumes/1.5T/AI-DATA/AI-Knowledge-Vault/01-projects/ai-3kingdom</string>
+		<key>KIMI_API_KEY</key>
+		<string>sk-kimi-a1ue1U5ehLy1enaX4d2KXry4C3qIkG6gLQyD0Xpkv2SLgsPhUfbXMueme41Of4Od</string>
+	</dict>
 </dict>
 </plist>
