@@ -45,6 +45,12 @@ jobs:
           cd backend
           PYTHONPATH=. pytest -q
 
+      - name: Run health check tests
+        run: |
+          source .venv/bin/activate
+          cd backend
+          PYTHONPATH=. pytest -q tests/test_health.py
+
       - name: Export OpenAPI
         run: |
           source .venv/bin/activate
