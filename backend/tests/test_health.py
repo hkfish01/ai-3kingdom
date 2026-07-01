@@ -7,8 +7,6 @@ except ImportError:
 
 client = TestClient(app)
 
-EXPECTED_STATUS = "ok"
-
 
 def test_health_check_returns_200_and_expected_status():
     """驗證 /health 回傳 200 與預期狀態。"""
@@ -16,4 +14,6 @@ def test_health_check_returns_200_and_expected_status():
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("application/json")
     payload = response.json()
-    assert payload["status"] == EXPECTED_STATUS
+    assert payload.get("success") is True
+    data = payload.get("data", {})
+    assert data.get("status") == "ok"
