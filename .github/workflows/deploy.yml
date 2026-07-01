@@ -90,6 +90,10 @@ jobs:
               sleep 2
             done
 
+            # Build image first so migrations use the latest code/deps
+            echo "  Building city-api image..."
+            docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" build city-api
+
             # Run database migrations
             echo "  Running database migrations..."
             docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" \
