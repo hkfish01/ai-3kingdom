@@ -16,10 +16,16 @@ on:
   repository_dispatch:
     types: [ai-devops]
 
+concurrency:
+  group: ai-devops
+  cancel-in-progress: true
+
 env:
   KIMI_API_KEY: ${{ secrets.KIMI_API_KEY }}
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   GITHUB_REPOSITORY: ${{ github.repository }}
+  AI_DEVOPS_REDIS_URL: ${{ secrets.AI_DEVOPS_REDIS_URL }}
+  AI_DEVOPS_AUTO_MERGE: ${{ vars.AI_DEVOPS_AUTO_MERGE || 'false' }}
 
 jobs:
   review:
@@ -38,6 +44,9 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install redis
 
       - name: Review AI DevOps PRs
         id: decision

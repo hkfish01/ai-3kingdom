@@ -9,6 +9,7 @@ import os
 import sys
 import json
 import re
+import time
 import subprocess
 import argparse
 import urllib.request
@@ -18,6 +19,11 @@ REPO_ROOT = os.environ.get('GITHUB_WORKSPACE', os.getcwd())
 KIMI_API_KEY = os.environ.get('KIMI_API_KEY', '')
 GITHUB_REPO = os.environ.get('GITHUB_REPOSITORY', '')
 GITHUB_TOKEN = os.environ.get('GITHUB_TOKEN', '')
+
+REDIS_URL = os.environ.get('AI_DEVOPS_REDIS_URL', '')
+LOCK_KEY = 'ai-devops:lock'
+LOCK_TTL_SECONDS = 600  # 10 minutes
+AUTO_MERGE = os.environ.get('AI_DEVOPS_AUTO_MERGE', 'false').lower() == 'true'
 
 
 def run_cmd(cmd, cwd=REPO_ROOT):
@@ -71,6 +77,77 @@ def parse_json_response(response):
         return None
 
 
+def redis_client():
+    if not REDIS_URL:
+        return None
+    try:
+        import redis
+        return redis.from_url(REDIS_URL, decode_responses=True)
+    except Exception as e:
+        print(f"Redis init failed: {e}")
+        return None
+
+
+def acquire_lock(ttl: int = LOCK_TTL_SECONDS) -> bool:
+    if not REDIS_URL:
+        print("AI_DEVOPS_REDIS_URL is not set, skipping distributed lock")
+        return True
+    client = redis_client()
+    if not client:
+        print("Redis client unavailable, skipping distributed lock")
+        return True
+    try:
+        acquired = client.set(LOCK_KEY, "1", nx=True, ex=ttl)
+        return bool(acquired)
+    except Exception as e:
+        print(f"Redis lock failed: {e}")
+        return False
+
+
+def release_lock():
+    if not REDIS_URL:
+        return
+    client = redis_client()
+    if not client:
+        return
+    try:
+        client.delete(LOCK_KEY)
+    except Exception as e:
+        print(f"Redis unlock failed: {e}")
+
+
+def refresh_lock(ttl: int = LOCK_TTL_SECONDS) -> bool:
+    if not REDIS_URL:
+        return True
+    client = redis_client()
+    if not client:
+        return True
+    try:
+        renewed = client.expire(LOCK_KEY, ttl)
+        return bool(renewed)
+    except Exception as e:
+        print(f"Redis lock refresh failed: {e}")
+        return False
+
+
+def run_cmd_with_lock_refresh(cmd: str, cwd: str = REPO_ROOT, refresh_interval: int = 120):
+    process = subprocess.Popen(
+        cmd,
+        cwd=cwd,
+        shell=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+    )
+    start = time.time()
+    for line in process.stdout:
+        print(line, end="")
+        if time.time() - start >= refresh_interval:
+            refresh_lock()
+            start = time.time()
+    return process.wait(), "", ""
+
+
 def get_open_ai_prs():
     code, out, _ = run_cmd("gh pr list --state open --json number,title,labels,author,updatedAt,headRefName,mergeable,statusCheckRollup")
     if code != 0:
@@ -101,15 +178,47 @@ def reject_pr(pr_number: int, reason: str):
     run_cmd(f"gh pr comment {pr_number} --body '❌ AI DevOps 審核未通過\\n\\n原因：{reason}'")
 
 
+def check_pr_limit(max_open: int = 3):
+    code, out, _ = run_cmd("gh pr list --state open --json number --jq 'length'")
+    open_count = int((out or '0').strip() or '0')
+    return open_count < max_open, open_count
+
+
+def require_pr_approval(pr_number: int) -> bool:
+    code, out, _ = run_cmd(f"gh pr view {pr_number} --json reviews --jq '.reviews | length'")
+    approval_count = int((out or '0').strip() or '0')
+    if approval_count == 0:
+        print(f"No review found for PR #{pr_number}")
+        return False
+    latest_approved = False
+    try:
+        code, out, _ = run_cmd(f"gh pr view {pr_number} --json reviews --jq 'any(.reviews[]; .state == \"APPROVED\")'")
+        latest_approved = out.strip().lower() == 'true'
+    except Exception:
+        latest_approved = False
+    return latest_approved
+
+
 def mode_generate():
-    code, recent_commits, _ = run_cmd("git log --oneline -10")
-    code, git_status, _ = run_cmd("git status --porcelain")
+    acquired = acquire_lock()
+    if not acquired:
+        print("Another AI DevOps run is in progress, aborting this run.")
+        return {"execute": False, "reason": "locked"}
 
-    code, issues_out, _ = run_cmd("gh issue list --state open --json number --jq 'length'")
-    open_issues = int(issues_out.strip() or 0)
+    try:
+        ok, open_count = check_pr_limit()
+        if not ok:
+            print(f"Open PR limit reached ({open_count}), skipping new PR creation.")
+            return {"execute": False, "reason": "pr_limit"}
 
-    nl = "\n"
-    context = f"""Current system status:
+        code, recent_commits, _ = run_cmd("git log --oneline -10")
+        code, git_status, _ = run_cmd("git status --porcelain")
+
+        code, issues_out, _ = run_cmd("gh issue list --state open --json number --jq 'length'")
+        open_issues = int(issues_out.strip() or 0)
+
+        nl = "\n"
+        context = f"""Current system status:
 - Uncommitted changes: {len([l for l in git_status.strip().split(nl) if l])} files
 - Latest commit: {recent_commits.strip().split(nl)[0] if recent_commits.strip() else 'N/A'}
 - Open issues: {open_issues}
@@ -117,39 +226,39 @@ def mode_generate():
 Recent 5 commits:
 {recent_commits.strip()}"""
 
-    print(f"System status: {len([l for l in git_status.strip().split(nl) if l])} uncommitted, {open_issues} open issues")
-    print("AI analyzing system...")
-    response = call_kimi(context)
+        print(f"System status: {len([l for l in git_status.strip().split(nl) if l])} uncommitted, {open_issues} open issues")
+        print("AI analyzing system...")
+        response = call_kimi(context)
 
-    if not response:
-        print("Kimi API call failed")
-        return {"execute": False}
+        if not response:
+            print("Kimi API call failed")
+            return {"execute": False}
 
-    decision = parse_json_response(response)
-    if not decision:
-        print("Failed to parse decision")
-        return {"execute": False}
+        decision = parse_json_response(response)
+        if not decision:
+            print("Failed to parse decision")
+            return {"execute": False}
 
-    if not decision.get("execute", False):
-        print("AI decision: No action needed")
-        return {"execute": False}
+        if not decision.get("execute", False):
+            print("AI decision: No action needed")
+            return {"execute": False}
 
-    task_name = decision["task_name"]
-    print(f"Task: {task_name}")
-    print(f"Reason: {decision.get('reason', '')}")
+        task_name = decision["task_name"]
+        print(f"Task: {task_name}")
+        print(f"Reason: {decision.get('reason', '')}")
 
-    context_files = {}
-    for file_path in decision.get("files_to_modify", [])[:3]:
-        full_path = os.path.join(REPO_ROOT, file_path)
-        if os.path.exists(full_path):
-            with open(full_path, 'r') as f:
-                content = f.read()[:3000]
-                context_files[file_path] = content
-                print(f"Reading: {file_path}")
+        context_files = {}
+        for file_path in decision.get("files_to_modify", [])[:3]:
+            full_path = os.path.join(REPO_ROOT, file_path)
+            if os.path.exists(full_path):
+                with open(full_path, 'r') as f:
+                    content = f.read()[:3000]
+                    context_files[file_path] = content
+                    print(f"Reading: {file_path}")
 
-    context_str = "\n\n".join([f"=== {p} ===\n{c}" for p, c in context_files.items()])
+        context_str = "\n\n".join([f"=== {p} ===\n{c}" for p, c in context_files.items()])
 
-    code_prompt = f"""Task: {task_name}
+        code_prompt = f"""Task: {task_name}
 Description: {decision['description']}
 
 Existing code:
@@ -168,91 +277,95 @@ Generate code changes, return JSON:
     "summary": "change summary"
 }}"""
 
-    print("AI generating code...")
-    code_response = call_kimi(code_prompt)
+        print("AI generating code...")
+        code_response = call_kimi(code_prompt)
 
-    if not code_response:
-        print("Code generation failed")
-        return {"execute": False}
+        if not code_response:
+            print("Code generation failed")
+            return {"execute": False}
 
-    code_data = parse_json_response(code_response)
-    if not code_data:
-        print("Failed to parse code")
-        return {"execute": False}
+        code_data = parse_json_response(code_response)
+        if not code_data:
+            print("Failed to parse code")
+            return {"execute": False}
 
-    branch_name = f"ai-devops/{task_name.lower().replace(' ', '-').replace('_', '-')}"
-    print(f"Creating branch: {branch_name}")
+        branch_name = f"ai-devops/{task_name.lower().replace(' ', '-').replace('_', '-')}"
+        print(f"Creating branch: {branch_name}")
 
-    run_cmd("git checkout -b " + branch_name)
+        run_cmd("git checkout -b " + branch_name)
 
-    for file_change in code_data.get("files", []):
-        file_path = os.path.join(REPO_ROOT, file_change["file_path"])
-        action = file_change.get("action", "modify")
+        for file_change in code_data.get("files", []):
+            file_path = os.path.join(REPO_ROOT, file_change["file_path"])
+            action = file_change.get("action", "modify")
 
-        if action == "delete":
-            if os.path.exists(file_path):
-                os.remove(file_path)
-                print(f"Deleting: {file_change['file_path']}")
-        else:
-            os.makedirs(os.path.dirname(file_path), exist_ok=True)
-            with open(file_path, 'w') as f:
-                f.write(file_change.get("content", ""))
-            print(f"Creating/updating: {file_change['file_path']}")
+            if action == "delete":
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+                    print(f"Deleting: {file_change['file_path']}")
+            else:
+                os.makedirs(os.path.dirname(file_path), exist_ok=True)
+                with open(file_path, 'w') as f:
+                    f.write(file_change.get("content", ""))
+                print(f"Creating/updating: {file_change['file_path']}")
 
-    run_cmd("git add -A")
-    commit_msg = code_data.get("commit_message", f"feat: {task_name}")
-    run_cmd(f'git commit -m "{commit_msg}"')
+        run_cmd("git add -A")
+        commit_msg = code_data.get("commit_message", f"feat: {task_name}")
+        run_cmd(f'git commit -m "{commit_msg}"')
 
-    run_cmd(f"git push -u origin {branch_name}")
-    print("Branch pushed")
+        run_cmd(f"git push -u origin {branch_name}")
+        print("Branch pushed")
 
-    pr_body = f"""## AI DevOps Auto-generated
+        pr_body = f"""## AI DevOps Auto-generated
 
 ### Task: {task_name}
 ### Reason: {decision.get('reason', '')}
 
 **Summary:** {code_data.get('summary', '')}
 
+**Safety:** This PR was created automatically. Please review and validate before deploying to production.
+
 ---
 _Auto-generated by AI DevOps Agent (Kimi K2.7)_"""
 
-    code, pr_out, _ = run_cmd(f'gh pr create --title "AI: {task_name}" --body "{pr_body.replace(chr(10), chr(92)+"n")}" --base main --label ai-devops')
+        code, pr_out, _ = run_cmd(f'gh pr create --title "AI: {task_name}" --body "{pr_body.replace(chr(10), chr(92)+"n")}" --base main --label ai-devops')
 
-    pr_number = None
-    if code == 0:
-        pr_match = re.search(r'pull/(\d+)', pr_out)
-        if pr_match:
-            pr_number = int(pr_match.group(1))
+        pr_number = None
+        if code == 0:
+            pr_match = re.search(r'pull/(\d+)', pr_out)
+            if pr_match:
+                pr_number = int(pr_match.group(1))
 
-    if not pr_number:
-        code, out, _ = run_cmd(f'gh pr list --head {branch_name} --json number --jq ".[0].number"')
-        if code == 0 and out.strip():
-            pr_number = int(out.strip())
+        if not pr_number:
+            code, out, _ = run_cmd(f'gh pr list --head {branch_name} --json number --jq ".[0].number"')
+            if code == 0 and out.strip():
+                pr_number = int(out.strip())
 
-    print(f"PR #{pr_number} created" if pr_number else "PR creation failed")
+        print(f"PR #{pr_number} created" if pr_number else "PR creation failed")
 
-    with open(os.environ.get('GITHUB_OUTPUT', '/tmp/github_output'), 'a') as f:
-        f.write(f"branch_name={branch_name}\n")
-        f.write(f"task_name={task_name}\n")
-        f.write(f"pr_number={pr_number or 0}\n")
-        f.write(f"summary={code_data.get('summary', '')}\n")
+        with open(os.environ.get('GITHUB_OUTPUT', '/tmp/github_output'), 'a') as f:
+            f.write(f"branch_name={branch_name}\n")
+            f.write(f"task_name={task_name}\n")
+            f.write(f"pr_number={pr_number or 0}\n")
+            f.write(f"summary={code_data.get('summary', '')}\n")
 
-    with open(os.environ.get('GITHUB_ENV', '/tmp/github_env'), 'a') as f:
-        f.write(f"branch_name={branch_name}\n")
-        f.write(f"task_name={task_name}\n")
-        f.write(f"pr_number={pr_number or 0}\n")
-        f.write(f"summary={code_data.get('summary', '')}\n")
+        with open(os.environ.get('GITHUB_ENV', '/tmp/github_env'), 'a') as f:
+            f.write(f"branch_name={branch_name}\n")
+            f.write(f"task_name={task_name}\n")
+            f.write(f"pr_number={pr_number or 0}\n")
+            f.write(f"summary={code_data.get('summary', '')}\n")
 
-    print(f"OUTPUT: branch_name={branch_name}")
-    print(f"OUTPUT: task_name={task_name}")
-    print(f"OUTPUT: pr_number={pr_number or 0}")
-    print(f"OUTPUT: summary={code_data.get('summary', '')}")
+        print(f"OUTPUT: branch_name={branch_name}")
+        print(f"OUTPUT: task_name={task_name}")
+        print(f"OUTPUT: pr_number={pr_number or 0}")
+        print(f"OUTPUT: summary={code_data.get('summary', '')}")
 
-    return {
-        "execute": True,
-        "pr_number": pr_number,
-        "task_name": task_name
-    }
+        return {
+            "execute": True,
+            "pr_number": pr_number,
+            "task_name": task_name
+        }
+    finally:
+        release_lock()
 
 
 def mode_review(prs_file=None):
@@ -279,7 +392,7 @@ def mode_review(prs_file=None):
 {chr(10).join(summary_lines)}
 
 規則：
-1. 只批准 mergeable=true 且 CI 全綠的 PR
+1. 只批准有至少一個人 APPROVED 且 CI 全綠的 PR
 2. 如果沒有候選 PR，回傳 approve=false
 3. 如果有多個候選 PR，優先批准最新更新的
 4. 回傳 JSON：
@@ -292,7 +405,15 @@ def mode_review(prs_file=None):
         reason = decision.get('reason') or ('沒有可批准的 PR' if not approve else '符合 CI/mergeable 條件')
 
         if approve and approved_pr_number:
-            approve_pr(approved_pr_number, reason)
+            if AUTO_MERGE:
+                if not require_pr_approval(approved_pr_number):
+                    print(f"PR #{approved_pr_number} has no APPROVED review, skipping merge")
+                    approve = False
+                    reason = "缺少 PR review approval"
+                else:
+                    approve_pr(approved_pr_number, reason)
+            else:
+                print(f"AUTO_MERGE is disabled, skipping merge for PR #{approved_pr_number}")
         elif prs:
             reject_pr(prs[0]['number'], reason)
 
