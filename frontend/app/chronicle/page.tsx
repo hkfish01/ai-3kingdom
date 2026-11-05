@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { BookOpenIcon } from "@heroicons/react/24/outline";
 import { apiClient } from "@/lib/api-client";
 import { useLocale } from "@/lib/locale";
-import type { ChronicleEntryItem, ChronicleStory, WorldEventItem } from "@/lib/types";
+import type { ChronicleEntryItem, ChroniclePostPackage, ChronicleStory, WorldEventItem } from "@/lib/types";
 
 function escapeXml(value: string): string {
   return value
@@ -75,6 +75,8 @@ export default function ChroniclePage() {
         pageSize: "每頁",
         copy: "複製這則史記",
         copied: "已複製",
+        postCopy: "複製發文文案",
+        postCopied: "文案已複製",
         card: "下載分享圖卡",
         recent: "近期記事",
         storyLabel: "今日史記",
@@ -103,6 +105,8 @@ export default function ChroniclePage() {
         pageSize: "Per page",
         copy: "Copy this entry",
         copied: "Copied",
+        postCopy: "Copy post caption",
+        postCopied: "Caption copied",
         card: "Download share card",
         recent: "Recent events",
         storyLabel: "Daily chronicle",
@@ -126,16 +130,22 @@ export default function ChroniclePage() {
   const [events, setEvents] = useState<WorldEventItem[]>([]);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
+  const [postPackage, setPostPackage] = useState<ChroniclePostPackage | null>(null);
+  const [postCopied, setPostCopied] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(12);
 
   useEffect(() => {
     const load = async () => {
       try {
-        const data = await apiClient.getPublicChronicle(locale);
+        const [data, post] = await Promise.all([
+          apiClient.getPublicChronicle(locale),
+          apiClient.getPublicChroniclePost(locale).catch(() => null)
+        ]);
         setStory(data.story ?? null);
         setEntries(data.entries ?? []);
         setEvents(data.events ?? []);
+        setPostPackage(post);
         setError("");
       } catch (err) {
         setError(err instanceof Error ? err.message : t.loadFailed);
@@ -161,6 +171,14 @@ export default function ChroniclePage() {
     await navigator.clipboard.writeText(story.share_text);
     setCopied(true);
     setTimeout(() => setCopied(false), 1800);
+  };
+
+  const copyPost = async () => {
+    const text = postPackage?.caption ?? story?.share_text;
+    if (!text) return;
+    await navigator.clipboard.writeText(text);
+    setPostCopied(true);
+    setTimeout(() => setPostCopied(false), 1800);
   };
 
   const downloadCard = () => {
@@ -251,6 +269,9 @@ export default function ChroniclePage() {
             <div className="flex flex-wrap gap-sm">
               <button type="button" className="btn-base btn-secondary" onClick={() => void copyStory()}>
                 {copied ? t.copied : t.copy}
+              </button>
+              <button type="button" className="btn-base btn-secondary" onClick={() => void copyPost()}>
+                {postCopied ? t.postCopied : t.postCopy}
               </button>
               <button type="button" className="btn-base btn-cta" onClick={downloadCard}>
                 {t.card}

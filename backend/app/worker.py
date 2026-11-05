@@ -58,6 +58,22 @@ def main() -> None:
                         db.rollback()
                         print(f"[Events] Evaluation failed: {e}")
 
+            # 每日 08:00 HKT（= UTC 00:00）備妥史記圖卡與發文包。
+            # 不需任何社群憑證就能跑；有 CHRONICLE_CARD_WEBHOOK_URLS 才會真的推送。
+            if settings.chronicle_card_enabled:
+                hkt = now.astimezone(timezone(timedelta(hours=8)))
+                if hkt.hour >= settings.chronicle_card_publish_hour_hkt:
+                    last_card_date = get_state(db, "chronicle_card_last_date", default="")
+                    if last_card_date != hkt.date().isoformat():
+                        try:
+                            from .services.chronicle_publish import publish_daily_post
+
+                            result = publish_daily_post(db, now=now)
+                            print(f"[ChronicleCard] {result['status']} for {hkt.date().isoformat()}")
+                        except Exception as e:
+                            db.rollback()
+                            print(f"[ChronicleCard] Daily post failed: {e}")
+
             # 每日史記 (UTC 01:00 之後的第一輪；去重存 system_state，重啟不會漏跑)
             # 這是觀戰內容的地基：即使沒有 LLM、沒有新玩家，也要有可讀的當日記事。
             last_story_date = get_state(db, "chronicle_story_last_date", default="")

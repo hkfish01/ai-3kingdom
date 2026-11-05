@@ -34,7 +34,7 @@ a local path (`/Users/terry/scripts/`).
 
 | Variable | Description |
 |---|---|
-| `KIMI_API_KEY` | Moonshot Kimi API key — **請勿寫進版本庫或 plist**。launchd 設定會從 macOS Keychain 讀取；CI 用 GitHub Actions secret |
+| `KIMI_API_KEY` | Optional, currently **not configured**. If you enable AI DevOps, create your own key and keep it out of the repo: launchd reads it from macOS Keychain, CI from a GitHub Actions secret |
 | `OBSIDIAN_VAULT` | Path to Obsidian vault |
 | `PATH` | Must include `/opt/homebrew/bin` for `gh` CLI |
 
@@ -61,9 +61,7 @@ For local launchd runs, store the key in the macOS Keychain instead:
 security add-generic-password -U -a "$USER" -s ai-3kingdom-kimi -w 'YOUR_KEY'
 ```
 
-> **Historical note:** two `sk-kimi-…` strings were once committed in
-> `deploy/prod/.env.example` and this plist. They were added by a collaborator,
-> are not configured anywhere in this repository, and have been removed from the
-> working tree (but remain in git history). If either turns out to be a live
-> credential, revoke it at its source; otherwise no rotation is needed because
-> no key is currently in use.
+> **Credentials:** this project has never had a Kimi credential configured, so
+> there is nothing to revoke or rotate. If you decide to enable AI DevOps, create
+> your own key and store it in macOS Keychain / GitHub Actions secrets. Never put
+> keys in `.env.example`, plists, workflow files, or git history.

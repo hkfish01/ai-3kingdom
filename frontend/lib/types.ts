@@ -245,6 +245,19 @@ export interface WorldEventItem {
   betrayals?: number;
 }
 
+/** 每日 08:00 HKT 自動備妥的社群發文包（免登入公開） */
+export interface ChroniclePostPackage {
+  date: string;
+  lang: string;
+  headline: string;
+  caption: string;
+  caption_long: string;
+  hashtags: string;
+  image_url: string;
+  link: string;
+  share_text: string;
+}
+
 export interface PublicChronicleFeed {
   story: ChronicleStory | null;
   city: string;

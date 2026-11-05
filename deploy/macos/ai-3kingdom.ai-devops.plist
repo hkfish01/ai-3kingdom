@@ -5,12 +5,10 @@
 	<key>Label</key>
 	<string>ai-3kingdom.ai-devops</string>
 	<!--
-	  KIMI_API_KEY 曾以明文寫在這個檔案裡並被 commit 到公開 repo，必須視為已外洩。
-	  現在改由 macOS Keychain 在啟動時注入，版本庫內不放任何金鑰。
-	  設定一次即可：
-	    security add-generic-password -a "$USER" -s ai-3kingdom-kimi -w 'YOUR_NEW_KEY'
-	  輪替時用 -U 覆蓋：
-	    security add-generic-password -U -a "$USER" -s ai-3kingdom-kimi -w 'YOUR_NEW_KEY'
+	  版本庫內不放任何金鑰。KIMI_API_KEY 由 macOS Keychain 在啟動時注入；
+	  若尚未設定，AI DevOps 腳本會自行跳過，不會發送任何請求。
+	  需要啟用時才設定：
+	    security add-generic-password -U -a "$USER" -s ai-3kingdom-kimi -w 'YOUR_KEY'
 	-->
 	<key>ProgramArguments</key>
 	<array>

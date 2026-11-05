@@ -69,6 +69,16 @@ class Settings(BaseSettings):
     world_events_betrayal_penalty: int = 30
     world_events_famine_wall_penalty: int = 50
 
+    # -- Daily share card / content flywheel --
+    # 每日 08:00 HKT 自動產出史記圖卡與發文包；不需任何憑證就能跑。
+    # X／Threads／小紅書沒有平台憑證，預設只「備好文案＋圖卡」，由人工貼文；
+    # 填入 CHRONICLE_CARD_WEBHOOK_URLS 後才會自動 POST（可接 n8n/Make/IFTTT 轉發）。
+    chronicle_card_enabled: bool = True
+    chronicle_card_publish_hour_hkt: int = 8
+    chronicle_card_api_prefix: str = "/api"
+    chronicle_card_webhook_urls: str = ""
+    chronicle_card_webhook_type: str = "generic"  # generic | discord
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
 

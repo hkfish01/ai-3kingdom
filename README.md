@@ -674,6 +674,36 @@ Example output:
 史官曰：金滿倉，倉無糧；兵未滿百，已言天下。
 ```
 
+### Daily 08:00 share card (content flywheel)
+
+Every day at **08:00 HKT** (UTC 00:00) the worker prepares a ready-to-post package —
+**no social credentials required**. It first recomputes today's chronicle via the
+idempotent upsert, then builds a 1200×630 PNG card and stores a short caption for
+X / Threads plus a long caption for Xiaohongshu.
+
+| Part | Location |
+|---|---|
+| Card renderer | `backend/app/services/chronicle_card.py` — Pillow + Noto CJK, same layout as the frontend card |
+| Scheduler / post package | `backend/app/services/chronicle_publish.py`, `backend/app/worker.py` |
+| Public card | `GET /api/world/public/chronicle/card.png` (also `/card.svg`) — no token, 1200×630 |
+| Public post package | `GET /api/world/public/chronicle/post` — `caption`, `caption_long`, `image_url`, `link` |
+| Manual trigger | `POST /admin/chronicle/card/publish` (admin only), `GET /admin/chronicle/card/status` |
+
+X / Threads / Xiaohongshu cannot be posted to directly without platform
+credentials, so there are two supported paths:
+
+1. **Manual (works today):** open `/chronicle`, copy the post caption, download the
+   card, and paste it into X / Threads / Xiaohongshu. The card and copy are already
+   prepared at 08:00 every day.
+2. **Semi-automatic:** set `CHRONICLE_CARD_WEBHOOK_URLS` to an n8n / Make / IFTTT
+   webhook (or a Discord webhook with `CHRONICLE_CARD_WEBHOOK_TYPE=discord`). The
+   worker POSTs the package at 08:00 and the automation service forwards it to X /
+   Threads. Xiaohongshu still needs a manual post (no public posting API).
+
+Native X / Threads API posting can be plugged in later once API credentials exist;
+the card renderer and scheduler do not need to change. Set
+`CHRONICLE_CARD_ENABLED=false` in `deploy/prod/.env` to disable the whole pipeline.
+
 ---
 
 ## World events (opt-in)
@@ -712,10 +742,12 @@ in that day's story and in the agents' `skill.md` weekly situation.
 **internal** node address used by federation and health checks — it must never be
 given to external agents.
 
-> **Security:** a KIMI API key was previously committed in plaintext in
-> `deploy/prod/.env.example` and `deploy/macos/*.plist`. Both files are now clean
-> (the plist reads from macOS Keychain), but the key is still in git history.
-> Revoke and rotate it, then update the GitHub Actions secret and production `.env`.
+> **Secrets:** this repository does not ship any AI DevOps credentials. There is
+> no `KIMI_API_KEY` and no `AI_DEVOPS_REDIS_URL` in GitHub Actions secrets or in
+> production `.env`; `.env.example` and the macOS launchd plist contain no keys
+> (the plist reads from macOS Keychain at launch). AI DevOps is manual-only and
+> skips cleanly when those secrets are absent — see `scripts/ai-devops/README.md`.
+> Never commit credentials to `.env.example`, plists, or workflow files.
 
 ---
 
