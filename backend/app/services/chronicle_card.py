@@ -45,10 +45,31 @@ def _wrap_chars(text: str, max_chars: int) -> list[str]:
     return ["".join(chars[i : i + max_chars]) for i in range(0, len(chars), max_chars)] or [""]
 
 
+# 事件／戰報比基礎數字更值得被轉貼；圖卡只放得下 6 行，先讓有戲的段落進場。
+PRIORITY_MARKERS = (
+    "【天下有事】",
+    "【戰報",
+    "交鋒",
+    "校場",
+    "戰報見",
+    "天下有事",
+    "battles were fought",
+)
+
+
+def _priority_lines(story: dict[str, Any]) -> list[str]:
+    """回傳重新排序後的史記內文：最多 3 行事件／戰報置頂，其餘保持原順序。"""
+    lines = [str(line) for line in story.get("lines", [])]
+    picked = [i for i, line in enumerate(lines) if any(m in line for m in PRIORITY_MARKERS)][:3]
+    return [lines[i] for i in picked] + [
+        line for i, line in enumerate(lines) if i not in picked
+    ]
+
+
 def _card_lines(story: dict[str, Any]) -> tuple[list[str], list[str]]:
-    """回傳 (內文行, 史官曰行)，與前端圖卡截斷規則一致。"""
+    """回傳 (內文行, 史官曰行)，與前端圖卡截斷規則一致，但優先帶事件／戰報。"""
     body: list[str] = []
-    for line in story.get("lines", []):
+    for line in _priority_lines(story):
         body.extend(_wrap_chars(str(line), 30))
     for q in story.get("quotes", []):
         body.extend(_wrap_chars(f"{q['name']} 曰：「{q['text']}」", 30))
@@ -154,40 +175,101 @@ def card_url(date_str: str, lang: str = "zh") -> str:
     )
 
 
-def card_caption(story: dict[str, Any], lang: str | None = None) -> str:
-    """X／Threads 用的短文案（控制在 X 的 280 weighted characters 內）。"""
+def battle_link(battle: dict[str, Any] | None) -> str:
+    return (
+        f"{settings.public_site_url.rstrip('/')}/battle/replay/{battle['battle_id']}"
+        if battle
+        else ""
+    )
+
+
+def battle_card_url(battle: dict[str, Any] | None, lang: str = "zh") -> str:
+    if not battle:
+        return ""
+    prefix = settings.chronicle_card_api_prefix.rstrip("/")
+    return (
+        f"{settings.public_site_url.rstrip('/')}{prefix}"
+        f"/world/public/battle/card.png?battle_id={battle['battle_id']}&lang={lang}"
+    )
+
+
+def _battle_line(battle: dict[str, Any], zh: bool) -> str:
+    outcome = "攻方勝" if battle.get("outcome") == "attacker_win" else "守方勝"
+    if zh:
+        return f"【今日戰報】{battle['attacker_name']} 對 {battle['defender_name']}，{outcome}"
+    return (
+        f"[Battle report] {battle['attacker_name']} vs {battle['defender_name']}: "
+        f"{'attacker won' if battle.get('outcome') == 'attacker_win' else 'defender won'}"
+    )
+
+
+def card_caption(
+    story: dict[str, Any],
+    lang: str | None = None,
+    battle: dict[str, Any] | None = None,
+) -> str:
+    """X／Threads 用的短文案（控制在 X 的 280 weighted characters 內）。
+
+    有戰報時，第二行改帶「今日戰報」、CTA 改指向回放頁——比基礎數字更有戲。
+    """
     lang = lang or story.get("lang", "zh")
     zh = lang == "zh"
     # X 對 CJK 以 2 個 weighted characters 計算，只帶一行內文才不會爆 280。
-    first_line = str((story.get("lines") or [""])[0])[:34]
+    first_line = str((_priority_lines(story) or [""])[0])[:34]
+    if battle:
+        first_line = _battle_line(battle, zh)[:38]
+        call_to_action = (
+            f"三回合回放 → {battle_link(battle)}" if zh else f"Replay → {battle_link(battle)}"
+        )
+    else:
+        call_to_action = f"今日天下 → {world_link()}" if zh else f"Today's world → {world_link()}"
     lines = [str(story.get("headline", "")), first_line]
     aphorism = (
         f"史官曰：{story.get('aphorism', '')}"
         if zh
         else f"The scribe writes: {story.get('aphorism', '')}"
     )
-    call_to_action = f"今日天下 → {world_link()}" if zh else f"Today's world → {world_link()}"
     parts = [*lines, aphorism, "", call_to_action, HASHTAGS_ZH if zh else HASHTAGS_EN]
     return "\n".join(parts)
 
 
-def card_caption_long(story: dict[str, Any]) -> str:
-    """小紅書／Threads 長文案：整則史記＋世界連結。"""
-    return f"{story.get('share_text', '')}\n\n{HASHTAGS_ZH if story.get('lang') == 'zh' else HASHTAGS_EN}"
+def card_caption_long(story: dict[str, Any], battle: dict[str, Any] | None = None) -> str:
+    """小紅書／Threads 長文案：整則史記＋戰報回放連結。"""
+    zh = story.get("lang") == "zh"
+    parts = [story.get("share_text", "")]
+    if battle:
+        parts.extend(
+            [
+                "",
+                _battle_line(battle, zh),
+                f"戰報回放 → {battle_link(battle)}" if zh else f"Battle replay → {battle_link(battle)}",
+            ]
+        )
+    parts.extend(["", HASHTAGS_ZH if zh else HASHTAGS_EN])
+    return "\n".join(parts)
 
 
-def build_post_package(story: dict[str, Any]) -> dict[str, Any]:
-    """每日發文包：人工貼文或自動化 webhook 都吃這一份。"""
+def build_post_package(
+    story: dict[str, Any],
+    battle: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """每日發文包：人工貼文或自動化 webhook 都吃這一份。
+
+    `battle` 是 `latest_public_battle()` 的公開欄位；沒有戰報時所有舊欄位保持不變。
+    """
     date_str = str(story.get("date", ""))
     lang = "zh" if story.get("lang") == "zh" else "en"
     return {
         "date": date_str,
         "lang": lang,
         "headline": story.get("headline", ""),
-        "caption": card_caption(story, lang),
-        "caption_long": card_caption_long(story),
+        "caption": card_caption(story, lang, battle),
+        "caption_long": card_caption_long(story, battle),
         "hashtags": HASHTAGS_ZH if lang == "zh" else HASHTAGS_EN,
         "image_url": card_url(date_str, lang),
         "link": world_link(),
         "share_text": story.get("share_text", ""),
+        "battle": battle,
+        "battle_link": battle_link(battle),
+        "battle_image_url": battle_card_url(battle, lang),
     }

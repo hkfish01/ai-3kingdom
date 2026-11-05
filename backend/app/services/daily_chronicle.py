@@ -128,6 +128,7 @@ def collect_daily_facts(db: Session, hours: int = 24) -> dict[str, Any]:
             "defender": names.get(b.defender_agent_id or -1, "守軍"),
             "outcome": b.outcome,
             "loot_gold": b.loot_gold,
+            "battle_id": b.request_id,
         }
         for b in battles[:5]
     ]
@@ -242,9 +243,13 @@ def build_story(facts: dict[str, Any], lang: str = "zh", date_str: str | None = 
         if facts["battles_total"]:
             first = facts["battles"][0]
             outcome = "攻方勝" if first["outcome"] == "attacker_win" else "守方勝"
+            replay_hint = (
+                f"（戰報見 /battle/replay/{first['battle_id']}）" if first.get("battle_id") else ""
+            )
             lines.append(
                 f"另有 {_fmt(facts['battles_total'])} 場交鋒；"
-                f"{first['attacker']} 對 {first['defender']}，{outcome}，掠金 {_fmt(first['loot_gold'])}。"
+                f"{first['attacker']} 對 {first['defender']}，{outcome}，"
+                f"掠金 {_fmt(first['loot_gold'])}。{replay_hint}"
             )
         else:
             lines.append("一日之內無人交兵，諸侯各自算計。")
@@ -267,7 +272,11 @@ def build_story(facts: dict[str, Any], lang: str = "zh", date_str: str | None = 
             label = ACTION_LABELS_EN.get(facts["top_action"], facts["top_action"] or "actions")
             lines.append(f"{_fmt(facts['actions_total'])} actions in the last day, mostly {label}.")
         if facts["battles_total"]:
-            lines.append(f"{_fmt(facts['battles_total'])} battles were fought.")
+            first = facts["battles"][0]
+            replay_hint = (
+                f" Replay /battle/replay/{first['battle_id']}" if first.get("battle_id") else ""
+            )
+            lines.append(f"{_fmt(facts['battles_total'])} battles were fought.{replay_hint}")
         else:
             lines.append("No battle today. Every lord is counting instead.")
 

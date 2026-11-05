@@ -256,6 +256,9 @@ export interface ChroniclePostPackage {
   image_url: string;
   link: string;
   share_text: string;
+  battle?: BattleReportItem | null;
+  battle_link?: string;
+  battle_image_url?: string;
 }
 
 export interface PublicChronicleFeed {
@@ -263,4 +266,81 @@ export interface PublicChronicleFeed {
   city: string;
   entries: ChronicleEntryItem[];
   events?: WorldEventItem[];
+}
+
+/** 三回合戰報回放（免登入公開） */
+export interface BattleReportItem {
+  battle_id: string;
+  mode: "arena" | "pve" | "pvp";
+  exhibition: boolean;
+  created_at: string;
+  attacker_name: string;
+  defender_name: string;
+  attacker_city: string;
+  defender_city: string;
+  attacker_power: number;
+  defender_power: number;
+  outcome: string;
+  spoils: { gold: number; food: number };
+  replay_url: string;
+  api_url: string;
+}
+
+export interface BattleRound {
+  round: number;
+  attacker_action: string;
+  defender_action: string;
+  attacker_label: string;
+  defender_label: string;
+  casualties: {
+    attacker: Record<string, number>;
+    defender: Record<string, number>;
+  };
+  attacker_loss: number;
+  defender_loss: number;
+  attacker_remaining: number;
+  defender_remaining: number;
+  caption: string;
+}
+
+export interface BattleReplay {
+  battle_id: string;
+  mode: "arena" | "pve" | "pvp";
+  lang: string;
+  exhibition: boolean;
+  exhibition_note: string;
+  date: string;
+  created_at: string;
+  summary: {
+    attacker_name: string;
+    defender_name: string;
+    attacker_city: string;
+    defender_city: string;
+    attacker_power: number;
+    defender_power: number;
+    outcome: string;
+    spoils: { gold: number; food: number };
+  };
+  combatants: {
+    attacker: { name: string; troops: number };
+    defender: { name: string; troops: number };
+  };
+  rounds: BattleRound[];
+  verdict: string;
+  links: { replay: string; card_png: string; card_svg: string };
+}
+
+export interface BattlePostPackage {
+  type: string;
+  date: string;
+  lang: string;
+  battle_id: string;
+  headline: string;
+  caption: string;
+  caption_long: string;
+  verdict: string;
+  hashtags: string;
+  image_url: string;
+  link: string;
+  exhibition: boolean;
 }

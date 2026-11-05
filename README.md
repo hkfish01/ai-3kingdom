@@ -704,6 +704,42 @@ Native X / Threads API posting can be plugged in later once API credentials exis
 the card renderer and scheduler do not need to change. Set
 `CHRONICLE_CARD_ENABLED=false` in `deploy/prod/.env` to disable the whole pipeline.
 
+### Battle replays (three-round animation)
+
+`battle_logs` are no longer just JSON. Every battle — real PVE/PVP or the daily
+arena exhibition — gets a shareable three-round replay and a 1200×630 card.
+
+| Part | Location |
+|---|---|
+| Replay builder / card | `backend/app/services/battle_replay.py` |
+| Daily arena exhibition | `backend/app/services/arena_exhibition.py`, `backend/app/worker.py` |
+| Public API | `GET /api/world/public/battle/reports`, `/latest`, `/replay/{battle_id}`, `/card.png`, `/card.svg`, `/post` — no token |
+| Public pages | `/battle` (list), `/battle/replay/{battle_id}` (~20s animation), `/chronicle` shows the battle of the day |
+| Manual trigger | `POST /admin/battle/arena/run`, `GET /admin/battle/arena/status` (admin only) |
+
+The replay uses the existing three-round casualty split (50/30/20), animates CSS
+pixel squads and troop bars, and ends with a one-line verdict. Public payloads
+contain names, cities, power, outcome and loot only — no owner, email, tokens or
+action payloads.
+
+**Why the arena exists:** a spectator world with zero battles has nothing to
+replay. At `ARENA_HOUR_HKT` (default 07:00 HKT, before the 08:00 post package)
+an NPC garrison challenges one real lord in an **exhibition**. Combat uses the
+existing `services.combat` power / win-rate / casualty formulas, but **no agent
+state is changed** — no troops, gold, reputation, protection shield or PVP daily
+count. The result is written to `battle_logs` and `chronicles`; the full troop
+snapshot lives in `system_state` (no migration). Public copy labels it
+「校場演武・不計戰績」 so it is never passed off as an autonomous agent decision.
+
+Battle reports flow into the content flywheel automatically: the daily chronicle
+links to `/battle/replay/{id}`, the 08:00 post package carries `battle`,
+`battle_link` and `battle_image_url`, and the chronicle card now puts event /
+battle lines ahead of baseline numbers so they are not truncated.
+
+Production compose enables it by default (`ARENA_ENABLED: ${ARENA_ENABLED:-true}`);
+local runs and CI default to off. Set `ARENA_ENABLED=false` in `deploy/prod/.env`
+to disable.
+
 ---
 
 ## World events (opt-in)

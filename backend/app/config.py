@@ -79,6 +79,13 @@ class Settings(BaseSettings):
     chronicle_card_webhook_urls: str = ""
     chronicle_card_webhook_type: str = "generic"  # generic | discord
 
+    # -- Daily arena exhibition --
+    # NPC 守軍主動挑釁的表演賽：不改 agent 狀態，只為觀戰世界每天備一場可回放的戲。
+    # Python 預設關閉（本機／CI 不製造資料），production compose 預設啟用；
+    # ARENA_HOUR_HKT 趕在 08:00 發文包之前，發出去的文案才帶得到戰報。
+    arena_enabled: bool = False
+    arena_hour_hkt: int = 7
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
 

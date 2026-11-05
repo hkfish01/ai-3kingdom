@@ -1,10 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { BookOpenIcon } from "@heroicons/react/24/outline";
 import { apiClient } from "@/lib/api-client";
 import { useLocale } from "@/lib/locale";
-import type { ChronicleEntryItem, ChroniclePostPackage, ChronicleStory, WorldEventItem } from "@/lib/types";
+import type { BattleReportItem, ChronicleEntryItem, ChroniclePostPackage, ChronicleStory, WorldEventItem } from "@/lib/types";
+
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api";
 
 function escapeXml(value: string): string {
   return value
@@ -24,10 +27,21 @@ function wrapChars(text: string, max: number): string[] {
   return out;
 }
 
+/** 與後端圖卡一致：只放得下 6 行，先讓事件／戰報進場，別被基礎數字擠掉。 */
+const PRIORITY_MARKERS = ["【天下有事】", "【戰報", "交鋒", "校場", "戰報見", "天下有事", "battles were fought"];
+function priorityLines(lines: string[]): string[] {
+  const picked = lines
+    .map((line, i) => ({ line, i }))
+    .filter(({ line }) => PRIORITY_MARKERS.some((m) => line.includes(m)))
+    .slice(0, 3)
+    .map(({ i }) => i);
+  return [...picked.map((i) => lines[i]), ...lines.filter((_, i) => !picked.includes(i))];
+}
+
 /** 產生 1200x630 的史記圖卡 SVG，供下載為 PNG。 */
 function buildCardSvg(story: ChronicleStory): string {
   const body: string[] = [];
-  for (const line of story.lines) {
+  for (const line of priorityLines(story.lines)) {
     body.push(...wrapChars(line, 30));
   }
   for (const q of story.quotes) {
@@ -78,6 +92,10 @@ export default function ChroniclePage() {
         postCopy: "複製發文文案",
         postCopied: "文案已複製",
         card: "下載分享圖卡",
+        battleLabel: "今日戰報",
+        watchReplay: "看三回合回放",
+        battleCard: "戰報卡",
+        exhibition: "校場演武・不計戰績",
         recent: "近期記事",
         storyLabel: "今日史記",
         stats: "城中現況",
@@ -108,6 +126,10 @@ export default function ChroniclePage() {
         postCopy: "Copy post caption",
         postCopied: "Caption copied",
         card: "Download share card",
+        battleLabel: "Battle of the day",
+        watchReplay: "Watch three-round replay",
+        battleCard: "Battle card",
+        exhibition: "Arena exhibition - no ranking impact",
         recent: "Recent events",
         storyLabel: "Daily chronicle",
         stats: "City snapshot",
@@ -131,6 +153,7 @@ export default function ChroniclePage() {
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
   const [postPackage, setPostPackage] = useState<ChroniclePostPackage | null>(null);
+  const [latestBattle, setLatestBattle] = useState<BattleReportItem | null>(null);
   const [postCopied, setPostCopied] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(12);
@@ -138,14 +161,16 @@ export default function ChroniclePage() {
   useEffect(() => {
     const load = async () => {
       try {
-        const [data, post] = await Promise.all([
+        const [data, post, battles] = await Promise.all([
           apiClient.getPublicChronicle(locale),
-          apiClient.getPublicChroniclePost(locale).catch(() => null)
+          apiClient.getPublicChroniclePost(locale).catch(() => null),
+          apiClient.getPublicBattleReports(locale, 1).catch(() => ({ items: [] as BattleReportItem[] }))
         ]);
         setStory(data.story ?? null);
         setEntries(data.entries ?? []);
         setEvents(data.events ?? []);
         setPostPackage(post);
+        setLatestBattle(battles.items?.[0] ?? null);
         setError("");
       } catch (err) {
         setError(err instanceof Error ? err.message : t.loadFailed);
@@ -231,6 +256,34 @@ export default function ChroniclePage() {
         </h1>
         <p className="text-sm text-white/75">{t.subtitle}</p>
       </header>
+
+      {latestBattle ? (
+        <section className="glass-card space-y-xs p-lg">
+          <div className="flex flex-wrap items-center justify-between gap-sm">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-cta">{t.battleLabel}</p>
+              <h2 className="text-xl font-bold text-white">
+                {latestBattle.attacker_name} <span className="text-cta">vs</span> {latestBattle.defender_name}
+              </h2>
+              <p className="text-xs text-white/60">
+                {latestBattle.exhibition ? t.exhibition : latestBattle.mode.toUpperCase()} · {latestBattle.created_at.slice(0, 10)}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-sm">
+              <Link className="btn-base btn-cta" href={`/battle/replay/${encodeURIComponent(latestBattle.battle_id)}`}>
+                {t.watchReplay}
+              </Link>
+              <a
+                className="btn-base btn-secondary"
+                href={`${API_BASE}/world/public/battle/card.png?battle_id=${encodeURIComponent(latestBattle.battle_id)}&lang=${locale}`}
+                download={`ai3k-battle-${latestBattle.battle_id}.png`}
+              >
+                {t.battleCard}
+              </a>
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       {events.length > 0 ? (
         <section className="space-y-md">

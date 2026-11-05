@@ -20,6 +20,7 @@ import httpx
 from sqlalchemy.orm import Session
 
 from ..config import settings
+from .battle_replay import latest_public_battle
 from .chronicle_card import build_post_package
 from .daily_chronicle import build_story_from_db, generate_daily_chronicle, get_latest_story
 from .system_state import get_state, set_state
@@ -59,7 +60,9 @@ def current_post_package(db: Session, lang: str = "zh") -> dict[str, Any]:
                 return package
         except json.JSONDecodeError:
             pass
-    return build_post_package(build_story_from_db(db, lang=lang))
+    return build_post_package(
+        build_story_from_db(db, lang=lang), battle=latest_public_battle(db, lang)
+    )
 
 
 def _webhook_payload(package: dict[str, Any], kind: str) -> dict[str, Any]:
@@ -84,6 +87,8 @@ def _webhook_payload(package: dict[str, Any], kind: str) -> dict[str, Any]:
         "hashtags": package["hashtags"],
         "image_url": package["image_url"],
         "link": package["link"],
+        "battle": package.get("battle"),
+        "battle_image_url": package.get("battle_image_url", ""),
         "package": package,
     }
 
@@ -120,8 +125,9 @@ def publish_daily_post(
         }
 
     # 08:00 HKT 時 worker 的 UTC 01:00 史記還沒跑；用 PR #9 的冪等 upsert 先補齊當日。
+    # 校場演武排在這個時段之前，所以發文包會帶到當日戰報與回放連結。
     story = generate_daily_chronicle(db, lang="zh", force=True)
-    package = build_post_package(story)
+    package = build_post_package(story, battle=latest_public_battle(db, "zh"))
     set_state(db, PACKAGE_KEY, json.dumps(package, ensure_ascii=False))
 
     urls = [u.strip() for u in settings.chronicle_card_webhook_urls.split(",") if u.strip()]
