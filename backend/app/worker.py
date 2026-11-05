@@ -1,5 +1,5 @@
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from .api.routes_action import _process_action_event
 from .config import settings
@@ -14,6 +14,7 @@ def main() -> None:
     Base.metadata.create_all(bind=engine)
 
     last_devops_run = None  # 追蹤 AI DevOps 最後執行日期
+    last_story_refresh_check = None  # 當日史記重算的節流時間戳記（UTC, naive）
 
     while True:
         now = datetime.now(timezone.utc)
@@ -69,6 +70,23 @@ def main() -> None:
                 except Exception as e:
                     db.rollback()
                     print(f"[Chronicle] Daily story failed: {e}")
+
+            # 當日史記重算：事件推進、捐糧、背盟或局勢數字變動後，公開觀戰不必等隔天。
+            # 每 10 分鐘才檢查一次；檢查本身比對內容簽章，內容沒變就不寫入。
+            now_naive = now.replace(tzinfo=None)
+            if (
+                last_story_refresh_check is None
+                or now_naive - last_story_refresh_check >= timedelta(minutes=10)
+            ):
+                last_story_refresh_check = now_naive
+                try:
+                    from .services.daily_chronicle import refresh_today_story_if_stale
+
+                    if refresh_today_story_if_stale(db, now=now):
+                        print(f"[Chronicle] Same-day story refreshed for {today}")
+                except Exception as e:
+                    db.rollback()
+                    print(f"[Chronicle] Same-day refresh failed: {e}")
 
             # AI DevOps 每日檢查 (凌晨 2 點，低流量時段)
             if last_devops_run != today and now.hour == 2:
