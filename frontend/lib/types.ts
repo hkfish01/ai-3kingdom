@@ -205,3 +205,33 @@ export interface DevOpsReportHistoryItem {
   health_status: string;
   summary: string;
 }
+
+/** 每日史記敘事層（免登入公開） */
+export interface ChronicleStory {
+  date: string;
+  lang: string;
+  city: string;
+  headline: string;
+  lines: string[];
+  quotes: Array<{ name: string; text: string }>;
+  aphorism: string;
+  share_text: string;
+  stats: Record<string, number>;
+}
+
+export interface ChronicleEntryItem {
+  id: number;
+  event_type: string;
+  event_type_localized?: string;
+  title: string;
+  title_localized?: string;
+  content: string;
+  content_localized?: string;
+  created_at: string;
+}
+
+export interface PublicChronicleFeed {
+  story: ChronicleStory | null;
+  city: string;
+  entries: ChronicleEntryItem[];
+}

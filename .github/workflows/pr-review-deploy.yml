@@ -5,18 +5,30 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     branches: [main]
 
+# gh CLI / github-script 需要明確授權；未設定時 GITHUB_TOKEN 預設為唯讀，
+# 會造成「get PR details 失敗」與「createComment 403」。
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
 jobs:
   # ============ 代碼審查 ============
   code-review:
     name: Code Review
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      
+
       - name: Run Cursor Review
+        env:
+          # gh CLI 不會讀 actions/checkout 寫進 .git/config 的憑證，必須顯式給 token。
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
           python3 scripts/ai-devops/cursor_reviewer.py --pr ${{ github.event.pull_request.number }}
 
@@ -26,18 +38,28 @@ jobs:
     needs: code-review
     runs-on: ubuntu-latest
     if: always()
-    
+
     steps:
       - name: Update PR Comment
         uses: actions/github-script@v7
+        env:
+          # needs 是 Actions 表達式 context，不能直接當 JS 變數用；用 env 帶進來。
+          CODE_REVIEW_RESULT: ${{ needs['code-review'].result }}
         with:
           script: |
             const pr = context.payload.pull_request;
-            const reviewResult = needs.code-review.result === 'success' ? '✅ 代碼審查完成' : '⚠️ 代碼審查失敗';
-            
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: pr.number,
-              body: `## PR 審批狀態\n\n${reviewResult}\n\n**Commit:** \`${{ github.sha }}\`\n**Branch:** \`${{ github.head_ref }}\`\n\n請在服務器上更新 .env 文件，然後執行部署。`
-            });
+            const reviewResult = process.env.CODE_REVIEW_RESULT === 'success'
+              ? '✅ 代碼審查完成'
+              : '⚠️ 代碼審查失敗';
+
+            // Fork PR 的 GITHUB_TOKEN 固定唯讀，留言失敗不應讓整個 check 變紅。
+            try {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+                body: `## PR 審批狀態\n\n${reviewResult}\n\n**Commit:** \`${{ github.sha }}\`\n**Branch:** \`${{ github.head_ref }}\`\n\n請在服務器上更新 .env 文件，然後執行部署。`
+              });
+            } catch (error) {
+              core.warning(`無法張貼審查狀態留言（常見於 fork PR 的唯讀 token）：${error.message}`);
+            }

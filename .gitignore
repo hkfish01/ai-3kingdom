@@ -14,4 +14,6 @@ deploy/prod/.env
 .DS_Store
 frontend/node_modules/
 frontend/.next/
+frontend/tsconfig.tsbuildinfo
+.venv-ci/
 deploy/scripts/*.sh

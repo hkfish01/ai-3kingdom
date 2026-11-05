@@ -7,7 +7,8 @@ export type Locale = "en" | "zh";
 const LOCALE_KEY = "locale";
 
 export function useLocale() {
-  const [locale, setLocaleState] = useState<Locale>("en");
+  // 主要受眾為繁中使用者；英文仍可由右上角切換。
+  const [locale, setLocaleState] = useState<Locale>("zh");
 
   useEffect(() => {
     const saved = localStorage.getItem(LOCALE_KEY);

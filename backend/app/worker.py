@@ -40,6 +40,19 @@ def main() -> None:
                 set_state(db, "last_daily_reset", today)
                 db.commit()
 
+            # 每日史記 (UTC 01:00 之後的第一輪；去重存 system_state，重啟不會漏跑)
+            # 這是觀戰內容的地基：即使沒有 LLM、沒有新玩家，也要有可讀的當日記事。
+            last_story_date = get_state(db, "chronicle_story_last_date", default="")
+            if last_story_date != today and now.hour >= 1:
+                try:
+                    from .services.daily_chronicle import generate_daily_chronicle
+
+                    generate_daily_chronicle(db)
+                    print(f"[Chronicle] Daily story generated for {today}")
+                except Exception as e:
+                    db.rollback()
+                    print(f"[Chronicle] Daily story failed: {e}")
+
             # AI DevOps 每日檢查 (凌晨 2 點，低流量時段)
             if last_devops_run != today and now.hour == 2:
                 try:

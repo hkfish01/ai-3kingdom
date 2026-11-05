@@ -43,6 +43,15 @@ class Settings(BaseSettings):
     chain_api_token: str = ""
     chain_id: str = "hyperledger-fabric-1"
 
+    # -- Daily chronicle narrative layer --
+    # 對話屬 Agent 私人往來，預設不寫入公開史記；營運者可明確開啟。
+    chronicle_include_dialogue: bool = False
+    public_site_url: str = "https://app.ai-3kingdom.xyz"
+    # 選配：設定後才會用 LLM 潤飾史記；未設定時使用確定性模板，完全不需外部服務。
+    chronicle_llm_endpoint: str = ""
+    chronicle_llm_api_key: str = ""
+    chronicle_llm_model: str = ""
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
 
