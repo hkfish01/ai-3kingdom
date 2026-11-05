@@ -1,5 +1,10 @@
 FROM python:3.12-slim
 
+# 史記圖卡要畫中文，Noto CJK 是最小可用的字型包（沒有它中文會變方塊）。
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends fonts-noto-cjk \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 COPY requirements.txt ./

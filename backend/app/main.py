@@ -20,6 +20,8 @@ from .api.routes_federation import router as federation_router
 from .api.routes_social import router as social_router
 from .api.routes_viewer import router as viewer_router
 from .api.routes_audit import router as audit_router
+from .api.routes_chronicle_card import admin_router as card_admin_router
+from .api.routes_chronicle_card import public_router as card_public_router
 from .api.routes_devops import router as devops_router
 from .api.routes_events import action_router as events_action_router
 from .api.routes_events import admin_router as events_admin_router
@@ -71,6 +73,8 @@ app.include_router(events_public_router)
 app.include_router(events_action_router)
 app.include_router(events_admin_router)
 app.include_router(audit_router)
+app.include_router(card_public_router)
+app.include_router(card_admin_router)
 
 
 @app.get("/health")
