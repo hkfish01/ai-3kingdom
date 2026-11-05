@@ -1,8 +1,17 @@
 name: AI DevOps
 
+# 2026-11-05: 這支 workflow 引用的 secrets.KIMI_API_KEY 與
+# secrets.AI_DEVOPS_REDIS_URL 在 repo 中並不存在，每日排程長期空轉；
+# 而 deploy job 具備「自動 squash merge PR + 觸發生產部署」的能力，
+# 不該在沒有憑證的情況下自動執行。
+# 因此改為「僅手動觸發 + preflight 檢查」：缺 secret 就明確 skip，不讓 check 變紅。
+#
+# 重新啟用：
+#   1. 到 Settings > Secrets and variables > Actions 新增兩個 secret；
+#   2. (選配) 設 repository variable AI_DEVOPS_AUTO_MERGE=true 才允許自動合併；
+#   3. 手動跑一次確認無誤，再把 schedule / repository_dispatch 加回 on:。
+
 on:
-  schedule:
-    - cron: '0 1 * * *'  # HKT 09:00
   workflow_dispatch:
     inputs:
       mode:
@@ -13,27 +22,56 @@ on:
         options:
           - review
           - generate
-  repository_dispatch:
-    types: [ai-devops]
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
 
 concurrency:
   group: ai-devops
   cancel-in-progress: true
 
 env:
-  KIMI_API_KEY: ${{ secrets.KIMI_API_KEY }}
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   GITHUB_REPOSITORY: ${{ github.repository }}
-  AI_DEVOPS_REDIS_URL: ${{ secrets.AI_DEVOPS_REDIS_URL }}
   AI_DEVOPS_AUTO_MERGE: ${{ vars.AI_DEVOPS_AUTO_MERGE || 'false' }}
 
 jobs:
+  preflight:
+    name: Preflight
+    runs-on: ubuntu-latest
+    outputs:
+      enabled: ${{ steps.check.outputs.enabled }}
+    steps:
+      - name: Check required secrets
+        id: check
+        env:
+          KIMI: ${{ secrets.KIMI_API_KEY }}
+          REDIS: ${{ secrets.AI_DEVOPS_REDIS_URL }}
+        run: |
+          missing=""
+          [ -z "$KIMI" ] && missing="$missing KIMI_API_KEY"
+          [ -z "$REDIS" ] && missing="$missing AI_DEVOPS_REDIS_URL"
+          if [ -n "$missing" ]; then
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=AI DevOps skipped::Missing repository secrets:$missing"
+            echo "Add them in Settings > Secrets and variables > Actions, then re-run manually."
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+
   review:
     name: Review
+    needs: preflight
+    if: ${{ needs.preflight.outputs.enabled == 'true' }}
     runs-on: ubuntu-latest
     outputs:
       approve: ${{ steps.decision.outputs.approve }}
       approved_pr_number: ${{ steps.decision.outputs.approved_pr_number }}
+    env:
+      KIMI_API_KEY: ${{ secrets.KIMI_API_KEY }}
+      AI_DEVOPS_REDIS_URL: ${{ secrets.AI_DEVOPS_REDIS_URL }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -51,14 +89,20 @@ jobs:
       - name: Review AI DevOps PRs
         id: decision
         env:
-          GITHUB_OUTPUT: ${{ github.output }}
-          GITHUB_ENV: ${{ github.env }}
-        run: python3 .github/scripts/ai-devops-agent.py --mode review
+          MODE: ${{ inputs.mode || 'review' }}
+        # 原本這裡把 GITHUB_OUTPUT / GITHUB_ENV 覆寫成不存在的 github.output / github.env
+        # context，會讓 steps.decision.outputs 永遠為空。已移除，沿用 runner 預設值。
+        run: python3 .github/scripts/ai-devops-agent.py --mode "$MODE"
 
   deploy:
     name: Deploy
-    needs: review
-    if: ${{ needs.review.outputs.approve == 'true' && needs.review.outputs.approved_pr_number != '0' }}
+    needs: [preflight, review]
+    # 三重保險：憑證齊全 + review 明確批准 + 營運者主動開啟 AUTO_MERGE。
+    if: >-
+      ${{ needs.preflight.outputs.enabled == 'true' &&
+          needs.review.outputs.approve == 'true' &&
+          needs.review.outputs.approved_pr_number != '0' &&
+          vars.AI_DEVOPS_AUTO_MERGE == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -67,8 +111,7 @@ jobs:
       - name: Merge approved PR
         env:
           PR_NUMBER: ${{ needs.review.outputs.approved_pr_number }}
-        run: |
-          gh pr merge "$PR_NUMBER" --squash --delete-branch
+        run: gh pr merge "$PR_NUMBER" --squash --delete-branch
 
       - name: Trigger deployment
         run: |

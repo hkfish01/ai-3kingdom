@@ -38,13 +38,32 @@ a local path (`/Users/terry/scripts/`).
 | `OBSIDIAN_VAULT` | Path to Obsidian vault |
 | `PATH` | Must include `/opt/homebrew/bin` for `gh` CLI |
 
-> **Security notice:** a KIMI key was once committed in plaintext (both
-> `deploy/prod/.env.example` and this plist). Treat it as compromised: revoke and
-> rotate it in the Moonshot console, then update **GitHub Actions secret
-> `KIMI_API_KEY`**, the production `deploy/prod/.env`, and the local Keychain:
->
-> ```sh
-> security add-generic-password -U -a "$USER" -s ai-3kingdom-kimi -w 'YOUR_NEW_KEY'
-> ```
->
-> Removing the value from the working tree does **not** remove it from git history.
+## CI status (verified 2026-11-05)
+
+AI DevOps is **disabled by default**. The repository has only three Actions
+secrets (`ADMIN_REFRESH_TOKEN`, `JUMP_HOST_PASSWORD`, `PROD_HOST_PASSWORD`) —
+there is **no `KIMI_API_KEY` and no `AI_DEVOPS_REDIS_URL`**. The old daily
+schedule therefore never performed any real review, and its `deploy` job could
+never legitimately auto-merge a PR.
+
+`.github/workflows/ai-devops.yml` now runs only via manual `workflow_dispatch`
+and exits cleanly with a notice when the secrets are missing. To enable it:
+
+1. Add both secrets in **Settings → Secrets and variables → Actions**.
+2. Optionally set repository variable `AI_DEVOPS_AUTO_MERGE=true` — without it,
+   the `deploy` job will never merge a PR or trigger a production deploy.
+3. Re-run the workflow manually. Only add `schedule` / `repository_dispatch`
+   back to `on:` after a successful run.
+
+For local launchd runs, store the key in the macOS Keychain instead:
+
+```sh
+security add-generic-password -U -a "$USER" -s ai-3kingdom-kimi -w 'YOUR_KEY'
+```
+
+> **Historical note:** two `sk-kimi-…` strings were once committed in
+> `deploy/prod/.env.example` and this plist. They were added by a collaborator,
+> are not configured anywhere in this repository, and have been removed from the
+> working tree (but remain in git history). If either turns out to be a live
+> credential, revoke it at its source; otherwise no rotation is needed because
+> no key is currently in use.
