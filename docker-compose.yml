@@ -23,6 +23,16 @@ services:
       CENTRAL_HEARTBEAT_URL: ${CENTRAL_HEARTBEAT_URL:-http://city-api:8000/registry/nodes/heartbeat}
       CENTRAL_NODE_ID: ${CENTRAL_NODE_ID:-}
       CENTRAL_ROLES_POLICY_REQUIRED: ${CENTRAL_ROLES_POLICY_REQUIRED:-false}
+      # 忘記密碼驗證碼；留空時前端會顯示「郵件服務尚未設定」。
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      SMTP_USE_TLS: ${SMTP_USE_TLS:-true}
+      SMTP_USE_SSL: ${SMTP_USE_SSL:-false}
+      SMTP_TIMEOUT_SEC: ${SMTP_TIMEOUT_SEC:-10}
+      PASSWORD_RESET_CODE_TTL_MINUTES: ${PASSWORD_RESET_CODE_TTL_MINUTES:-15}
     depends_on:
       - postgres
       - redis
@@ -53,6 +63,16 @@ services:
       CENTRAL_HEARTBEAT_URL: ${CENTRAL_HEARTBEAT_URL:-http://city-api:8000/registry/nodes/heartbeat}
       CENTRAL_NODE_ID: ${CENTRAL_NODE_ID:-}
       CENTRAL_ROLES_POLICY_REQUIRED: ${CENTRAL_ROLES_POLICY_REQUIRED:-false}
+      # 忘記密碼驗證碼；留空時前端會顯示「郵件服務尚未設定」。
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      SMTP_USE_TLS: ${SMTP_USE_TLS:-true}
+      SMTP_USE_SSL: ${SMTP_USE_SSL:-false}
+      SMTP_TIMEOUT_SEC: ${SMTP_TIMEOUT_SEC:-10}
+      PASSWORD_RESET_CODE_TTL_MINUTES: ${PASSWORD_RESET_CODE_TTL_MINUTES:-15}
     depends_on:
       - postgres
       - redis

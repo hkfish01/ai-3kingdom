@@ -279,6 +279,52 @@ At minimum, set these in `deploy/prod/.env`:
 - `CITY_BASE_URL`
 - `GATEWAY_PORT`
 
+### 3.1 SMTP / forgot-password email (production)
+
+The `/login` forgot-password flow mails a 6-digit code. When SMTP is not
+configured the API returns `{"sent": false, "reason": "EMAIL_NOT_CONFIGURED"}`
+and the UI shows a clear warning; the code is neither sent nor written to logs
+(the old dev fallback printed the code to logs, which was unsafe on a public node).
+
+Fill these in **`~/ai-3kingdom/deploy/prod/.env` on the server** (this file is
+git-ignored, so `git reset --hard` during deploy will not overwrite it):
+
+```bash
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_USER=mailer@example.com
+SMTP_PASSWORD=your-app-password
+SMTP_FROM=mailer@example.com
+SMTP_USE_TLS=true
+SMTP_USE_SSL=false
+SMTP_TIMEOUT_SEC=10
+```
+
+Use `SMTP_USE_SSL=true` with `SMTP_PORT=465` for implicit TLS instead of STARTTLS.
+
+Environment variables are read when a container is created, so after editing
+`.env` recreate the two app services — no code rebuild and no GitHub Actions run
+are required just to change SMTP values:
+
+```bash
+cd ~/ai-3kingdom
+docker compose -f deploy/prod/docker-compose.server.yml --env-file deploy/prod/.env \
+  up -d --force-recreate city-api city-worker
+```
+
+Verify with:
+
+```bash
+curl -s https://app.ai-3kingdom.xyz/api/auth/password-reset/status
+# {"success":true,"data":{"email_enabled":true,"delivery_degraded":false}}
+```
+
+If you edit `.env` **before** merging a code change, the normal `push to main`
+deploy already runs `up -d --build` and picks up the new values automatically.
+Transient relay failures are reported as `EMAIL_DELIVERY_FAILED` for five
+minutes; responses stay identical for registered and unregistered emails to
+avoid account enumeration.
+
 ### 4. Start services
 
 Path A: one-click script (recommended)

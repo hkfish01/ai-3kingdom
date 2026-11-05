@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { KeyIcon } from "@heroicons/react/24/outline";
 import { apiClient } from "@/lib/api-client";
@@ -8,6 +8,18 @@ import { useLocale } from "@/lib/locale";
 import { normalizePassword, validatePassword } from "@/lib/password";
 
 type Mode = "login" | "forgot" | "reset";
+type DeliveryKind = "not_configured" | "failed";
+
+function deliveryMessage(kind: DeliveryKind, locale: string): string {
+  if (locale === "zh") {
+    return kind === "not_configured"
+      ? "郵件服務尚未設定，重設碼無法寄出。請聯絡管理員，或由管理後台直接重設密碼。"
+      : "郵件服務目前寄送異常，重設碼可能收不到。請稍後再試或聯絡管理員。";
+  }
+  return kind === "not_configured"
+    ? "Email delivery is not configured, so reset codes cannot be sent. Please contact the operator or ask for an admin password reset."
+    : "Email delivery is currently failing, so the reset code may not arrive. Please try again later or contact the operator.";
+}
 
 export default function LoginPage() {
   const router = useRouter();
@@ -24,6 +36,31 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [pending, setPending] = useState(false);
+  const [deliveryNotice, setDeliveryNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (mode !== "forgot" && mode !== "reset") {
+      setDeliveryNotice(null);
+      return;
+    }
+    let active = true;
+    apiClient.getPasswordResetStatus()
+      .then((status) => {
+        if (!active) return;
+        if (!status.email_enabled) {
+          setDeliveryNotice(deliveryMessage("not_configured", locale));
+        } else if (status.delivery_degraded) {
+          setDeliveryNotice(deliveryMessage("failed", locale));
+        } else {
+          setDeliveryNotice(null);
+        }
+      })
+      .catch(() => {
+        // 舊版後端沒有狀態端點時不干擾原有流程，改由送出結果判斷。
+        if (active) setDeliveryNotice(null);
+      });
+    return () => { active = false; };
+  }, [mode, locale]);
 
   const t = locale === "zh"
     ? {
@@ -90,7 +127,15 @@ export default function LoginPage() {
     setError("");
     setMessage("");
     try {
-      await apiClient.forgotPassword({ email });
+      const data = await apiClient.forgotPassword({ email });
+      if (!data.sent) {
+        // 明確告知寄送失敗，且留在「忘記密碼」頁，不要跳去輸入永遠收不到的驗證碼。
+        setError(deliveryMessage(
+          data.reason === "EMAIL_NOT_CONFIGURED" ? "not_configured" : "failed",
+          locale
+        ));
+        return;
+      }
       setMessage(t.codeSent);
       setMode("reset");
     } catch (err) {
@@ -154,6 +199,15 @@ export default function LoginPage() {
           <button type="button" className="btn-base btn-secondary" onClick={() => setMode("forgot")}>{t.forgotPassword}</button>
           <button type="button" className="btn-base btn-secondary" onClick={() => setMode("reset")}>{t.resetPassword}</button>
         </div>
+
+        {deliveryNotice && (mode === "forgot" || mode === "reset") ? (
+          <p
+            className="mb-md rounded-md border border-amber-300/40 bg-amber-400/10 p-md text-sm text-amber-100"
+            role="status"
+          >
+            {deliveryNotice}
+          </p>
+        ) : null}
 
         {mode === "login" ? (
           <form onSubmit={onLogin} className="space-y-md" aria-label="login form">
