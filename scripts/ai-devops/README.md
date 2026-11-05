@@ -34,6 +34,17 @@ a local path (`/Users/terry/scripts/`).
 
 | Variable | Description |
 |---|---|
-| `KIMI_API_KEY` | Moonshot Kimi API key |
+| `KIMI_API_KEY` | Moonshot Kimi API key — **請勿寫進版本庫或 plist**。launchd 設定會從 macOS Keychain 讀取；CI 用 GitHub Actions secret |
 | `OBSIDIAN_VAULT` | Path to Obsidian vault |
 | `PATH` | Must include `/opt/homebrew/bin` for `gh` CLI |
+
+> **Security notice:** a KIMI key was once committed in plaintext (both
+> `deploy/prod/.env.example` and this plist). Treat it as compromised: revoke and
+> rotate it in the Moonshot console, then update **GitHub Actions secret
+> `KIMI_API_KEY`**, the production `deploy/prod/.env`, and the local Keychain:
+>
+> ```sh
+> security add-generic-password -U -a "$USER" -s ai-3kingdom-kimi -w 'YOUR_NEW_KEY'
+> ```
+>
+> Removing the value from the working tree does **not** remove it from git history.

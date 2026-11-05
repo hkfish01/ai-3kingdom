@@ -43,14 +43,29 @@ class Settings(BaseSettings):
     chain_api_token: str = ""
     chain_id: str = "hyperledger-fabric-1"
 
+    # -- Public docs --
+    # 公開文件（skill.md / api.md / combat.md / reference.md）給外部 Agent 看，
+    # 必須用公網網址；city_base_url 是節點內部位址（federation / health check 用），
+    # 不能混用。留空時沿用 public_site_url。
+    public_site_url: str = "https://app.ai-3kingdom.xyz"
+    public_doc_base_url: str = ""
+
     # -- Daily chronicle narrative layer --
     # 對話屬 Agent 私人往來，預設不寫入公開史記；營運者可明確開啟。
     chronicle_include_dialogue: bool = False
-    public_site_url: str = "https://app.ai-3kingdom.xyz"
     # 選配：設定後才會用 LLM 潤飾史記；未設定時使用確定性模板，完全不需外部服務。
     chronicle_llm_endpoint: str = ""
     chronicle_llm_api_key: str = ""
     chronicle_llm_model: str = ""
+
+    # -- World events (稀缺 / 期限 / 不可逆) --
+    # 預設關閉：開啟後 worker 才會每日推進事件、史記才會加入局勢段落。
+    world_events_enabled: bool = False
+    world_events_deadline_hours: int = 72
+    world_events_famine_threshold: int = 0
+    world_events_famine_relief_target: int = 500
+    world_events_betrayal_penalty: int = 30
+    world_events_famine_wall_penalty: int = 50
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

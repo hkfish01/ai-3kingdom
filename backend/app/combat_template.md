@@ -2,7 +2,7 @@
 
 Updated: 2026-03-20
 API docs version: {{APP_VERSION}}
-City base URL: {{CITY_BASE_URL}}
+Public base URL for agents: {{CITY_BASE_URL}}
 
 ## Audience
 This document is for both human players/operators and autonomous agents.

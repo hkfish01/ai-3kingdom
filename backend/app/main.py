@@ -19,7 +19,11 @@ from .api.routes_discovery import router as discovery_router
 from .api.routes_federation import router as federation_router
 from .api.routes_social import router as social_router
 from .api.routes_viewer import router as viewer_router
+from .api.routes_audit import router as audit_router
 from .api.routes_devops import router as devops_router
+from .api.routes_events import action_router as events_action_router
+from .api.routes_events import admin_router as events_admin_router
+from .api.routes_events import public_router as events_public_router
 from .api.routes_world import router as world_router
 from .api.routes_quests import router as quest_router
 from .config import settings
@@ -28,6 +32,15 @@ from .errors import AppError, app_error_handler, unhandled_error_handler, valida
 from .models import Announcement, Base, User
 from .services.daily_chronicle import build_weekly_situation, generate_daily_chronicle
 from .services.daily_reset import run_daily_reset
+
+def _public_doc_base_url() -> str:
+    """公開文件要給外部 Agent 看，一律用公網網址。
+
+    city_base_url 是節點內部位址（federation / discovery / health），
+    直接放進文件會讓 Agent 去打自己本機的 localhost。
+    """
+    return (settings.public_doc_base_url or settings.public_site_url).rstrip("/")
+
 
 app = FastAPI(title=settings.app_name, version=settings.app_version)
 
@@ -54,6 +67,10 @@ app.include_router(central_router)
 app.include_router(admin_router)
 app.include_router(quest_router)
 app.include_router(devops_router)
+app.include_router(events_public_router)
+app.include_router(events_action_router)
+app.include_router(events_admin_router)
+app.include_router(audit_router)
 
 
 @app.get("/health")
@@ -88,7 +105,7 @@ def dynamic_skill_md(request: Request, lang: str | None = None, db: Session = De
     else:
         base_text = "# AI Three Kingdoms Agent Skill\n\n"
     base_text = base_text.replace("{{APP_VERSION}}", settings.app_version)
-    base_text = base_text.replace("{{CITY_BASE_URL}}", settings.city_base_url)
+    base_text = base_text.replace("{{CITY_BASE_URL}}", _public_doc_base_url())
     # 注入客觀局勢（不是決策步驟），讓 agent 有「處境」而非只有 API。
     try:
         situation = build_weekly_situation(db, lang_code)
@@ -121,7 +138,7 @@ def dynamic_api_md():
 
     text = base_path.read_text(encoding="utf-8")
     text = text.replace("{{APP_VERSION}}", settings.app_version)
-    text = text.replace("{{CITY_BASE_URL}}", settings.city_base_url)
+    text = text.replace("{{CITY_BASE_URL}}", _public_doc_base_url())
     return text
 
 
@@ -133,7 +150,7 @@ def dynamic_combat_md():
 
     text = base_path.read_text(encoding="utf-8")
     text = text.replace("{{APP_VERSION}}", settings.app_version)
-    text = text.replace("{{CITY_BASE_URL}}", settings.city_base_url)
+    text = text.replace("{{CITY_BASE_URL}}", _public_doc_base_url())
     return text
 
 
@@ -148,7 +165,7 @@ def dynamic_reference_md():
         return "# AI Three Kingdoms API Reference\n\nSee /api.md and /openapi.json\n"
     text = base_path.read_text(encoding="utf-8")
     text = text.replace("{{APP_VERSION}}", settings.app_version)
-    text = text.replace("{{CITY_BASE_URL}}", settings.city_base_url)
+    text = text.replace("{{CITY_BASE_URL}}", _public_doc_base_url())
     return text
 
 

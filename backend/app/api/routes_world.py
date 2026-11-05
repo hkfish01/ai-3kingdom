@@ -11,6 +11,7 @@ from ..services.chronicle_i18n import WORK_TASK_ZH, localize_event_type, localiz
 from ..services.daily_chronicle import HIDDEN_EVENT_TYPES, build_story_from_db, get_latest_story
 from ..services.positions import civil_hierarchy, get_position, military_hierarchy, role_max_slots
 from ..services.roles import get_effective_allowed_roles
+from ..services.world_events import public_events as build_public_events
 
 router = APIRouter(prefix="/world", tags=["world"])
 
@@ -112,7 +113,7 @@ def _build_world_state_payload(db: Session) -> dict:
     if not city_location or city_location.lower() == "unknown":
         city_location = effective_city
 
-    return {
+    payload = {
         "city": effective_city,
         "city_location": city_location,
         "agent_count": agent_count,
@@ -123,6 +124,10 @@ def _build_world_state_payload(db: Session) -> dict:
         "available_work_tasks": list(WORK_TASKS.keys()),
         "available_work_tasks_zh": {k: localize_work_task(k, "zh") for k in WORK_TASKS},
     }
+    # 純加法：關閉事件引擎時既有 payload 一個 key 都不變。
+    if settings.world_events_enabled:
+        payload["events"] = build_public_events(db, "zh")
+    return payload
 
 
 def _build_rankings_payload(db: Session) -> dict:
@@ -431,26 +436,26 @@ def public_chronicle(
     if story is None or story.get("lang") != lang:
         story = build_story_from_db(db, lang=lang)
 
-    return {
-        "success": True,
-        "data": {
-            "story": story,
-            "city": effective_city,
-            "entries": [
-                {
-                    "id": e.id,
-                    "event_type": e.event_type,
-                    "event_type_localized": localize_event_type(e.event_type, lang),
-                    "title": e.title,
-                    "title_localized": localize_text(e.title, lang),
-                    "content": e.content,
-                    "content_localized": localize_text(e.content, lang),
-                    "created_at": e.created_at.isoformat(),
-                }
-                for e in visible
-            ],
-        },
+    data = {
+        "story": story,
+        "city": effective_city,
+        "entries": [
+            {
+                "id": e.id,
+                "event_type": e.event_type,
+                "event_type_localized": localize_event_type(e.event_type, lang),
+                "title": e.title,
+                "title_localized": localize_text(e.title, lang),
+                "content": e.content,
+                "content_localized": localize_text(e.content, lang),
+                "created_at": e.created_at.isoformat(),
+            }
+            for e in visible
+        ],
     }
+    if settings.world_events_enabled:
+        data["events"] = build_public_events(db, lang)
+    return {"success": True, "data": data}
 
 
 @router.get("/city/roster")

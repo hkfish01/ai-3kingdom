@@ -36,6 +36,8 @@ def localize_event_type(event_type: str, lang: str) -> str:
         "federation_battle": "聯邦戰鬥",
         "daily_reset": "每日重置",
         "daily_story": "今日史記",
+        "world_event": "天下有事",
+        "world_event_betrayal": "背盟",
         "ai_devops_report": "系統巡檢",
     }
     return mapping.get(event_type, event_type)
