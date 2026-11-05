@@ -8,10 +8,12 @@
 - 不新增資料表：寫入既有 chronicles，並把結構化故事存進 system_state。
 - 對話預設不公開（隱私），需營運者明確設定 CHRONICLE_INCLUDE_DIALOGUE=true。
 - collect / build 為唯讀，公開 API 可直接呼叫；只有 generate 會寫入。
+- 同一天的重算採 upsert：覆寫當日那一則，不在公開史記裡堆重複的今日記事。
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 from collections import Counter
 from datetime import datetime, timedelta, timezone
@@ -29,6 +31,9 @@ from .world_events import enrich_facts_with_events, event_lines
 STORY_EVENT_TYPE = "daily_story"
 LATEST_STORY_KEY = "chronicle_story_latest"
 LAST_RUN_KEY = "chronicle_story_last_date"
+# 記錄「未潤飾的模板內容」摘要，用來判斷當日局勢是否值得重算。
+# 舊版本沒有這個 key：部署後第一輪會被視為 stale，自動把當日史記補齊。
+STORY_SIGNATURE_KEY = "chronicle_story_signature"
 
 # 這些是營運內部訊息，不適合出現在公開史記
 HIDDEN_EVENT_TYPES = {"ai_devops_report"}
@@ -370,6 +375,36 @@ def get_latest_story(db: Session) -> dict[str, Any] | None:
         return None
 
 
+def story_signature(story: dict[str, Any]) -> str:
+    """用「讀者真正會看到的內容」算簽章，判斷當日史記是否過時。
+
+    刻意排除 collected_at 之類的時間欄位，也比對未潤飾的模板版本：
+    LLM 每次改寫措辭不該被誤判成局勢變了，否則會反覆寫入資料庫。
+    """
+    payload = {
+        "headline": story.get("headline", ""),
+        "lines": story.get("lines", []),
+        "quotes": story.get("quotes", []),
+        "aphorism": story.get("aphorism", ""),
+    }
+    raw = json.dumps(payload, ensure_ascii=False, sort_keys=True)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def _find_today_story_entry(db: Session, date_str: str) -> ChronicleEntry | None:
+    """找出當日已寫入的 daily_story，讓重算可以覆寫而不是新增。"""
+    day_start = datetime.fromisoformat(f"{date_str}T00:00:00")
+    return (
+        db.query(ChronicleEntry)
+        .filter(
+            ChronicleEntry.event_type == STORY_EVENT_TYPE,
+            ChronicleEntry.created_at >= day_start,
+        )
+        .order_by(ChronicleEntry.id.desc())
+        .first()
+    )
+
+
 def build_story_from_db(db: Session, lang: str = "zh") -> dict[str, Any]:
     """唯讀版本：給公開 API 在尚未產生當日史記時即時算出內容，不做任何寫入。"""
     return build_story(enrich_facts_with_events(db, collect_daily_facts(db)), lang=lang)
@@ -407,7 +442,11 @@ def build_weekly_situation(db: Session, lang: str = "zh") -> str:
 
 
 def generate_daily_chronicle(db: Session, lang: str = "zh", force: bool = False) -> dict[str, Any]:
-    """寫入一則當日史記。由 worker 每日觸發，或 admin 手動觸發。"""
+    """寫入／重算一則當日史記。由 worker 每日觸發，或 admin 手動觸發。
+
+    同一天重算時覆寫當日既有那一則（upsert），不新增 ChronicleEntry；
+    否則每次局勢變動都會在公開史記裡堆一則長得差不多的今日記事。
+    """
     today = _naive_utc().date().isoformat()
     if not force and get_state(db, LAST_RUN_KEY, default="") == today:
         cached = get_latest_story(db)
@@ -416,15 +455,50 @@ def generate_daily_chronicle(db: Session, lang: str = "zh", force: bool = False)
 
     facts = enrich_facts_with_events(db, collect_daily_facts(db))
     story = build_story(facts, lang=lang, date_str=today)
+    signature = story_signature(story)
     story = _polish_with_llm(story)
 
-    write_chronicle(
-        db,
-        event_type=STORY_EVENT_TYPE,
-        title=story["headline"],
-        content=story["share_text"],
-    )
+    entry = _find_today_story_entry(db, today)
+    if entry is not None:
+        entry.title = story["headline"]
+        entry.content = story["share_text"]
+        db.add(entry)
+    else:
+        write_chronicle(
+            db,
+            event_type=STORY_EVENT_TYPE,
+            title=story["headline"],
+            content=story["share_text"],
+        )
     set_state(db, LATEST_STORY_KEY, json.dumps(story, ensure_ascii=False))
+    set_state(db, STORY_SIGNATURE_KEY, signature)
     set_state(db, LAST_RUN_KEY, today)
     db.commit()
     return story
+
+
+def refresh_today_story_if_stale(db: Session, now: datetime | None = None) -> dict[str, Any] | None:
+    """當日史記重算：局勢變了就補寫，沒變就什麼都不做，回傳新史記或 None。
+
+    典型情境：今日史記在 UTC 01:00 生成，事件引擎稍後才開啟／推進，
+    或玩家捐糧、背盟讓局勢改觀 —— 公開觀戰不必等隔天才看得到。
+    升級前產生的史記沒有簽章，會被視為 stale，部署後第一輪自動補齊。
+    """
+    current = _as_naive(now) or _naive_utc()
+    today = current.date().isoformat()
+    if get_state(db, LAST_RUN_KEY, default="") != today:
+        # 當日還沒生過：交給 worker 的首次生成，不在這裡搶跑。
+        return None
+
+    latest = get_latest_story(db)
+    lang = (latest or {}).get("lang", "zh")
+    if lang not in {"zh", "en"}:
+        lang = "zh"
+    candidate = build_story(
+        enrich_facts_with_events(db, collect_daily_facts(db)),
+        lang=lang,
+        date_str=today,
+    )
+    if story_signature(candidate) == get_state(db, STORY_SIGNATURE_KEY, default=""):
+        return None
+    return generate_daily_chronicle(db, lang=lang, force=True)

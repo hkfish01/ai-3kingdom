@@ -175,7 +175,10 @@ def admin_generate_chronicle(
     db: Session = Depends(get_db),
     current_admin: User = Depends(get_current_admin),
 ):
-    """讓營運者不必等到 UTC 01:00 就能立刻生出一則今日史記。"""
+    """立刻重算今日史記（冪等：覆寫當日同一則，不新增 chronicle）。
+
+    worker 也會自動比對內容簽章重算；這個端點是給營運者手動補發用。
+    """
     _ = current_admin
     story = generate_daily_chronicle(db, lang="zh" if lang == "zh" else "en", force=True)
     return {"success": True, "data": story}
