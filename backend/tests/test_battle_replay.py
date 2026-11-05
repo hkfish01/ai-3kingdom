@@ -130,6 +130,35 @@ def test_arena_creates_one_exhibition_per_day_without_touching_agents(monkeypatc
     assert _agent_snapshot(agent_id) == (57, 1000)
 
 
+def test_arena_rotates_among_lords_with_real_troops():
+    """線上有大量 0～2 兵的空殼，演武不能挑到他們，否則三回合沒有傷亡可播。"""
+    _seed()
+    db = SessionLocal()
+    try:
+        owner = db.query(User).first()
+        for i, troops in enumerate((1, 2, 3, 70, 80, 90)):
+            db.add(
+                Agent(
+                    owner_user_id=owner.id,
+                    name=f"測試{i}",
+                    role="平民",
+                    home_city=settings.city_name,
+                    current_city=settings.city_name,
+                    infantry=troops,
+                )
+            )
+        db.commit()
+        picks = {
+            arena_exhibition._pick_challenger(db, f"2026-11-{day:02d}").name
+            for day in range(5, 25)
+        }
+    finally:
+        db.close()
+    assert "測試0" not in picks
+    assert "測試1" not in picks
+    assert len(picks) > 1  # 每天換人，不是永遠同一位
+
+
 def test_public_battle_endpoints_require_no_token_and_leak_no_account_data(monkeypatch):
     _seed()
     _enable_arena(monkeypatch)

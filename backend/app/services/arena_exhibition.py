@@ -51,12 +51,13 @@ def _seed(value: str) -> int:
 
 
 def _pick_challenger(db: Session, date_str: str) -> Agent | None:
-    """確定性輪值一位有兵力的真實諸侯；每天換人，但不能是假帳號或空殼。"""
+    """從兵力最多的前 5 位確定性輪值；每天換人，且避免挑到 1 兵的空殼讓回放沒傷亡。"""
     agents = db.query(Agent).order_by(Agent.id.asc()).all()
     candidates = [a for a in agents if sum(_troops(a).values()) > 0]
     if not candidates:
         return None
-    return candidates[_seed(date_str) % len(candidates)]
+    pool = sorted(candidates, key=lambda a: (-sum(_troops(a).values()), a.id))[:5]
+    return pool[_seed(date_str) % len(pool)]
 
 
 def _npc_troops(challenger_troops: dict[str, int], date_str: str) -> dict[str, int]:
