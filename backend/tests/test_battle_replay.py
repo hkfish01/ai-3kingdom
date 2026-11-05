@@ -22,6 +22,7 @@ from app.services.battle_replay import (
 )
 from app.services.chronicle_card import _card_lines, card_caption
 from app.services.daily_chronicle import generate_daily_chronicle
+from app.services.system_state import get_state
 
 client = TestClient(app)
 ROOT = Path(__file__).resolve().parents[2]
@@ -130,8 +131,8 @@ def test_arena_creates_one_exhibition_per_day_without_touching_agents(monkeypatc
     assert _agent_snapshot(agent_id) == (57, 1000)
 
 
-def test_arena_rotates_among_lords_with_real_troops():
-    """線上有大量 0～2 兵的空殼，演武不能挑到他們，否則三回合沒有傷亡可播。"""
+def test_arena_picks_the_strongest_lord_so_replay_has_visible_casualties():
+    """線上大量 0～十幾兵的空殼；挑小諸侯會讓三回合只掉 1 兵，兵力條看不出變化。"""
     _seed()
     db = SessionLocal()
     try:
@@ -148,15 +149,14 @@ def test_arena_rotates_among_lords_with_real_troops():
                 )
             )
         db.commit()
-        picks = {
-            arena_exhibition._pick_challenger(db, f"2026-11-{day:02d}").name
-            for day in range(5, 25)
-        }
+        picked = arena_exhibition._pick_challenger(db, "2026-11-05")
+        assert picked is not None
+        picked_name = picked.name
+        picked_troops = arena_exhibition._troops(picked)
     finally:
         db.close()
-    assert "測試0" not in picks
-    assert "測試1" not in picks
-    assert len(picks) > 1  # 每天換人，不是永遠同一位
+    assert picked_name == "測試5"  # 90 兵，全城最強
+    assert sum(picked_troops.values()) == 90
 
 
 def test_public_battle_endpoints_require_no_token_and_leak_no_account_data(monkeypatch):
@@ -280,6 +280,7 @@ def test_daily_story_and_post_package_carry_the_battle(monkeypatch):
         arena_exhibition.run_daily_arena(db)
         story = generate_daily_chronicle(db, lang="zh", force=True)
         assert any("/battle/replay/" in line for line in story["lines"])
+        assert any("校場演武" in line and "校場守軍" in line for line in story["lines"])
 
         result = chronicle_publish.publish_daily_post(db, force=True)
         package = result["package"]
@@ -288,6 +289,28 @@ def test_daily_story_and_post_package_carry_the_battle(monkeypatch):
         assert "battle/replay/" in package["caption"]
         assert package["battle_image_url"].endswith("&lang=zh")
         assert "battle/replay/" in package["caption_long"]
+    finally:
+        db.close()
+
+
+def test_cached_post_package_picks_up_a_new_battle_without_a_rewrite(monkeypatch):
+    """08:00 先發文、部署後才有戰報的情況：公開 /post 當天就要帶到戰報。"""
+    _seed()
+    monkeypatch.setattr(settings, "arena_enabled", False)
+    db = SessionLocal()
+    try:
+        early = chronicle_publish.publish_daily_post(db, force=True)["package"]
+        assert not early.get("battle")
+        assert get_state(db, chronicle_publish.PACKAGE_KEY, default="")
+
+        monkeypatch.setattr(settings, "arena_enabled", True)
+        arena_exhibition.run_daily_arena(db, force=True)
+        current = chronicle_publish.current_post_package(db, "zh")
+        assert current["battle"] is not None
+        assert "今日戰報" in current["caption"]
+        assert "battle/replay/" in current["caption_long"]
+        # 即時補上，但不能改寫當日快取（隔天 worker 仍照常重算）。
+        assert json.loads(get_state(db, chronicle_publish.PACKAGE_KEY)).get("battle") is None
     finally:
         db.close()
 

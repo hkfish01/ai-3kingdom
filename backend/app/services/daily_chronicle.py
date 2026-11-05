@@ -125,7 +125,13 @@ def collect_daily_facts(db: Session, hours: int = 24) -> dict[str, Any]:
     battle_summaries = [
         {
             "attacker": names.get(b.attacker_agent_id or -1, "無名"),
-            "defender": names.get(b.defender_agent_id or -1, "守軍"),
+            # 演武的對手是 NPC，不在 agents 表；明確標名，不要顯示成一般「守軍」。
+            "defender": (
+                "校場守軍"
+                if b.defender_city == "校場:arena"
+                else names.get(b.defender_agent_id or -1, "守軍")
+            ),
+            "exhibition": b.defender_city == "校場:arena",
             "outcome": b.outcome,
             "loot_gold": b.loot_gold,
             "battle_id": b.request_id,
@@ -246,9 +252,11 @@ def build_story(facts: dict[str, Any], lang: str = "zh", date_str: str | None = 
             replay_hint = (
                 f"（戰報見 /battle/replay/{first['battle_id']}）" if first.get("battle_id") else ""
             )
+            opener = (
+                "校場演武" if first.get("exhibition") else f"另有 {_fmt(facts['battles_total'])} 場交鋒"
+            )
             lines.append(
-                f"另有 {_fmt(facts['battles_total'])} 場交鋒；"
-                f"{first['attacker']} 對 {first['defender']}，{outcome}，"
+                f"{opener}；{first['attacker']} 對 {first['defender']}，{outcome}，"
                 f"掠金 {_fmt(first['loot_gold'])}。{replay_hint}"
             )
         else:
@@ -276,7 +284,10 @@ def build_story(facts: dict[str, Any], lang: str = "zh", date_str: str | None = 
             replay_hint = (
                 f" Replay /battle/replay/{first['battle_id']}" if first.get("battle_id") else ""
             )
-            lines.append(f"{_fmt(facts['battles_total'])} battles were fought.{replay_hint}")
+            opener = (
+                "Arena exhibition" if first.get("exhibition") else f"{_fmt(facts['battles_total'])} battles were fought"
+            )
+            lines.append(f"{opener}.{replay_hint}")
         else:
             lines.append("No battle today. Every lord is counting instead.")
 

@@ -51,18 +51,29 @@ def current_story(db: Session, lang: str = "zh") -> dict[str, Any]:
 
 
 def current_post_package(db: Session, lang: str = "zh") -> dict[str, Any]:
-    """優先回傳當天已產出的發文包；worker 尚未跑時即時算一份（不寫入）。"""
+    """優先回傳當天已產出的發文包；worker 尚未跑時即時算一份（不寫入）。
+
+    舊快取包可能是在當日演武之前產出的（例如 08:00 先發文、部署後才有戰報）。
+    這種情況即時把戰報補進回傳值，不必等隔天 08:00，也不改寫資料庫。
+    """
+    cached: dict[str, Any] | None = None
     raw = get_state(db, PACKAGE_KEY, default="")
     if raw:
         try:
             package = json.loads(raw)
             if package.get("lang") == lang:
-                return package
+                cached = package
         except json.JSONDecodeError:
             pass
-    return build_post_package(
-        build_story_from_db(db, lang=lang), battle=latest_public_battle(db, lang)
-    )
+
+    battle = latest_public_battle(db, lang)
+    if cached and (battle is None or cached.get("battle")):
+        return cached
+
+    story = get_latest_story(db)
+    if not story or story.get("lang") != lang:
+        story = build_story_from_db(db, lang=lang)
+    return build_post_package(story, battle=battle)
 
 
 def _webhook_payload(package: dict[str, Any], kind: str) -> dict[str, Any]:
