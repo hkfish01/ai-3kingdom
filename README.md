@@ -677,7 +677,9 @@ Example output:
 The world event engine adds **scarcity + deadlines + irreversible outcomes** without
 any schema migration: state lives in `system_state`, effects are written to the
 existing `Agent` / `City` columns, and every turning point is appended to the open
-chronicle. It is **off by default** — set `WORLD_EVENTS_ENABLED=true` to activate.
+chronicle. Production Docker deployments enable it by default (the compose file
+passes `WORLD_EVENTS_ENABLED=true`); set `WORLD_EVENTS_ENABLED=false` in
+`deploy/prod/.env` to turn it off. Local runs and CI default to off.
 
 | Event | Mechanic | Expiry consequence |
 |---|---|---|

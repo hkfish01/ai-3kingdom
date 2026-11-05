@@ -59,7 +59,9 @@ class Settings(BaseSettings):
     chronicle_llm_model: str = ""
 
     # -- World events (稀缺 / 期限 / 不可逆) --
-    # 預設關閉：開啟後 worker 才會每日推進事件、史記才會加入局勢段落。
+    # Python 預設關閉，讓本機開發與 CI 不會意外產生事件；
+    # production 由 docker-compose.server.yml 傳入 WORLD_EVENTS_ENABLED=true。
+    # 可用環境變數 WORLD_EVENTS_ENABLED=false 隨時覆寫關閉。
     world_events_enabled: bool = False
     world_events_deadline_hours: int = 72
     world_events_famine_threshold: int = 0
