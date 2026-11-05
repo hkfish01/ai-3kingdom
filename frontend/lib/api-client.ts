@@ -11,6 +11,9 @@ import {
   FederationStatus,
   ChroniclePostPackage,
   PublicChronicleFeed,
+  BattlePostPackage,
+  BattleReplay,
+  BattleReportItem,
   RegisterPayload,
   UserCredentials,
   ViewerAgentSummary
@@ -190,6 +193,21 @@ export const apiClient = {
   getPublicChroniclePost: (lang?: "en" | "zh") =>
     request<ChroniclePostPackage>(
       `/world/public/chronicle/post${lang ? `?lang=${lang}` : ""}`
+    ),
+
+  getPublicBattleReports: (lang?: "en" | "zh", limit = 20) =>
+    request<{ items: BattleReportItem[] }>(
+      `/world/public/battle/reports?limit=${limit}&lang=${lang ?? "zh"}`
+    ),
+  getPublicBattleLatest: (lang?: "en" | "zh") =>
+    request<BattleReportItem | null>(`/world/public/battle/latest?lang=${lang ?? "zh"}`),
+  getPublicBattleReplay: (battleId: string, lang?: "en" | "zh") =>
+    request<BattleReplay>(
+      `/world/public/battle/replay/${encodeURIComponent(battleId)}?lang=${lang ?? "zh"}`
+    ),
+  getPublicBattlePost: (battleId?: string, lang?: "en" | "zh") =>
+    request<BattlePostPackage>(
+      `/world/public/battle/post?lang=${lang ?? "zh"}${battleId ? `&battle_id=${encodeURIComponent(battleId)}` : ""}`
     ),
 
   createFaction: (payload: { name: string; leader_agent_id: number }) =>

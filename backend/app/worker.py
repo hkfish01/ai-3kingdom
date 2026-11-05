@@ -58,6 +58,23 @@ def main() -> None:
                         db.rollback()
                         print(f"[Events] Evaluation failed: {e}")
 
+            # 每日校場演武：NPC 守軍主動挑釁，不改 agent 狀態，只保證每天有戰報可回放。
+            # 排在 08:00 發文包之前，當日文案才帶得到「今日戰報」。
+            if settings.arena_enabled:
+                arena_hkt = now.astimezone(timezone(timedelta(hours=8)))
+                if arena_hkt.hour >= settings.arena_hour_hkt:
+                    last_arena = get_state(db, "arena.last_date", default="")
+                    if last_arena != arena_hkt.date().isoformat():
+                        try:
+                            from .services.arena_exhibition import run_daily_arena
+
+                            arena_result = run_daily_arena(db, now=now)
+                            if arena_result["status"] == "created":
+                                print(f"[Arena] Exhibition {arena_result['battle_id']} held")
+                        except Exception as e:
+                            db.rollback()
+                            print(f"[Arena] Exhibition failed: {e}")
+
             # 每日 08:00 HKT（= UTC 00:00）備妥史記圖卡與發文包。
             # 不需任何社群憑證就能跑；有 CHRONICLE_CARD_WEBHOOK_URLS 才會真的推送。
             if settings.chronicle_card_enabled:

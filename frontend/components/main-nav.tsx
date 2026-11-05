@@ -19,6 +19,7 @@ const linkLabels = {
     admin: "Admin",
     rankings: "Rankings",
     chronicle: "Chronicle",
+    battle: "Battles",
     federation: "Alliance",
     pixelCity: "Pixel City",
     faq: "FAQ",
@@ -36,6 +37,7 @@ const linkLabels = {
     admin: "管理平台",
     rankings: "排行榜",
     chronicle: "史記",
+    battle: "戰報",
     federation: "聯盟",
     pixelCity: "像素城",
     faq: "常見問題",
@@ -49,6 +51,7 @@ type NavLink = { href: string; key: NavKey };
 const alwaysLinks: NavLink[] = [
   { href: "/", key: "landing" },
   { href: "/chronicle", key: "chronicle" },
+  { href: "/battle", key: "battle" },
   { href: "/intro", key: "intro" },
   { href: "/rankings", key: "rankings" },
   { href: "/faq", key: "faq" }
