@@ -51,13 +51,18 @@ def _seed(value: str) -> int:
 
 
 def _pick_challenger(db: Session, date_str: str) -> Agent | None:
-    """從兵力最多的前 5 位確定性輪值；每天換人，且避免挑到 1 兵的空殼讓回放沒傷亡。"""
+    """由城中最強諸侯應戰。
+
+    線上多數諸侯只有 0～十幾兵，輪值會挑到小規模遭遇戰，三回合傷亡只有
+    1 兵，回放的兵力條幾乎不動。固定讓握兵最多者上場，一方面數字有戲，
+    一方面自然形成「衛冕者」劇情：誰練兵超過他，隔天就換人守擂。
+    """
+    _ = date_str
     agents = db.query(Agent).order_by(Agent.id.asc()).all()
     candidates = [a for a in agents if sum(_troops(a).values()) > 0]
     if not candidates:
         return None
-    pool = sorted(candidates, key=lambda a: (-sum(_troops(a).values()), a.id))[:5]
-    return pool[_seed(date_str) % len(pool)]
+    return sorted(candidates, key=lambda a: (-sum(_troops(a).values()), a.id))[0]
 
 
 def _npc_troops(challenger_troops: dict[str, int], date_str: str) -> dict[str, int]:
