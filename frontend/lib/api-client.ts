@@ -122,10 +122,12 @@ export const apiClient = {
     }),
   getMe: () => request<AuthMe>("/auth/me"),
   forgotPassword: (payload: { email: string }) =>
-    request<{ sent: boolean }>("/auth/forgot-password", {
+    request<{ sent: boolean; reason?: string }>("/auth/forgot-password", {
       method: "POST",
       body: JSON.stringify(payload)
     }),
+  getPasswordResetStatus: () =>
+    request<{ email_enabled: boolean; delivery_degraded: boolean }>("/auth/password-reset/status"),
   resetPassword: (payload: { email: string; code: string; new_password: string }) =>
     request<{ reset: boolean }>("/auth/reset-password", {
       method: "POST",

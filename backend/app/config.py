@@ -36,6 +36,9 @@ class Settings(BaseSettings):
     smtp_password: str = ""
     smtp_from: str = ""
     smtp_use_tls: bool = True
+    # 465 用 implicit TLS；587 用 STARTTLS（smtp_use_tls）。兩者不要同時開。
+    smtp_use_ssl: bool = False
+    smtp_timeout_sec: int = 10
 
     # -- Blockchain / Chain Abstraction Layer --
     chain_provider: str = "hyperledger"

@@ -137,7 +137,7 @@ def publish_daily_post(
 
     # 08:00 HKT 時 worker 的 UTC 01:00 史記還沒跑；用 PR #9 的冪等 upsert 先補齊當日。
     # 校場演武排在這個時段之前，所以發文包會帶到當日戰報與回放連結。
-    story = generate_daily_chronicle(db, lang="zh", force=True)
+    story = generate_daily_chronicle(db, lang="zh", force=True, date_str=date_str)
     package = build_post_package(story, battle=latest_public_battle(db, "zh"))
     set_state(db, PACKAGE_KEY, json.dumps(package, ensure_ascii=False))
 

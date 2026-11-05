@@ -1,4 +1,5 @@
 from datetime import timedelta, timezone
+import logging
 import unicodedata
 
 from fastapi import APIRouter, Depends
@@ -10,11 +11,20 @@ from ..db import get_db
 from ..errors import AppError
 from ..models import PasswordResetCode, RefreshToken, User, utc_now
 from ..schemas import ForgotPasswordRequest, LoginRequest, RefreshTokenRequest, RegisterUserRequest, ResetPasswordRequest
-from ..services.email import send_password_reset_email
+from ..services.email import (
+    DELIVERY_FAILED,
+    DELIVERY_NOT_CONFIGURED,
+    delivery_health,
+    send_password_reset_email,
+)
 from ..services.secrets import hash_secret, make_numeric_code
 from .deps import get_current_user
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+REASON_NOT_CONFIGURED = "EMAIL_NOT_CONFIGURED"
+REASON_DELIVERY_FAILED = "EMAIL_DELIVERY_FAILED"
 
 
 def _normalize_utc(dt):
@@ -129,24 +139,68 @@ def me(current_user: User = Depends(get_current_user)):
     }
 
 
+def _delivery_failure(reason: str) -> dict:
+    return {"success": True, "data": {"sent": False, "reason": reason}}
+
+
+@router.get("/password-reset/status")
+def password_reset_status():
+    """Public, account-free mail health for the forgot-password UI.
+
+    Only global state is exposed, never whether an email address is registered.
+    """
+    health = delivery_health()
+    return {
+        "success": True,
+        "data": {
+            "email_enabled": health["configured"],
+            "delivery_degraded": health["degraded"],
+        },
+    }
+
+
 @router.post("/forgot-password")
 def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db)):
-    # Always return success to avoid account enumeration.
-    user = db.query(User).filter(User.email == payload.email).first()
-    if user:
-        code = make_numeric_code(6)
-        expires_at = utc_now() + timedelta(minutes=settings.password_reset_code_ttl_minutes)
-        db.add(
-            PasswordResetCode(
-                user_id=user.id,
-                email=user.email,
-                code_hash=hash_secret(code),
-                expires_at=expires_at,
-            )
-        )
-        db.commit()
-        send_password_reset_email(user.email, code)
+    # 回應只取決於「全域郵件狀態」與「這次寄送結果」，不取決於帳號是否存在，
+    # 避免攻擊者用 sent/reason 的差異枚舉註冊信箱。
+    health = delivery_health()
+    global_reason = None
+    if not health["configured"]:
+        global_reason = REASON_NOT_CONFIGURED
+    elif health["degraded"]:
+        global_reason = REASON_DELIVERY_FAILED
 
+    user = db.query(User).filter(User.email == payload.email).first()
+    if not user:
+        if global_reason:
+            return _delivery_failure(global_reason)
+        return {"success": True, "data": {"sent": True}}
+
+    code = make_numeric_code(6)
+    expires_at = utc_now() + timedelta(minutes=settings.password_reset_code_ttl_minutes)
+    ticket = PasswordResetCode(
+        user_id=user.id,
+        email=user.email,
+        code_hash=hash_secret(code),
+        expires_at=expires_at,
+    )
+    db.add(ticket)
+    db.commit()
+
+    try:
+        delivery = send_password_reset_email(user.email, code)
+    except Exception as exc:  # noqa: BLE001 - 寄送異常不應讓 API 500
+        logger.warning("Password reset mail raised unexpectedly (%s): %s", type(exc).__name__, exc)
+        delivery = DELIVERY_FAILED
+
+    if delivery in (DELIVERY_NOT_CONFIGURED, DELIVERY_FAILED):
+        # 沒寄出去，就不留一組仍然有效的驗證碼在資料庫裡。
+        db.delete(ticket)
+        db.commit()
+        reason = REASON_NOT_CONFIGURED if delivery == DELIVERY_NOT_CONFIGURED else REASON_DELIVERY_FAILED
+        return _delivery_failure(reason)
+
+    # None 視為成功，相容舊版的測試替身／自訂寄送函式。
     return {"success": True, "data": {"sent": True}}
 
 

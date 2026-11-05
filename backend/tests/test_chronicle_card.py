@@ -1,5 +1,6 @@
 """每日 08:00 史記圖卡與發文包：渲染、公開端點、冪等排程、webhook、部署設定。"""
 
+from datetime import datetime, timezone
 import io
 import re
 from pathlib import Path
@@ -210,3 +211,19 @@ def test_readme_no_longer_claims_a_leaked_kimi_key():
     assert "previously committed in plaintext" not in readme
     assert "Revoke and rotate it" not in readme
     assert "no `KIMI_API_KEY`" in readme
+
+
+def test_publish_keeps_one_hkt_date_when_utc_date_lags():
+    """00:00–08:00 HKT 期間 UTC 仍是前一天；史記、圖卡、發文包要用同一個日期。"""
+    db = SessionLocal()
+    try:
+        # 2026-11-05 16:07 UTC = 2026-11-06 00:07 HKT
+        now = datetime(2026, 11, 5, 16, 7, tzinfo=timezone.utc)
+        result = publish_daily_post(db, now=now, force=True)
+        assert result["date"] == "2026-11-06"
+        assert result["package"]["date"] == "2026-11-06"
+        assert current_post_package(db)["date"] == "2026-11-06"
+        assert "2026-11-06" in result["package"]["headline"]
+        assert get_state(db, LAST_DATE_KEY, default="") == "2026-11-06"
+    finally:
+        db.close()

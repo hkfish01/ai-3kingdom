@@ -461,13 +461,21 @@ def build_weekly_situation(db: Session, lang: str = "zh") -> str:
     ])
 
 
-def generate_daily_chronicle(db: Session, lang: str = "zh", force: bool = False) -> dict[str, Any]:
+def generate_daily_chronicle(
+    db: Session,
+    lang: str = "zh",
+    force: bool = False,
+    date_str: str | None = None,
+) -> dict[str, Any]:
     """寫入／重算一則當日史記。由 worker 每日觸發，或 admin 手動觸發。
 
     同一天重算時覆寫當日既有那一則（upsert），不新增 ChronicleEntry；
     否則每次局勢變動都會在公開史記裡堆一則長得差不多的今日記事。
+
+    `date_str` 讓 08:00 HKT 的發文包可指定同一個 HKT 日期；00:00–08:00 HKT
+    這段期間 UTC 日期會落後一天，若不指定，史記／圖卡日期會與發文包冪等鍵錯位。
     """
-    today = _naive_utc().date().isoformat()
+    today = date_str or _naive_utc().date().isoformat()
     if not force and get_state(db, LAST_RUN_KEY, default="") == today:
         cached = get_latest_story(db)
         if cached:
