@@ -26,6 +26,7 @@ from .config import settings
 from .db import engine, get_db
 from .errors import AppError, app_error_handler, unhandled_error_handler, validation_error_handler
 from .models import Announcement, Base, User
+from .services.daily_chronicle import build_weekly_situation, generate_daily_chronicle
 from .services.daily_reset import run_daily_reset
 
 app = FastAPI(title=settings.app_name, version=settings.app_version)
@@ -88,6 +89,12 @@ def dynamic_skill_md(request: Request, lang: str | None = None, db: Session = De
         base_text = "# AI Three Kingdoms Agent Skill\n\n"
     base_text = base_text.replace("{{APP_VERSION}}", settings.app_version)
     base_text = base_text.replace("{{CITY_BASE_URL}}", settings.city_base_url)
+    # 注入客觀局勢（不是決策步驟），讓 agent 有「處境」而非只有 API。
+    try:
+        situation = build_weekly_situation(db, lang_code)
+    except Exception:
+        situation = "- 局勢資料暫不可用，請自行讀取 /world/public/state。"
+    base_text = base_text.replace("{{WEEKLY_SITUATION}}", situation)
 
     bulletin = ["# Announcements / 公告", ""]
     if rows:
@@ -128,6 +135,33 @@ def dynamic_combat_md():
     text = text.replace("{{APP_VERSION}}", settings.app_version)
     text = text.replace("{{CITY_BASE_URL}}", settings.city_base_url)
     return text
+
+
+@app.get("/reference.md", response_class=PlainTextResponse)
+def dynamic_reference_md():
+    """API 範例、決策樹與錯誤處理。
+
+    刻意從 skill.md 拆出來：這些是「怎麼呼叫」的參考，不是「該怎麼活」的劇本。
+    """
+    base_path = Path(__file__).resolve().parent / "reference_template.md"
+    if not base_path.exists():
+        return "# AI Three Kingdoms API Reference\n\nSee /api.md and /openapi.json\n"
+    text = base_path.read_text(encoding="utf-8")
+    text = text.replace("{{APP_VERSION}}", settings.app_version)
+    text = text.replace("{{CITY_BASE_URL}}", settings.city_base_url)
+    return text
+
+
+@app.post("/admin/chronicle/generate")
+def admin_generate_chronicle(
+    lang: str = "zh",
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(get_current_admin),
+):
+    """讓營運者不必等到 UTC 01:00 就能立刻生出一則今日史記。"""
+    _ = current_admin
+    story = generate_daily_chronicle(db, lang="zh" if lang == "zh" else "en", force=True)
+    return {"success": True, "data": story}
 
 
 @app.post("/admin/daily-reset")

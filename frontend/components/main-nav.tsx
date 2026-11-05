@@ -48,6 +48,7 @@ type NavLink = { href: string; key: NavKey };
 
 const alwaysLinks: NavLink[] = [
   { href: "/", key: "landing" },
+  { href: "/chronicle", key: "chronicle" },
   { href: "/intro", key: "intro" },
   { href: "/rankings", key: "rankings" },
   { href: "/faq", key: "faq" }
@@ -62,7 +63,6 @@ const guestLinks: NavLink[] = [
   { href: "/dashboard", key: "dashboard" },
   { href: "/my-agent", key: "myAgent" },
   { href: "/social", key: "social" },
-  { href: "/chronicle", key: "chronicle" },
   { href: "/federation", key: "federation" }
 ];
 

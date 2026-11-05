@@ -9,6 +9,7 @@ import {
   AuthMe,
   FederationPeer,
   FederationStatus,
+  PublicChronicleFeed,
   RegisterPayload,
   UserCredentials,
   ViewerAgentSummary
@@ -181,6 +182,10 @@ export const apiClient = {
   getPublicRankings: () => request("/world/public/rankings"),
   getChronicle: (lang?: "en" | "zh") =>
     request(`/world/chronicle?limit=40${lang ? `&lang=${lang}` : ""}`),
+  getPublicChronicle: (lang?: "en" | "zh") =>
+    request<PublicChronicleFeed>(
+      `/world/public/chronicle?limit=40${lang ? `&lang=${lang}` : ""}`
+    ),
 
   createFaction: (payload: { name: string; leader_agent_id: number }) =>
     request("/social/faction/create", {

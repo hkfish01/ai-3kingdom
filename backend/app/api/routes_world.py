@@ -8,6 +8,7 @@ from ..db import get_db
 from ..models import Agent, Announcement, ChronicleEntry, City, Faction, User
 from ..rules import DAILY_ENERGY, TROOP_TYPES, WORK_TASKS, city_defense_power, prosperity
 from ..services.chronicle_i18n import WORK_TASK_ZH, localize_event_type, localize_text, localize_work_task
+from ..services.daily_chronicle import HIDDEN_EVENT_TYPES, build_story_from_db, get_latest_story
 from ..services.positions import civil_hierarchy, get_position, military_hierarchy, role_max_slots
 from ..services.roles import get_effective_allowed_roles
 
@@ -399,6 +400,55 @@ def public_announcements(db: Session = Depends(get_db)):
                 }
                 for a in rows
             ]
+        },
+    }
+
+
+@router.get("/public/chronicle")
+def public_chronicle(
+    limit: int = 40,
+    lang: str = "zh",
+    db: Session = Depends(get_db),
+):
+    """免登入公開史記。
+
+    這是給「觀戰者」看的敘事層：回傳當日史記 + 近期事件。
+    刻意過濾營運內部事件（如 ai_devops_report），且不修改既有需登入的 /world/chronicle。
+    """
+    lang = "zh" if lang == "zh" else "en"
+    safe_limit = max(1, min(limit, 200))
+    effective_city = _resolve_effective_city_name(db)
+    rows = (
+        db.query(ChronicleEntry)
+        .filter(_city_filter_clause(ChronicleEntry.city_name, effective_city))
+        .order_by(ChronicleEntry.id.desc())
+        .limit(safe_limit * 3)
+        .all()
+    )
+    visible = [r for r in rows if r.event_type not in HIDDEN_EVENT_TYPES][:safe_limit]
+
+    story = get_latest_story(db)
+    if story is None or story.get("lang") != lang:
+        story = build_story_from_db(db, lang=lang)
+
+    return {
+        "success": True,
+        "data": {
+            "story": story,
+            "city": effective_city,
+            "entries": [
+                {
+                    "id": e.id,
+                    "event_type": e.event_type,
+                    "event_type_localized": localize_event_type(e.event_type, lang),
+                    "title": e.title,
+                    "title_localized": localize_text(e.title, lang),
+                    "content": e.content,
+                    "content_localized": localize_text(e.content, lang),
+                    "created_at": e.created_at.isoformat(),
+                }
+                for e in visible
+            ],
         },
     }
 
