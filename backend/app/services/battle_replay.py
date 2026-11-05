@@ -350,14 +350,33 @@ def battle_card_lines(replay: dict[str, Any]) -> tuple[str, str, list[str]]:
         if zh
         else "AI Three Kingdoms - Three-round replay - the lords act, the scribe records"
     )
+    summary = replay["summary"]
     body: list[str] = []
+    if zh:
+        body.append(
+            f"戰力 {summary['attacker_power']} 對 {summary['defender_power']}　"
+            f"掠金 {summary['spoils']['gold']}"
+        )
+    else:
+        body.append(
+            f"Power {summary['attacker_power']} vs {summary['defender_power']} - "
+            f"loot {summary['spoils']['gold']} gold"
+        )
+    # 圖卡一行只放得下 30 字：用單行短字幕，不把回放的完整句子硬折成兩行。
     for row in replay["rounds"]:
-        body.extend(_wrap_chars(str(row["caption"]), 30))
-    if replay.get("exhibition_note"):
-        body.extend(_wrap_chars(str(replay["exhibition_note"]), 30))
-    shown = body[:6]
-    if len(body) > 6 and shown:
-        shown[5] = f"{shown[5][:28]}…"
+        if zh:
+            body.append(
+                f"第{row['round']}回合・{row['attacker_label']}　"
+                f"攻 −{row['attacker_loss']}　守 −{row['defender_loss']}"
+            )
+        else:
+            body.append(
+                f"Round {row['round']} - {row['attacker_label']}: "
+                f"-{row['attacker_loss']} / -{row['defender_loss']}"
+            )
+    if replay.get("exhibition"):
+        body.append("校場演武・不計戰績" if zh else "Arena exhibition - no ranking impact")
+    shown = [line[:30] for line in body[:6]]
     return headline, subtitle, shown
 
 
@@ -412,10 +431,15 @@ def battle_post_package(replay: dict[str, Any]) -> dict[str, Any]:
     summary = replay["summary"]
     hashtags = HASHTAGS_ZH if zh else HASHTAGS_EN
     link = replay["links"]["replay"]
+    outcome = (
+        ("攻方勝" if zh else "attacker won")
+        if summary["outcome"] == "attacker_win"
+        else ("守方勝" if zh else "defender won")
+    )
     headline = (
-        f"【今日戰報】{summary['attacker_name']} 對 {summary['defender_name']}"
+        f"【今日戰報】{summary['attacker_name']} 對 {summary['defender_name']}・{outcome}"
         if zh
-        else f"[Battle report] {summary['attacker_name']} vs {summary['defender_name']}"
+        else f"[Battle report] {summary['attacker_name']} vs {summary['defender_name']}: {outcome}"
     )
     caption_lines = [headline, replay["verdict"], ""]
     if zh:
