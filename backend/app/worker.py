@@ -2,6 +2,7 @@ import time
 from datetime import datetime, timezone
 
 from .api.routes_action import _process_action_event
+from .config import settings
 from .db import SessionLocal, engine
 from .models import AgentActionEvent, Base
 from .services.ai_devops import run_ai_devops_daily
@@ -39,6 +40,22 @@ def main() -> None:
                 run_daily_reset(db)
                 set_state(db, "last_daily_reset", today)
                 db.commit()
+
+            # 世界事件推進 (必須排在每日史記之前，當日事件才會被寫進史記)
+            if settings.world_events_enabled:
+                last_event_eval = get_state(db, "world.event.last_eval", default="")
+                if last_event_eval != today and now.hour >= 1:
+                    try:
+                        from .services.world_events import evaluate_world_events
+
+                        result = evaluate_world_events(db, now=now)
+                        if result.get("changes"):
+                            print(f"[Events] {', '.join(result['changes'])}")
+                        set_state(db, "world.event.last_eval", today)
+                        db.commit()
+                    except Exception as e:
+                        db.rollback()
+                        print(f"[Events] Evaluation failed: {e}")
 
             # 每日史記 (UTC 01:00 之後的第一輪；去重存 system_state，重啟不會漏跑)
             # 這是觀戰內容的地基：即使沒有 LLM、沒有新玩家，也要有可讀的當日記事。

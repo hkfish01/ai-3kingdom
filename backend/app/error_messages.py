@@ -37,5 +37,9 @@ ERROR_MESSAGES = {
     "PVP_DAILY_LIMIT_REACHED": "Daily PVP challenge limit reached.",
     "PVP_TARGET_PROTECTED": "Target is currently under protection.",
     "INVALID_REQUEST": "The request payload is invalid.",
+    "EVENTS_DISABLED": "World events are currently disabled.",
+    "EVENT_NOT_ACTIVE": "This world event is not active right now.",
+    "EVENT_PACT_EXISTS": "An active pact already exists for this agent.",
+    "EVENT_NO_PACT": "This agent has no active pact.",
     "INTERNAL_ERROR": "Unexpected server error occurred.",
 }

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { BookOpenIcon } from "@heroicons/react/24/outline";
 import { apiClient } from "@/lib/api-client";
 import { useLocale } from "@/lib/locale";
-import type { ChronicleEntryItem, ChronicleStory } from "@/lib/types";
+import type { ChronicleEntryItem, ChronicleStory, WorldEventItem } from "@/lib/types";
 
 function escapeXml(value: string): string {
   return value
@@ -82,7 +82,15 @@ export default function ChroniclePage() {
         agents: "諸侯",
         factions: "已選邊",
         actions: "近一日動作",
-        battles: "交鋒"
+        battles: "交鋒",
+        crises: "天下有事",
+        deadline: "期限",
+        irreversible: "不可逆",
+        statusActive: "進行中",
+        statusResolved: "已定",
+        statusExpired: "逾期",
+        statusStanding: "常設",
+        statusPending: "未起"
       }
     : {
         title: "Chronicle",
@@ -102,11 +110,20 @@ export default function ChroniclePage() {
         agents: "Agents",
         factions: "Aligned",
         actions: "Actions (24h)",
-        battles: "Battles"
+        battles: "Battles",
+        crises: "Open crises",
+        deadline: "Deadline",
+        irreversible: "Irreversible",
+        statusActive: "Active",
+        statusResolved: "Resolved",
+        statusExpired: "Expired",
+        statusStanding: "Standing",
+        statusPending: "Pending"
       };
 
   const [story, setStory] = useState<ChronicleStory | null>(null);
   const [entries, setEntries] = useState<ChronicleEntryItem[]>([]);
+  const [events, setEvents] = useState<WorldEventItem[]>([]);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
   const [page, setPage] = useState(1);
@@ -118,6 +135,7 @@ export default function ChroniclePage() {
         const data = await apiClient.getPublicChronicle(locale);
         setStory(data.story ?? null);
         setEntries(data.entries ?? []);
+        setEvents(data.events ?? []);
         setError("");
       } catch (err) {
         setError(err instanceof Error ? err.message : t.loadFailed);
@@ -195,6 +213,34 @@ export default function ChroniclePage() {
         </h1>
         <p className="text-sm text-white/75">{t.subtitle}</p>
       </header>
+
+      {events.length > 0 ? (
+        <section className="space-y-md">
+          <h2 className="text-xl font-bold">{t.crises}</h2>
+          <div className="grid grid-cols-1 gap-sm md:grid-cols-2 xl:grid-cols-3">
+            {events.map((ev) => (
+              <article key={ev.id} className="glass-card space-y-xs p-lg">
+                <div className="flex flex-wrap items-center justify-between gap-sm">
+                  <h3 className="text-lg font-bold text-white">{ev.title}</h3>
+                  <span className="rounded-full border border-cta/40 px-2 py-0.5 text-xs text-cta">
+                    {ev.status === "active" ? t.statusActive
+                      : ev.status === "resolved" ? t.statusResolved
+                      : ev.status === "expired" ? t.statusExpired
+                      : ev.status === "standing" ? t.statusStanding
+                      : t.statusPending}
+                  </span>
+                </div>
+                <p className="text-sm text-white/75">{ev.description}</p>
+                {ev.progress ? <p className="text-sm font-semibold text-cta">{ev.progress}</p> : null}
+                {ev.deadline_utc ? (
+                  <p className="text-xs text-white/60">{t.deadline} {ev.deadline_utc.slice(0, 10)}</p>
+                ) : null}
+                <p className="text-xs text-white/45">{t.irreversible}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       {error ? <p className="rounded-lg bg-red-500/20 p-sm text-sm">{error}</p> : null}
 

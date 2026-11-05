@@ -230,8 +230,24 @@ export interface ChronicleEntryItem {
   created_at: string;
 }
 
+export interface WorldEventItem {
+  id: string;
+  title: string;
+  description: string;
+  status: string;
+  irreversible: boolean;
+  timed: boolean;
+  progress: string;
+  deadline_utc?: string;
+  opened_at?: string;
+  outcome?: string | null;
+  active_pacts?: number;
+  betrayals?: number;
+}
+
 export interface PublicChronicleFeed {
   story: ChronicleStory | null;
   city: string;
   entries: ChronicleEntryItem[];
+  events?: WorldEventItem[];
 }

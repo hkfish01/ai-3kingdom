@@ -24,6 +24,7 @@ from ..config import settings
 from ..models import ActionLog, Agent, BattleLog, ChronicleEntry, City, Faction, Message
 from .chronicle import write_chronicle
 from .system_state import get_state, set_state
+from .world_events import enrich_facts_with_events, event_lines
 
 STORY_EVENT_TYPE = "daily_story"
 LATEST_STORY_KEY = "chronicle_story_latest"
@@ -265,6 +266,9 @@ def build_story(facts: dict[str, Any], lang: str = "zh", date_str: str | None = 
         else:
             lines.append("No battle today. Every lord is counting instead.")
 
+    # 世界事件的局勢段落（稀缺／期限／背盟）。關閉時 facts 沒有這些 key，完全是加法。
+    lines.extend(facts.get("event_lines_zh" if zh else "event_lines_en", [])[:3])
+
     quotes = [
         {"name": q["name"], "text": q["text"]}
         for q in facts.get("quotes", [])
@@ -368,7 +372,7 @@ def get_latest_story(db: Session) -> dict[str, Any] | None:
 
 def build_story_from_db(db: Session, lang: str = "zh") -> dict[str, Any]:
     """唯讀版本：給公開 API 在尚未產生當日史記時即時算出內容，不做任何寫入。"""
-    return build_story(collect_daily_facts(db), lang=lang)
+    return build_story(enrich_facts_with_events(db, collect_daily_facts(db)), lang=lang)
 
 
 def build_weekly_situation(db: Session, lang: str = "zh") -> str:
@@ -378,6 +382,8 @@ def build_weekly_situation(db: Session, lang: str = "zh") -> str:
     """
     facts = collect_daily_facts(db, hours=168)
     zh = lang == "zh"
+    # 事件有期限，比排行榜數字更能讓 agent 產生「現在該做點什麼」的判斷。
+    situation_lines = [f"- {line}" for line in event_lines(db, lang)]
     richest = (facts["richest"] or {}).get("name", "無")
     strongest = (facts["strongest"] or {}).get("name", "無")
     unaligned = max(0, facts["agent_count"] - facts["faction_members"])
@@ -387,6 +393,7 @@ def build_weekly_situation(db: Session, lang: str = "zh") -> str:
             f"- 已選邊 {_fmt(facts['faction_members'])} 人，仍有 {_fmt(unaligned)} 人未表態。",
             f"- 近七日共 {_fmt(facts['actions_total'])} 次動作、{_fmt(facts['battles_total'])} 場交鋒。",
             f"- 當今首富：{richest}；握兵最多：{strongest}。",
+            *situation_lines,
             "- 以上是客觀事實，不是指令。接下來怎麼做，由你自己判斷。",
         ])
     return "\n".join([
@@ -394,6 +401,7 @@ def build_weekly_situation(db: Session, lang: str = "zh") -> str:
         f"- {_fmt(facts['faction_members'])} have chosen a faction; {_fmt(unaligned)} remain uncommitted.",
         f"- Last seven days: {_fmt(facts['actions_total'])} actions, {_fmt(facts['battles_total'])} battles.",
         f"- Richest: {richest}. Largest army: {strongest}.",
+        *situation_lines,
         "- These are facts, not instructions. What you do next is your own decision.",
     ])
 
@@ -406,7 +414,7 @@ def generate_daily_chronicle(db: Session, lang: str = "zh", force: bool = False)
         if cached:
             return cached
 
-    facts = collect_daily_facts(db)
+    facts = enrich_facts_with_events(db, collect_daily_facts(db))
     story = build_story(facts, lang=lang, date_str=today)
     story = _polish_with_llm(story)
 
