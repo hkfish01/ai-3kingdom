@@ -268,3 +268,66 @@ def test_deploy_files_keep_the_zero_credential_loop_documented():
     # 不能從代理後的請求網址組絕對 Location：會外洩 container 內部位址並造成 502。
     assert "Location: `/world/public/s/${safe}`" in route
     assert "new URL(" not in route
+    assert "/admin/links/stats" in readme
+
+
+def _admin_token() -> str:
+    from app.auth import create_access_token
+
+    with SessionLocal() as db:
+        admin = User(
+            username="link_admin",
+            email="link_admin@example.com",
+            password_hash="x",
+            is_admin=True,
+        )
+        db.add(admin)
+        db.commit()
+        db.refresh(admin)
+        return create_access_token(admin.id)
+
+
+def test_admin_stats_requires_an_admin_token():
+    assert client.get("/admin/links/stats").status_code == 401
+
+    from app.auth import create_access_token
+
+    _seed()
+    non_admin = client.get(
+        "/admin/links/stats",
+        headers={"Authorization": f"Bearer {create_access_token(1)}"},
+    )
+    assert non_admin.status_code == 403
+
+
+def test_admin_stats_breaks_down_by_date_channel_and_target():
+    _seed()
+    rows = _codes()
+    code = next(c for c, m in rows.items() if m["channel"] == "x")
+    links.record_click(SessionLocal(), code, "Mozilla/5.0 (Macintosh)")
+    links.record_click(SessionLocal(), code, "Twitterbot/1.0")
+
+    token = _admin_token()
+    resp = client.get(
+        "/admin/links/stats?days=7",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert data["total_clicks"] == 2
+    assert data["total_human_clicks"] == 1
+    assert data["by_channel"]["x"] == 1
+    assert data["by_target"] == {"/chronicle": 1}
+    today = next(p for p in data["per_day"] if p["date"] == DAY)
+    assert today["by_target"] == {"/chronicle": 1}
+    row = next(r for r in today["rows"] if r["channel"] == "x")
+    assert row["target"] == "/chronicle"
+    assert row["clicks"] == 2 and row["human_clicks"] == 1
+    assert data["top_links"][0]["code"] == code
+    assert "visitor_id" not in json.dumps(data)
+    assert "user_agent" not in json.dumps(data)
+
+    # 公開版維持只有聚合數字，不洩漏逐日明細。
+    public = client.get("/world/public/links/stats?days=7").json()["data"]
+    assert "top_links" not in public and "by_target" not in public
+    assert all("rows" not in p for p in public["per_day"])

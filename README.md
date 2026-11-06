@@ -817,7 +817,8 @@ platform credentials and no schema changes** (everything lives in `system_state`
 |---|---|
 | Short link | `/s/{code}` (Next.js route handler) 302s to `/world/public/s/{code}`, which validates, counts a click and redirects to a whitelisted in-site path. The first hop uses a **relative** `Location` on purpose: behind the reverse proxy, building an absolute URL from the request origin would emit `http://0.0.0.0:3000/...` and break every shared link. |
 | Channel links | `GET /world/public/links/today?lang=zh` — one link and one caption per channel (`x`, `threads`, `xhs`, `webhook`, `audience`, `direct`) |
-| Clicks | `GET /world/public/links/stats?days=7` — aggregated numbers only; `GET /admin/links/status` for ops |
+| Clicks | `GET /world/public/links/stats?days=7` — aggregated numbers only, so `/share` can read it without a login |
+| Admin report | `GET /admin/links/stats?days=7` — admin token required; adds **date × channel × target page** breakdown (`per_day[].rows`, `by_target`, `top_links`). `GET /admin/links/status` remains the ops/config view |
 | Outbox | `GET /world/public/links/outbox?days=7` — last 7 days of prepared/sent packages, no webhook URLs or error details |
 | Share desk | `/share` — card preview, copy buttons, per-channel stats, recent outbox |
 
