@@ -78,6 +78,26 @@ def _fmt(value: float | int) -> str:
     return f"{int(value):,}"
 
 
+def _season_announcement_lines(db: Session, lang: str) -> list[str]:
+    """賽季開季詔書／季末本紀：只帶最近 26 小時的公告，舊訊息不會永久卡在史記裡。
+
+    賽季引擎把公告寫在 `system_state`；這裡純讀取，關閉賽季或沒有公告時回空陣列。
+    """
+    raw = get_state(db, "season.announcement")
+    if not raw:
+        return []
+    try:
+        data = json.loads(raw)
+        created = datetime.fromisoformat(str(data["created_at"]))
+        if created.tzinfo:
+            created = created.replace(tzinfo=None)
+        if _naive_utc() - created > timedelta(hours=26):
+            return []
+        return [str(line) for line in data.get("zh" if lang == "zh" else "en", [])][:2]
+    except (json.JSONDecodeError, KeyError, ValueError, TypeError):
+        return []
+
+
 def _safe_quote(text: str, limit: int = 48) -> str:
     """避免把憑證、claim code 或過長內容放進公開圖卡。"""
     cleaned = " ".join((text or "").split())
@@ -184,6 +204,8 @@ def collect_daily_facts(db: Session, hours: int = 24) -> dict[str, Any]:
         "battles": battle_summaries,
         "chronicle_count": chronicle_count,
         "quotes": quotes,
+        "season_lines_zh": _season_announcement_lines(db, "zh"),
+        "season_lines_en": _season_announcement_lines(db, "en"),
         "window_hours": hours,
         "collected_at": now.isoformat(),
     }
@@ -293,6 +315,8 @@ def build_story(facts: dict[str, Any], lang: str = "zh", date_str: str | None = 
 
     # 世界事件的局勢段落（稀缺／期限／背盟）。關閉時 facts 沒有這些 key，完全是加法。
     lines.extend(facts.get("event_lines_zh" if zh else "event_lines_en", [])[:3])
+    # 賽季開季詔書／季末本紀：一樣是加法，沒有賽季或不啟用時不影響既有史記。
+    lines.extend(facts.get("season_lines_zh" if zh else "season_lines_en", [])[:2])
 
     quotes = [
         {"name": q["name"], "text": q["text"]}

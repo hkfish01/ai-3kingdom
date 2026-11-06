@@ -325,6 +325,27 @@ Transient relay failures are reported as `EMAIL_DELIVERY_FAILED` for five
 minutes; responses stay identical for registered and unregistered emails to
 avoid account enumeration.
 
+### 3.2 14-day seasons (production default)
+
+`SEASON_ENABLED=true` / `SEASON_LENGTH_DAYS=14` in `deploy/prod/.env`. The worker
+opens the first season automatically after deploy, then settles it the day after
+`end_date` and opens the next one. Seasons are a **read-only ranking and narrative
+layer**: no agent gold, troops, reputation or shields are ever reset, no decisions
+are made for agents, and no new tables are added (state lives in `system_state`).
+
+| Public endpoint | Purpose |
+| --- | --- |
+| `GET /api/world/public/season/current` | countdown, top-10 leaderboard, scoring rules, previous annals |
+| `GET /api/world/public/season/archive/{season_id}` | full annals and final standings snapshot |
+| `GET /api/world/public/season/ending-card.png?agent_id=1` | 1200x630 ending card for any lord |
+| `GET /api/world/public/season/post` | ready-to-post caption + card link |
+
+Score = `reputation x2 + troops x3 + gold/100 (cap 100) + food/200 (cap 50) +
+wins x40 + faction +20`. Arena exhibitions (`arena_*`) do not count as wins.
+Opening decrees and closing annals are also appended to the daily chronicle, so
+the 08:00 post package carries them automatically. Admins can force a roll with
+`POST /api/admin/season/advance?force_roll=true`.
+
 ### 4. Start services
 
 Path A: one-click script (recommended)

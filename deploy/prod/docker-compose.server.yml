@@ -55,6 +55,9 @@ services:
       CHRONICLE_CARD_WEBHOOK_TYPE: ${CHRONICLE_CARD_WEBHOOK_TYPE:-generic}
       ARENA_ENABLED: ${ARENA_ENABLED:-true}
       ARENA_HOUR_HKT: ${ARENA_HOUR_HKT:-7}
+      # 十四日賽季：只讀排行榜與敘事層，不重置任何諸侯數值。
+      SEASON_ENABLED: ${SEASON_ENABLED:-true}
+      SEASON_LENGTH_DAYS: ${SEASON_LENGTH_DAYS:-14}
     depends_on:
       - postgres
       - redis
@@ -116,6 +119,9 @@ services:
       CHRONICLE_CARD_WEBHOOK_TYPE: ${CHRONICLE_CARD_WEBHOOK_TYPE:-generic}
       ARENA_ENABLED: ${ARENA_ENABLED:-true}
       ARENA_HOUR_HKT: ${ARENA_HOUR_HKT:-7}
+      # 十四日賽季：只讀排行榜與敘事層，不重置任何諸侯數值。
+      SEASON_ENABLED: ${SEASON_ENABLED:-true}
+      SEASON_LENGTH_DAYS: ${SEASON_LENGTH_DAYS:-14}
     depends_on:
       - postgres
       - redis

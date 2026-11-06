@@ -344,3 +344,108 @@ export interface BattlePostPackage {
   link: string;
   exhibition: boolean;
 }
+
+/** 十四日賽季（免登入公開） */
+export interface SeasonLeaderRow {
+  agent_id: number;
+  name: string;
+  city: string;
+  role: string;
+  reputation: number;
+  troops: number;
+  gold: number;
+  food: number;
+  wins: number;
+  faction: boolean;
+  breakdown: {
+    reputation: number;
+    troops: number;
+    gold: number;
+    food: number;
+    wins: number;
+    faction: number;
+  };
+  score: number;
+  rank: number;
+  total: number;
+  title_zh: string;
+  title_en: string;
+  ending_zh: string;
+  ending_en: string;
+}
+
+export interface SeasonRules {
+  length_days: number;
+  score_formula_zh: string;
+  score_formula_en: string;
+  winner_zh: string;
+  winner_en: string;
+  exclusions_zh: string;
+  exclusions_en: string;
+}
+
+export interface SeasonHistoryItem {
+  season_id: string;
+  index: number;
+  start_date: string;
+  end_date: string;
+  total_agents: number;
+  winner_name: string | null;
+  winner_score: number;
+  aphorism_zh: string;
+  aphorism_en: string;
+  chronicle?: string;
+}
+
+export interface SeasonSummary {
+  enabled: boolean;
+  season: {
+    season_id: string;
+    index: number;
+    start_date: string;
+    end_date: string;
+    status: string;
+    opened_at: string;
+  } | null;
+  days_left: number | null;
+  total_agents: number;
+  leaderboard: SeasonLeaderRow[];
+  rules: SeasonRules;
+  previous: SeasonHistoryItem | null;
+  history_count: number;
+  note: string;
+}
+
+export interface SeasonArchive {
+  season_id: string;
+  index: number;
+  start_date: string;
+  end_date: string;
+  closed_at: string;
+  total_agents: number;
+  winner: SeasonLeaderRow | null;
+  standings: SeasonLeaderRow[];
+  chronicle: string;
+  aphorism: string;
+}
+
+export interface SeasonPostPackage {
+  type: string;
+  date: string;
+  lang: string;
+  season_id: string;
+  closed: boolean;
+  headline: string;
+  caption: string;
+  caption_long: string;
+  image_url: string;
+  link: string;
+  hashtags: string;
+  agent: {
+    agent_id: number;
+    name: string;
+    rank: number;
+    score: number;
+    title: string;
+  } | null;
+}

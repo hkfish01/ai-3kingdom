@@ -32,6 +32,9 @@ services:
       SMTP_USE_TLS: ${SMTP_USE_TLS:-true}
       SMTP_USE_SSL: ${SMTP_USE_SSL:-false}
       SMTP_TIMEOUT_SEC: ${SMTP_TIMEOUT_SEC:-10}
+      # 本機開發預設不開賽季（CI 不製造資料）；要看 /season 可設 SEASON_ENABLED=true
+      SEASON_ENABLED: ${SEASON_ENABLED:-false}
+      SEASON_LENGTH_DAYS: ${SEASON_LENGTH_DAYS:-14}
       PASSWORD_RESET_CODE_TTL_MINUTES: ${PASSWORD_RESET_CODE_TTL_MINUTES:-15}
     depends_on:
       - postgres
@@ -72,6 +75,9 @@ services:
       SMTP_USE_TLS: ${SMTP_USE_TLS:-true}
       SMTP_USE_SSL: ${SMTP_USE_SSL:-false}
       SMTP_TIMEOUT_SEC: ${SMTP_TIMEOUT_SEC:-10}
+      # 本機開發預設不開賽季（CI 不製造資料）；要看 /season 可設 SEASON_ENABLED=true
+      SEASON_ENABLED: ${SEASON_ENABLED:-false}
+      SEASON_LENGTH_DAYS: ${SEASON_LENGTH_DAYS:-14}
       PASSWORD_RESET_CODE_TTL_MINUTES: ${PASSWORD_RESET_CODE_TTL_MINUTES:-15}
     depends_on:
       - postgres

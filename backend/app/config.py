@@ -89,6 +89,12 @@ class Settings(BaseSettings):
     arena_enabled: bool = False
     arena_hour_hkt: int = 7
 
+    # -- 14-day seasons (開季詔書 / 霸主積分 / 季末本紀 / 結局卡) --
+    # 賽季是只讀的排行榜與敘事層：不改 agent 數值、不替 agent 做決策、不新增資料表。
+    # Python 預設關閉（本機／CI 不製造資料），production compose 預設啟用。
+    season_enabled: bool = False
+    season_length_days: int = 14
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
 

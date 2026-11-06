@@ -29,6 +29,7 @@ LAST_DATE_KEY = "chronicle_card_last_date"
 PACKAGE_KEY = "chronicle_card_post_latest"
 RESULT_KEY = "chronicle_card_last_result"
 ATTEMPTS_KEY = "chronicle_card_attempts"
+SEASON_ANNOUNCEMENT_KEY = "season.announcement"
 
 MAX_ATTEMPTS = 5
 HKT = timezone(timedelta(hours=8))
@@ -68,12 +69,45 @@ def current_post_package(db: Session, lang: str = "zh") -> dict[str, Any]:
 
     battle = latest_public_battle(db, lang)
     if cached and (battle is None or cached.get("battle")):
-        return cached
+        package = cached
+    else:
+        story = get_latest_story(db)
+        if not story or story.get("lang") != lang:
+            story = build_story_from_db(db, lang=lang)
+        package = build_post_package(story, battle=battle)
+    return _with_season_notice(db, package, lang)
 
-    story = get_latest_story(db)
-    if not story or story.get("lang") != lang:
-        story = build_story_from_db(db, lang=lang)
-    return build_post_package(story, battle=battle)
+
+def _with_season_notice(db: Session, package: dict[str, Any], lang: str) -> dict[str, Any]:
+    """08:00 快取包可能比當日開季詔書／季末本紀更早產生。
+
+    即時把公告補進回傳值（不寫入 DB、不改快取），當天的發文不必等隔天 08:00。
+    這裡直接讀 `system_state` 的字串 key，避免與 season 服務互相 import。
+    """
+    raw = get_state(db, SEASON_ANNOUNCEMENT_KEY)
+    if not raw:
+        return package
+    try:
+        data = json.loads(raw)
+        created = datetime.fromisoformat(str(data["created_at"]))
+        if created.tzinfo:
+            created = created.replace(tzinfo=None)
+        if datetime.now(timezone.utc).replace(tzinfo=None) - created > timedelta(hours=26):
+            return package
+        lines = [str(x) for x in data.get("zh" if lang == "zh" else "en", [])][:2]
+    except (json.JSONDecodeError, KeyError, ValueError, TypeError):
+        return package
+    if not lines:
+        return package
+
+    notice = "\n".join(lines)
+    patched = dict(package)
+    if lines[0] not in patched.get("caption", ""):
+        patched["caption"] = f"{patched.get('caption', '')}\n{lines[0]}"
+    if notice not in patched.get("caption_long", ""):
+        patched["caption_long"] = f"{patched.get('caption_long', '')}\n{notice}"
+    patched["season_notice"] = notice
+    return patched
 
 
 def _webhook_payload(package: dict[str, Any], kind: str) -> dict[str, Any]:

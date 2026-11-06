@@ -285,6 +285,25 @@ export default function ChroniclePage() {
         </section>
       ) : null}
 
+      <section className="glass-card flex flex-wrap items-center justify-between gap-sm p-lg">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-cta">
+            {locale === "zh" ? "十四日定天下" : "Fourteen-day season"}
+          </p>
+          <h2 className="text-xl font-bold text-white">
+            {locale === "zh" ? "賽季・霸主積分與季末本紀" : "Season - score, annals, ending cards"}
+          </h2>
+          <p className="text-xs text-white/60">
+            {locale === "zh"
+              ? "開季詔書與季末本紀會自動寫進史記；季末每位諸侯都有一張結局卡。"
+              : "Opening decrees and closing annals land here automatically; every lord gets an ending card."}
+          </p>
+        </div>
+        <Link className="btn-base btn-secondary" href="/season">
+          {locale === "zh" ? "看賽季" : "View season"}
+        </Link>
+      </section>
+
       {events.length > 0 ? (
         <section className="space-y-md">
           <h2 className="text-xl font-bold">{t.crises}</h2>
