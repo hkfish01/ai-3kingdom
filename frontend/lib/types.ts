@@ -581,3 +581,28 @@ export interface LinkOutbox {
   items: OutboxItem[];
   count: number;
 }
+
+export interface QuestRow {
+  id: number;
+  agent_id: number;
+  agent_name: string;
+  type: string;
+  target: number;
+  current_progress: number;
+  is_completed: boolean;
+  is_claimed: boolean;
+  description: string;
+  reward_gold: number;
+  reward_food: number;
+  reward_reputation: number;
+}
+
+export interface QuestClaimResult {
+  quest_type: string;
+  reward_gold: number;
+  reward_food: number;
+  reward_reputation: number;
+  new_gold: number;
+  new_food: number;
+  new_reputation: number;
+}

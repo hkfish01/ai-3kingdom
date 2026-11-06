@@ -9,6 +9,7 @@ from ..errors import AppError
 from ..models import Agent, Faction, Message, User
 from ..schemas import CreateFactionRequest, InboxMarkReadRequest, InboxReplyRequest, JoinLordRequest, MessageRequest
 from ..services.chronicle import write_chronicle
+from ..services import quests as quest_service
 
 router = APIRouter(prefix="/social", tags=["social"])
 LORD_TO_VASSAL_BONUS_PCT = 1.0
@@ -57,6 +58,7 @@ def join_lord(
         content=f"{agent.name} is now vassal of {lord.name}.",
     )
     db.commit()
+    quest_service.update_progress(db, agent.id, "join_federation", 1)
 
     return {
         "success": True,
@@ -153,6 +155,7 @@ def message(
     )
     db.commit()
     db.refresh(msg)
+    quest_service.update_progress(db, payload.from_agent_id, "send_messages", 1)
 
     return {
         "success": True,

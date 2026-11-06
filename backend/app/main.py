@@ -36,6 +36,7 @@ from .api.routes_events import action_router as events_action_router
 from .api.routes_events import admin_router as events_admin_router
 from .api.routes_events import public_router as events_public_router
 from .api.routes_world import router as world_router
+from .api.routes_quests import agent_router as quest_agent_router
 from .api.routes_quests import router as quest_router
 from .config import settings
 from .db import engine, get_db
@@ -77,6 +78,7 @@ app.include_router(combat_router)
 app.include_router(central_router)
 app.include_router(admin_router)
 app.include_router(quest_router)
+app.include_router(quest_agent_router)
 app.include_router(devops_router)
 app.include_router(events_public_router)
 app.include_router(events_action_router)

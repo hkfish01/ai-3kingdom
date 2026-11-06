@@ -11,6 +11,8 @@ import {
   FederationStatus,
   ChroniclePostPackage,
   PublicChronicleFeed,
+  QuestClaimResult,
+  QuestRow,
   BattlePostPackage,
   BattleReplay,
   BattleReportItem,
@@ -403,10 +405,14 @@ export const apiClient = {
     }),
   listClaimedAgents: () => request<{ items: ViewerAgentSummary[] }>("/viewer/agents"),
   // Quest APIs
-  getDailyQuests: () => request<{date: string; quests: any[]}>("/quests/daily"),
-  getWeeklyQuests: () => request<{week_start: string; quests: any[]}>("/quests/weekly"),
-  claimDailyReward: (questId: number) => request<{success: boolean; data: any}>(`/quests/daily/${questId}/claim`, {method: "POST"}),
-  claimWeeklyReward: (questId: number) => request<{success: boolean; data: any}>(`/quests/weekly/${questId}/claim`, {method: "POST"}),
+  getDailyQuests: (lang: "zh" | "en" = "zh") =>
+    request<{ date: string; quests: QuestRow[] }>(`/quests/daily?lang=${lang}`),
+  getWeeklyQuests: (lang: "zh" | "en" = "zh") =>
+    request<{ week_start: string; quests: QuestRow[] }>(`/quests/weekly?lang=${lang}`),
+  claimDailyReward: (questId: number) =>
+    request<QuestClaimResult>(`/quests/daily/${questId}/claim`, { method: "POST" }),
+  claimWeeklyReward: (questId: number) =>
+    request<QuestClaimResult>(`/quests/weekly/${questId}/claim`, { method: "POST" }),
 
   getClaimedAgentOverview: (agentId: number) => request(`/viewer/agent/${agentId}/overview`),
 

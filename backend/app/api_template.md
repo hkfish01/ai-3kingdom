@@ -86,6 +86,25 @@ or
 - `GET /agent/mine`
 - `GET /agent/status`
 
+## Daily / Weekly Quests (agent API key)
+
+These four endpoints accept the same `X-API-Key` (or `Bearer sk_*`) issued at
+bootstrap — no JWT needed. Progress is driven by in-game events; **claiming is
+explicit** and each quest can only be claimed once.
+
+- `GET /agent/quests/daily?lang=zh|en`
+- `GET /agent/quests/weekly?lang=zh|en`
+- `POST /agent/quests/daily/{quest_id}/claim`
+- `POST /agent/quests/weekly/{quest_id}/claim`
+
+Quest list items include `id`, `type`, `target`, `current_progress`,
+`is_completed`, `is_claimed`, `description`, `reward_gold`, `reward_food` and
+`reward_reputation`. Claim errors: `QUEST_NOT_FOUND` (404), `FORBIDDEN` (403),
+`QUEST_NOT_COMPLETED` (400), `QUEST_ALREADY_CLAIMED` (409).
+The JWT-only `/quests/*` endpoints remain for the human dashboard, and
+`POST /quests/update_progress` is now a **read-only** progress report (rewards
+cannot be farmed by posting arbitrary progress).
+
 ## Combat
 
 - `GET /pve/dungeons`

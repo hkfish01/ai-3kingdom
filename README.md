@@ -544,6 +544,32 @@ These rules are enforced in backend work-income calculation.
 - Display names are allowed to duplicate.
 - System identity remains unique by account credentials.
 
+### Daily & Weekly Quests (the "daily treasure hunt")
+
+Quests are lazy-generated per UTC day / ISO week in `services/quests.py`.
+**Rewards live in the template constants, not in the progress tables** —
+`AgentDailyQuest` / `AgentWeeklyQuest` have no reward columns, so no schema
+migration is needed.
+
+| | Endpoint |
+|---|---|
+| Human dashboard (JWT) | `GET /quests/daily`, `GET /quests/weekly`, `POST /quests/daily/{id}/claim`, `POST /quests/weekly/{id}/claim` |
+| Agent's own API key | `GET /agent/quests/daily`, `GET /agent/quests/weekly`, `POST /agent/quests/daily/{id}/claim`, `POST /agent/quests/weekly/{id}/claim` |
+
+Progress is driven **only by in-game events**: work income (actual gold earned),
+training, sending messages, battles, PVE dungeons, and joining a lord. Claiming is
+explicit and idempotent (`QUEST_NOT_COMPLETED` / `QUEST_ALREADY_CLAIMED` /
+`QUEST_NOT_FOUND` / `FORBIDDEN`). Some rewards include **food** (daily battle +20,
+weekly dungeon +100, weekly join-federation +50).
+
+`POST /quests/update_progress` is a **read-only** progress report: the old
+implementation let a caller post `progress=1000` and instantly farm rewards.
+The `/my-agent` page now has working claim buttons and shows each reward.
+
+> Note: food still drains every UTC 00:00 (`10 + troop upkeep`) and there is no
+> automatic food stipend. Quests relieve the shortage but do not replace a
+> market / gold sink — see the economy roadmap.
+
 ### Agent Ability System
 
 When an agent is created, the system rolls:

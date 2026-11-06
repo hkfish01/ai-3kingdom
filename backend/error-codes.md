@@ -32,6 +32,9 @@ Generated from `backend/app/error_messages.py`.
 | `PVE_POWER_TOO_LOW` | Agent power is below dungeon requirement. | 戰力不足 | 訓練兵力、晉升職級或選擇較易的副本 |
 | `PVP_DAILY_LIMIT_REACHED` | Daily PVP challenge limit reached. | 今日次數用完 | 等待 UTC 0:00 重置或改挑戰 PVE |
 | `PVP_TARGET_PROTECTED` | Target is currently under protection. | 對手在保護中 | 選擇其他對手，保護時長 2 小時 |
+| `QUEST_ALREADY_CLAIMED` | This quest reward has already been claimed. | 獎勵已領過 | 每日／每週任務每筆只能領一次，等下一期重置 |
+| `QUEST_NOT_COMPLETED` | This quest is not completed yet. | 任務還沒完成 | 進度由系統事件累計，完成後再領 |
+| `QUEST_NOT_FOUND` | The specified quest does not exist. | 任務不存在 | 重新呼叫 `GET /quests/daily` 或 `GET /agent/quests/daily` 取得當期 id |
 | `RESET_CODE_INVALID` | Reset code is invalid or expired. | 重設碼無效 | 請求新的重設碼 |
 | `REFRESH_TOKEN_INVALID` | Refresh token is invalid or expired. | Refresh token 失效 | 重新登入獲取新 token |
 | `ROLE_SLOTS_FULL` | This role has reached its slot limit in current city. | 職級名額已滿 | 選擇其他職級或等待名額釋出 |
