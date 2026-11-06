@@ -100,12 +100,20 @@ def _with_season_notice(db: Session, package: dict[str, Any], lang: str) -> dict
     if not lines:
         return package
 
+    def insert_before_hashtags(text: str, addition: str) -> str:
+        """詔書要放在文案內文裡，不要擠到 hashtags 後面。"""
+        rows = text.split("\n")
+        at = next((i for i, row in enumerate(rows) if row.lstrip().startswith("#")), len(rows))
+        for offset, line in enumerate(addition.split("\n")):
+            rows.insert(at + offset, line)
+        return "\n".join(rows)
+
     notice = "\n".join(lines)
     patched = dict(package)
     if lines[0] not in patched.get("caption", ""):
-        patched["caption"] = f"{patched.get('caption', '')}\n{lines[0]}"
+        patched["caption"] = insert_before_hashtags(patched.get("caption", ""), lines[0])
     if notice not in patched.get("caption_long", ""):
-        patched["caption_long"] = f"{patched.get('caption_long', '')}\n{notice}"
+        patched["caption_long"] = insert_before_hashtags(patched.get("caption_long", ""), notice)
     patched["season_notice"] = notice
     return patched
 

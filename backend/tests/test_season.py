@@ -241,8 +241,12 @@ def test_ending_card_payload_from_current_and_archive():
         assert live is not None
         assert live["closed"] is False
         assert "/season/ending-card.png" in live["links"]["card_png"]
+        assert "暫居首位" in live["ending"] or "勝負未定" in live["ending"]
+        assert "定鼎" not in live["ending"]
 
         ensure_season(db, now=AFTER_END, enabled=True)
+        champion = ending_card_payload(db, agent_ids[1], "s20261106", "zh")
+        assert champion is not None and "定鼎" in champion["ending"]
         archived = ending_card_payload(db, agent_ids[0], "s20261106", "zh")
         assert archived is not None
         assert archived["closed"] is True
@@ -371,11 +375,30 @@ def test_cached_daily_post_gets_opening_decree_backfilled():
         assert "開季詔書" in package["caption_long"]
         assert "開季詔書" in package["caption"]
         assert package["season_notice"]
+        rows = package["caption"].split("\n")
+        decree_at = next(i for i, line in enumerate(rows) if "開季詔書" in line)
+        tags_at = next(i for i, line in enumerate(rows) if line.startswith("#"))
+        assert decree_at < tags_at  # 詔書在文案內文，不在 hashtags 後面
         # 只補回傳值，不改寫 DB 裡的快取
         from app.services.system_state import get_state
         from app.services.chronicle_publish import PACKAGE_KEY
 
         assert "開季詔書" not in json.loads(get_state(db, PACKAGE_KEY))["caption_long"]
+    finally:
+        db.close()
+
+
+def test_live_season_post_never_claims_a_winner():
+    """賽季還沒結算，發文包與領先榜不能寫「定鼎」。"""
+    _seed()
+    db = SessionLocal()
+    try:
+        ensure_season(db, now=OPEN_AT, enabled=True)
+        package = season_post_package(db, "zh")
+        assert package["closed"] is False
+        assert "定鼎" not in package["caption"]
+        assert "暫居首位" in package["caption"]
+        assert all("定鼎" not in row["ending_zh"] for row in season_summary(db, "zh")["leaderboard"])
     finally:
         db.close()
 

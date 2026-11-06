@@ -183,6 +183,19 @@ def _ending(row: dict[str, Any], rank: int, total: int, season_id: str) -> tuple
     )
 
 
+def _live_note(row: dict[str, Any]) -> tuple[str, str]:
+    """賽季進行中的局勢句；結算語氣（定鼎／本紀）只能出現在歸檔與季末卡。"""
+    if row["rank"] == 1:
+        return (
+            f"{row['name']} 以 {row['score']} 分暫居首位；霸主未定，諸侯仍可翻盤。",
+            f"{row['name']} leads with {row['score']} points; the crown is still undecided.",
+        )
+    return (
+        f"{row['name']} 列名第 {row['rank']}，號「{row['title_zh']}」；一季未終，勝負未定。",
+        f"{row['name']} sits at #{row['rank']} as {row['title_en']}; the season is still open.",
+    )
+
+
 def standings(db: Session, season: dict[str, Any]) -> list[dict[str, Any]]:
     """即時排行榜；純讀取，不改任何 agent 資料。"""
     if not season:
@@ -419,12 +432,16 @@ def season_summary(db: Session, lang: str = "zh") -> dict[str, Any]:
                 **history[0],
                 "chronicle": archive.get("chronicle_zh" if lang == "zh" else "chronicle_en", ""),
             }
+    # 進行中的賽季不能講「定鼎」；歸檔快照才用結算語氣的結局句。
+    leaders = rows[:10]
+    for row in leaders:
+        row["ending_zh"], row["ending_en"] = _live_note(row)
     return {
         "enabled": settings.season_enabled,
         "season": state or None,
         "days_left": days_left,
         "total_agents": len(rows),
-        "leaderboard": rows[:10],
+        "leaderboard": leaders,
         "rules": season_rules(),
         "previous": previous,
         "history_count": len(archive_ids(db)),
@@ -463,6 +480,12 @@ def ending_card_payload(
             return None
         closed = False
 
+    zh_note, en_note = _live_note(row)
+    if closed:
+        ending = row["ending_zh"] if zh else row["ending_en"]
+    else:
+        ending = zh_note if zh else en_note
+
     site = settings.public_site_url.rstrip("/")
     prefix = (settings.chronicle_card_api_prefix or "").rstrip("/")
     query = f"?agent_id={agent_id}&lang={'zh' if zh else 'en'}"
@@ -481,7 +504,7 @@ def ending_card_payload(
         "total": row["total"],
         "score": row["score"],
         "title": row["title_zh"] if zh else row["title_en"],
-        "ending": row["ending_zh"] if zh else row["ending_en"],
+        "ending": ending,
         "reputation": row["reputation"],
         "troops": row["troops"],
         "gold": row["gold"],
