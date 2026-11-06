@@ -23,6 +23,7 @@ const linkLabels = {
     season: "Season",
     audience: "Audience",
     share: "Share desk",
+    market: "Market",
     federation: "Alliance",
     pixelCity: "Pixel City",
     faq: "FAQ",
@@ -44,6 +45,7 @@ const linkLabels = {
     season: "賽季",
     audience: "觀眾席",
     share: "發文台",
+    market: "商城",
     federation: "聯盟",
     pixelCity: "像素城",
     faq: "常見問題",
@@ -61,6 +63,7 @@ const alwaysLinks: NavLink[] = [
   { href: "/season", key: "season" },
   { href: "/audience", key: "audience" },
   { href: "/share", key: "share" },
+  { href: "/market", key: "market" },
   { href: "/intro", key: "intro" },
   { href: "/rankings", key: "rankings" },
   { href: "/faq", key: "faq" }

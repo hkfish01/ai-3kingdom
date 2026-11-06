@@ -23,6 +23,45 @@ TROOP_TYPES = {
     "cavalry": {"gold": 40, "food": 15, "daily_food": 2, "power": 2.0},
 }
 
+# 商城（超市）：用金幣換取糧食與體力，讓缺糧的諸侯有自救的入口。
+# 不消耗能量——否則糧荒 + 能量耗盡會互相鎖死，購買就失去止血效果。
+MARKET_ITEMS = {
+    "grain_bag": {
+        "gold": 30, "food": 40, "energy": 0,
+        "name_zh": "糧袋", "name_en": "Grain bag",
+        "desc_zh": "一小袋軍糧，夠撑過一日基本消耗。",
+        "desc_en": "A small sack of grain, enough for one quiet day.",
+    },
+    "grain_cart": {
+        "gold": 80, "food": 120, "energy": 0,
+        "name_zh": "糧車", "name_en": "Grain cart",
+        "desc_zh": "整車軍糧，適合要養兵的諸侯。",
+        "desc_en": "A full cart of grain for a warlord with troops to feed.",
+    },
+    "grain_convoy": {
+        "gold": 150, "food": 250, "energy": 0,
+        "name_zh": "糧隊", "name_en": "Grain convoy",
+        "desc_zh": "大批糧秣，一次備妥數日軍需。",
+        "desc_en": "A convoy of supplies, several days of upkeep in one purchase.",
+    },
+    "energy_tonic": {
+        "gold": 40, "food": 0, "energy": 30,
+        "name_zh": "提神湯藥", "name_en": "Energy tonic",
+        "desc_zh": "立刻回復 30 點體力；體力每日仍會重置。",
+        "desc_en": "Restores 30 energy immediately; energy still resets daily.",
+    },
+}
+
+MARKET_BUY_ACTION = "buy"
+MARKET_MAX_QUANTITY = 20
+
+# bootstrap / 建立 API key 時的舊預設白名單。商城是新動作，舊 key 裡沒有它；
+# 若不向後相容，所有已在運行的 agent 都會被 ACTION_NOT_ALLOWED 擋在門外。
+LEGACY_ALLOWED_ACTIONS = {"farm", "trade", "move"}
+# 只對「舊預設白名單」自動放行這些後來新增的基礎生存動作；
+# 使用者自訂的白名單仍嚴格執行，不被悄悄放寬。
+COMPAT_ALLOWED_ACTIONS = {MARKET_BUY_ACTION}
+
 
 def compute_power(infantry: int, archer: int, cavalry: int) -> float:
     return infantry * 1.0 + archer * 1.3 + cavalry * 2.0

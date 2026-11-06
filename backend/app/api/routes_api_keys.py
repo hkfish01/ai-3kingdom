@@ -8,6 +8,7 @@ from ..api.deps import get_current_user
 from ..db import get_db
 from ..errors import AppError
 from ..models import Agent, ApiKey, User
+from ..rules import COMPAT_ALLOWED_ACTIONS, LEGACY_ALLOWED_ACTIONS
 from ..schemas import CreateApiKeyRequest
 from ..services.secrets import hash_secret, make_api_key
 
@@ -40,6 +41,16 @@ def _safe_json_load_list(raw: str) -> list[str]:
     return [str(item) for item in parsed]
 
 
+def _effective_allowed_actions(raw: str) -> list[str]:
+    """列出實際會被放行的動作（含舊 key 的向後相容動作）。"""
+    parsed = {item.strip() for item in _safe_json_load_list(raw) if item.strip()}
+    if not parsed:
+        return sorted(LEGACY_ALLOWED_ACTIONS | COMPAT_ALLOWED_ACTIONS)
+    if parsed == LEGACY_ALLOWED_ACTIONS:
+        return sorted(parsed | COMPAT_ALLOWED_ACTIONS)
+    return sorted(parsed)
+
+
 @router.get("")
 def list_api_keys(
     db: Session = Depends(get_db),
@@ -62,6 +73,7 @@ def list_api_keys(
                     "scope": _safe_json_load_list(k.scope_json),
                     "rate_limit": k.rate_limit,
                     "allowed_actions": _safe_json_load_list(k.allowed_actions_json),
+                    "effective_allowed_actions": _effective_allowed_actions(k.allowed_actions_json),
                     "expires_at": k.expires_at.isoformat() if k.expires_at else None,
                     "key_preview": f"{k.key_prefix}...{k.last4}",
                     "revoked": k.revoked_at is not None,
@@ -114,6 +126,7 @@ def create_api_key(
             "scope": payload.scope,
             "rate_limit": key.rate_limit,
             "allowed_actions": payload.allowed_actions,
+            "effective_allowed_actions": _effective_allowed_actions(key.allowed_actions_json),
             "expires_at": key.expires_at.isoformat() if key.expires_at else None,
             "key": plain_key,
             "key_preview": f"{key.key_prefix}...{key.last4}",

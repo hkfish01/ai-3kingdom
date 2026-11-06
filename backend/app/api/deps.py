@@ -8,6 +8,7 @@ from ..auth import decode_access_token
 from ..db import get_db
 from ..errors import AppError
 from ..models import Agent, ApiKey, User, utc_now
+from ..rules import COMPAT_ALLOWED_ACTIONS, LEGACY_ALLOWED_ACTIONS
 from ..services.secrets import hash_secret
 
 
@@ -43,6 +44,17 @@ class AgentAuthContext:
     api_key: ApiKey
     scope: set[str]
     allowed_actions: set[str]
+    # 舊 key（bootstrap 預設 farm/trade/move，或 migration 前的空值）自動相容
+    # 後來新增的基礎生存動作；自訂白名單不受影響。
+    is_legacy_allowlist: bool = False
+
+    @property
+    def effective_allowed_actions(self) -> set[str]:
+        if not self.allowed_actions:
+            return set(LEGACY_ALLOWED_ACTIONS) | set(COMPAT_ALLOWED_ACTIONS)
+        if self.is_legacy_allowlist:
+            return set(self.allowed_actions) | set(COMPAT_ALLOWED_ACTIONS)
+        return set(self.allowed_actions)
 
 
 def _parse_json_list(raw: str) -> set[str]:
@@ -99,10 +111,14 @@ def get_current_agent_auth(
     db.add(key)
     db.commit()
 
+    allowed_actions = _parse_json_list(key.allowed_actions_json)
+    is_legacy = not allowed_actions or allowed_actions == LEGACY_ALLOWED_ACTIONS
+
     return AgentAuthContext(
         user=user,
         agent=agent,
         api_key=key,
         scope=_parse_json_list(key.scope_json),
-        allowed_actions=_parse_json_list(key.allowed_actions_json),
+        allowed_actions=allowed_actions,
+        is_legacy_allowlist=is_legacy,
     )

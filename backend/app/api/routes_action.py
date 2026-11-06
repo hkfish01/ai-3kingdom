@@ -11,10 +11,18 @@ from ..config import settings
 from ..db import get_db
 from ..errors import AppError
 from ..models import ActionLog, Agent, AgentActionEvent, BattleLog, City, User, utc_now
-from ..rules import CITY_TAX_RATE, TROOP_TYPES, WORK_TASKS, compute_power
+from ..rules import (
+    CITY_TAX_RATE,
+    COMPAT_ALLOWED_ACTIONS,
+    MARKET_BUY_ACTION,
+    TROOP_TYPES,
+    WORK_TASKS,
+    compute_power,
+)
 from ..schemas import TrainActionRequest, WorkActionRequest
 from ..services.chronicle import write_chronicle
 from ..services.positions import get_position
+from ..services import market as market_service
 from ..services import quests as quest_service
 
 logger = logging.getLogger(__name__)
@@ -22,7 +30,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/action", tags=["action"])
 LORD_TO_VASSAL_BONUS_RATE = 0.01
 VASSAL_TO_LORD_BONUS_RATE = 0.001
-WORK_ACTION_ALLOWLIST = set(WORK_TASKS.keys()) | {"move"}
+WORK_ACTION_ALLOWLIST = set(WORK_TASKS.keys()) | {"move", MARKET_BUY_ACTION}
 BLOCKED_PAYLOAD_KEYS = {"command", "script", "url", "file_path", "path", "shell_args", "argv"}
 
 
@@ -115,9 +123,23 @@ def _validate_work_payload(action_type: str, payload: dict) -> dict:
 
     if action_type == "move":
         city_id = raw_payload.get("city_id")
-        if not isinstance(city_id, int) or city_id <= 0:
+        if not isinstance(city_id, int) or isinstance(city_id, bool) or city_id <= 0:
             raise AppError("INVALID_ACTION_PAYLOAD", "move payload requires positive integer city_id.", status_code=422)
+        if set(raw_payload) != {"city_id"}:
+            raise AppError("INVALID_ACTION_PAYLOAD", "move payload only accepts city_id.", status_code=422)
         return {"city_id": city_id}
+
+    # 商城是唯一需要帶參數的工作動作：嚴格白名單欄位 + 商品/數量驗證，
+    # 其餘工作動作仍維持空物件，不放大既有攻擊面。
+    if action_type == MARKET_BUY_ACTION:
+        if set(raw_payload) != {"item", "quantity"}:
+            raise AppError(
+                "INVALID_ACTION_PAYLOAD",
+                "buy payload requires exactly item and quantity.",
+                status_code=422,
+            )
+        deal = market_service.quote(raw_payload.get("item"), raw_payload.get("quantity"))
+        return {"item": deal["item_id"], "quantity": deal["quantity"]}
 
     if raw_payload:
         raise AppError("INVALID_ACTION_PAYLOAD", f"{action_type} payload must be empty object.", status_code=422)
@@ -128,7 +150,11 @@ def _assert_api_key_can_submit_action(db: Session, auth: AgentAuthContext, actio
     if "action:submit" not in auth.scope:
         raise AppError("INSUFFICIENT_SCOPE", "API key missing required scope: action:submit.", status_code=403)
     if auth.allowed_actions and action_type not in auth.allowed_actions:
-        raise AppError("ACTION_NOT_ALLOWED", "This action is not permitted by current API key.", status_code=403)
+        # 舊 key 的 allowlist 是 bootstrap 時代的 farm/trade/move，後來新增的
+        # 基礎生存動作（商城 buy）自動相容；使用者自訂白名單則照舊嚴格執行。
+        legacy_compat = auth.is_legacy_allowlist and action_type in COMPAT_ALLOWED_ACTIONS
+        if not legacy_compat:
+            raise AppError("ACTION_NOT_ALLOWED", "This action is not permitted by current API key.", status_code=403)
 
     limit, window = _rate_window(auth.api_key.rate_limit)
     window_start = utc_now() - window
@@ -225,6 +251,39 @@ def _process_action_event(db: Session, event_id: int) -> dict:
                 content=f"{agent.name} moved from {previous_city} to {target_city.name}.",
             )
             db.add(agent)
+            event.status = "completed"
+            event.result_json = json.dumps(result, ensure_ascii=False)
+            event.error_code = ""
+            event.error_message = ""
+            event.processed_at = utc_now()
+            db.add(event)
+            db.commit()
+            return result
+
+        # 商城：先檢查餘額再扣款發貨，餘額不足時 service 直接拋錯，
+        # 外層 except 會把 event 標成 failed，agent 的金幣與糧食都不會變動。
+        if action_type == MARKET_BUY_ACTION:
+            result = market_service.purchase(db, agent, payload.get("item"), payload.get("quantity"))
+            result["action_type"] = MARKET_BUY_ACTION
+            db.add(
+                ActionLog(
+                    agent_id=agent.id,
+                    city_name=settings.city_name,
+                    action_type="market_buy",
+                    payload_json=json.dumps(payload, ensure_ascii=False),
+                    energy_cost=0,
+                    result_json=json.dumps(result, ensure_ascii=False),
+                )
+            )
+            write_chronicle(
+                db,
+                event_type="economy",
+                title=f"{agent.name} bought {result['quantity']} x {result['item_id']}",
+                content=(
+                    f"{agent.name} spent {result['gold_spent']} gold at the market "
+                    f"and received {result['food_gained']} food, {result['energy_gained']} energy."
+                ),
+            )
             event.status = "completed"
             event.result_json = json.dumps(result, ensure_ascii=False)
             event.error_code = ""
