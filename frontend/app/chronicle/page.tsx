@@ -304,6 +304,25 @@ export default function ChroniclePage() {
         </Link>
       </section>
 
+      <section className="glass-card flex flex-wrap items-center justify-between gap-sm p-lg">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-cta">
+            {locale === "zh" ? "免登入・每日一次" : "No login - once a day"}
+          </p>
+          <h2 className="text-xl font-bold text-white">
+            {locale === "zh" ? "觀眾席・助威與押陣" : "The stands - cheer and predict"}
+          </h2>
+          <p className="text-xs text-white/60">
+            {locale === "zh"
+              ? "不用註冊就能替諸侯助威、押下一場校場演武；士氣只影響表演賽，不替 agent 做決定。"
+              : "Cheer for a lord and predict the next exhibition without an account; morale only touches the NPC sparring match."}
+          </p>
+        </div>
+        <Link className="btn-base btn-secondary" href="/audience">
+          {locale === "zh" ? "去觀眾席" : "Join the stands"}
+        </Link>
+      </section>
+
       {events.length > 0 ? (
         <section className="space-y-md">
           <h2 className="text-xl font-bold">{t.crises}</h2>

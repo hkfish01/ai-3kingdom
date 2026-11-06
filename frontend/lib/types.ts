@@ -449,3 +449,79 @@ export interface SeasonPostPackage {
     title: string;
   } | null;
 }
+
+export interface AudienceAgent {
+  agent_id: number;
+  name: string;
+  city: string;
+  troops: number;
+}
+
+export interface AudienceStanding extends AudienceAgent {
+  cheers: number;
+}
+
+export interface AudienceMorale {
+  challenger_votes: number;
+  defender_votes: number;
+  total_votes: number;
+  boost: number;
+  boost_pct: number;
+  applied: boolean;
+  cap_pct: number;
+  min_votes: number;
+}
+
+export interface AudienceRules {
+  one_per_day_zh: string;
+  one_per_day_en: string;
+  target_zh: string;
+  target_en: string;
+  min_votes: number;
+  boost_cap_pct: number;
+  full_participation_votes: number;
+  exclusions_zh: string;
+  exclusions_en: string;
+  note: string;
+}
+
+export interface AudienceToday {
+  enabled: boolean;
+  date: string;
+  target_date: string;
+  target_hour_hkt: number;
+  already_cheered: boolean;
+  already_voted: boolean;
+  cheer_total: number;
+  cheer_standings: AudienceStanding[];
+  votes: { challenger: number; defender: number };
+  morale: AudienceMorale;
+  agents: AudienceAgent[];
+  rules: AudienceRules;
+  note: string;
+}
+
+export interface AudienceActionResult {
+  recorded: boolean;
+  reason: string | null;
+  target_date: string;
+  side?: string;
+}
+
+export interface AudiencePostPackage {
+  type: string;
+  date: string;
+  target_date: string;
+  lang: string;
+  headline: string;
+  caption: string;
+  caption_long: string;
+  hashtags: string;
+  image_url: string;
+  link: string;
+  share_text: string;
+  cheer_total: number;
+  standings: AudienceStanding[];
+  votes: { challenger: number; defender: number };
+  morale: AudienceMorale;
+}

@@ -75,7 +75,16 @@ def current_post_package(db: Session, lang: str = "zh") -> dict[str, Any]:
         if not story or story.get("lang") != lang:
             story = build_story_from_db(db, lang=lang)
         package = build_post_package(story, battle=battle)
-    return _with_season_notice(db, package, lang)
+    return _with_audience_note(db, _with_season_notice(db, package, lang), lang)
+
+
+def _insert_before_hashtags(text: str, addition: str) -> str:
+    """公告要放在文案內文裡，不要擠到 hashtags 後面。"""
+    rows = text.split("\n")
+    at = next((i for i, row in enumerate(rows) if row.lstrip().startswith("#")), len(rows))
+    for offset, line in enumerate(addition.split("\n")):
+        rows.insert(at + offset, line)
+    return "\n".join(rows)
 
 
 def _with_season_notice(db: Session, package: dict[str, Any], lang: str) -> dict[str, Any]:
@@ -100,21 +109,33 @@ def _with_season_notice(db: Session, package: dict[str, Any], lang: str) -> dict
     if not lines:
         return package
 
-    def insert_before_hashtags(text: str, addition: str) -> str:
-        """詔書要放在文案內文裡，不要擠到 hashtags 後面。"""
-        rows = text.split("\n")
-        at = next((i for i, row in enumerate(rows) if row.lstrip().startswith("#")), len(rows))
-        for offset, line in enumerate(addition.split("\n")):
-            rows.insert(at + offset, line)
-        return "\n".join(rows)
-
     notice = "\n".join(lines)
     patched = dict(package)
     if lines[0] not in patched.get("caption", ""):
-        patched["caption"] = insert_before_hashtags(patched.get("caption", ""), lines[0])
+        patched["caption"] = _insert_before_hashtags(patched.get("caption", ""), lines[0])
     if notice not in patched.get("caption_long", ""):
-        patched["caption_long"] = insert_before_hashtags(patched.get("caption_long", ""), notice)
+        patched["caption_long"] = _insert_before_hashtags(patched.get("caption_long", ""), notice)
     patched["season_notice"] = notice
+    return patched
+
+
+def _with_audience_note(db: Session, package: dict[str, Any], lang: str) -> dict[str, Any]:
+    """08:00 快取包可能比當日觀眾助威更早產生，即時回補（不寫入 DB）。
+
+    讀的是「當日」bucket，對應當天 07:00 已結束的演武，不是下一場的票。
+    """
+    # audience 服務會 import 本模組的 hkt_now，這裡用 lazy import 避免循環。
+    from .audience import audience_note
+
+    note = audience_note(db, lang)
+    if not note:
+        return package
+    patched = dict(package)
+    if note not in patched.get("caption", ""):
+        patched["caption"] = _insert_before_hashtags(patched.get("caption", ""), note)
+    if note not in patched.get("caption_long", ""):
+        patched["caption_long"] = _insert_before_hashtags(patched.get("caption_long", ""), note)
+    patched["audience_note"] = note
     return patched
 
 

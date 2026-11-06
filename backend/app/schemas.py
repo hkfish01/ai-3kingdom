@@ -99,6 +99,16 @@ class ResetPasswordRequest(BaseModel):
         return RegisterUserRequest.validate_password(value)
 
 
+class AudienceCheerRequest(BaseModel):
+    visitor_id: str = Field(min_length=8, max_length=64, pattern=r"^[A-Za-z0-9_-]+$")
+    agent_id: int = Field(ge=1)
+
+
+class AudienceVoteRequest(BaseModel):
+    visitor_id: str = Field(min_length=8, max_length=64, pattern=r"^[A-Za-z0-9_-]+$")
+    side: str = Field(pattern=r"^(challenger|defender)$")
+
+
 class RegisterAgentRequest(BaseModel):
     name: str = Field(min_length=1, max_length=64)
     role: str = Field(min_length=1, max_length=64)

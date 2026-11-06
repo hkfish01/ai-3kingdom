@@ -6,6 +6,7 @@
 - 只讀一位真實諸侯的兵力快照，用既有 `services.combat` 的戰力／勝率／傷亡公式推演三回合。
 - 結果寫入既有 `battle_logs` 與 `chronicles`，完整兵種快照存 `system_state`（不新增表）。
 - 公開回放與文案會標明「演武・不計戰績」，不偽裝成諸侯自主出戰。
+- 觀眾押陣只以有限度士氣係數影響本場戰力（見 `services.audience`），同樣不改 agent 資料。
 
 開關：`ARENA_ENABLED`（Python 預設 False，production compose 預設 true）；
 時段：`ARENA_HOUR_HKT`（預設 7，趕在 08:00 發文包之前）。同一個 HKT 日期只跑一次。
@@ -23,6 +24,7 @@ from sqlalchemy.orm import Session
 from ..config import settings
 from ..models import Agent, BattleLog, ChronicleEntry
 from . import combat
+from .audience import morale_for_date
 from .chronicle_publish import hkt_now
 from .system_state import get_state, set_state
 
@@ -101,8 +103,11 @@ def run_daily_arena(
     if sum(defender_troops.values()) <= 0:
         return {"status": "no_challenger", "date": date_str}
 
+    morale = morale_for_date(db, date_str)
     attacker_power = combat.total_power(attacker_troops, challenger.martial or 0, defender_troops)
     defender_power = combat.total_power(defender_troops, 50, attacker_troops)
+    # 觀眾押陣只調整這場表演賽的士氣係數：不寫回 agent、不改兵力、不計勝場。
+    attacker_power *= 1.0 + morale["boost"]
     rate = combat.win_rate(attacker_power, defender_power)
     attacker_win = rate >= 0.5
     attacker_losses, defender_losses = combat.compute_losses(
@@ -114,6 +119,11 @@ def run_daily_arena(
         f"是役，{challenger.name} 以 {max(0, sum(attacker_troops.values()) - sum(attacker_losses.values()))} 兵"
         f"{'力挫' if attacker_win else '不敵'}{NPC_NAME_ZH}；城中始有刀兵之聲。"
     )
+    if morale["applied"] and morale["boost_pct"]:
+        verdict += (
+            f"觀眾押陣 {morale['challenger_votes']}：{morale['defender_votes']}，"
+            f"士氣 {morale['boost_pct']:+.1f}%。"
+        )
     note = "校場演武・不計戰績，不更動諸侯兵力；諸侯仍自行決定是否出戰。"
 
     db.add(
@@ -152,6 +162,7 @@ def run_daily_arena(
                 "losses": attacker_losses,
                 "enemy_losses": defender_losses,
                 "verdict": verdict,
+                "audience": morale,
             },
             ensure_ascii=False,
         ),

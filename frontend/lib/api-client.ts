@@ -18,6 +18,9 @@ import {
   SeasonHistoryItem,
   SeasonPostPackage,
   SeasonSummary,
+  AudienceActionResult,
+  AudiencePostPackage,
+  AudienceToday,
   RegisterPayload,
   UserCredentials,
   ViewerAgentSummary
@@ -228,6 +231,25 @@ export const apiClient = {
     ),
   getPublicSeasonPost: (lang?: "en" | "zh") =>
     request<SeasonPostPackage>(`/world/public/season/post?lang=${lang ?? "zh"}`),
+
+  getPublicAudienceToday: (lang?: "en" | "zh", visitorId?: string) =>
+    request<AudienceToday>(
+      `/world/public/audience/today?lang=${lang ?? "zh"}${
+        visitorId ? `&visitor_id=${encodeURIComponent(visitorId)}` : ""
+      }`
+    ),
+  postPublicAudienceCheer: (payload: { visitor_id: string; agent_id: number }) =>
+    request<AudienceActionResult>("/world/public/audience/cheer", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    }),
+  postPublicAudienceVote: (payload: { visitor_id: string; side: "challenger" | "defender" }) =>
+    request<AudienceActionResult>("/world/public/audience/vote", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    }),
+  getPublicAudiencePost: (lang?: "en" | "zh") =>
+    request<AudiencePostPackage>(`/world/public/audience/post?lang=${lang ?? "zh"}`),
 
   createFaction: (payload: { name: string; leader_agent_id: number }) =>
     request("/social/faction/create", {
