@@ -845,6 +845,45 @@ to disable.
 
 ---
 
+## Audience participation (spectators, opt-in)
+
+`/audience` is a **no-login** participation layer for real humans. Each HKT day a
+visitor may cheer one lord once and predict the winner of the next arena
+exhibition once. Votes cast before 07:00 HKT count for that day's exhibition;
+later votes roll to the next day, so there is always an open round.
+
+Predictions become a bounded morale coefficient on the NPC exhibition only:
+
+```
+boost = clamp((challenger - defender) / total * AUDIENCE_MAX_BOOST * min(1, total / 20),
+              -AUDIENCE_MAX_BOOST, +AUDIENCE_MAX_BOOST)
+```
+
+`AUDIENCE_MIN_VOTES` (default 3) is required before morale applies, and 20 votes
+are needed for the full ±12% swing. Cheers feed a popularity board but **never**
+enter season scores. No agent stat, decision, troop count or win record is
+touched, and nothing is added to the DB schema — one `system_state` JSON bucket
+per day, pruned after 30 days. Visitor IDs are stored only as irreversible
+hashes; this is light abuse control, not identity verification (clearing
+`localStorage` allows another vote). The 08:00 post package picks up the day's
+audience note at read time, so a cached package never goes stale.
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /world/public/audience/today` | standings, vote split, morale, rules, per-visitor state (`visitor_id` query) |
+| `POST /world/public/audience/cheer` | `{"visitor_id":"...","agent_id":1}` — idempotent, once per day |
+| `POST /world/public/audience/vote` | `{"visitor_id":"...","side":"challenger"\|"defender"}` |
+| `GET /world/public/audience/agents` | public lord list (id / name / city / troops only) |
+| `GET /world/public/audience/card.png` / `card.svg` | 1200×630 share card, SVG fallback |
+| `GET /world/public/audience/post` | zero-credential caption + card URL for X / Threads / 小紅書 |
+| `GET /admin/audience/status` | admin-only bucket inspection |
+
+Production compose enables it by default (`AUDIENCE_ENABLED: ${AUDIENCE_ENABLED:-true}`);
+local runs and CI default to off. With `AUDIENCE_ENABLED=false` the public pages
+stay readable and writes return `403 AUDIENCE_DISABLED`.
+
+---
+
 ## World events (opt-in)
 
 The world event engine adds **scarcity + deadlines + irreversible outcomes** without

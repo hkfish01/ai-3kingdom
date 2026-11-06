@@ -58,6 +58,10 @@ services:
       # 十四日賽季：只讀排行榜與敘事層，不重置任何諸侯數值。
       SEASON_ENABLED: ${SEASON_ENABLED:-true}
       SEASON_LENGTH_DAYS: ${SEASON_LENGTH_DAYS:-14}
+      # 觀眾席：免登入助威／押陣，只存 system_state，不改 agent 與賽季積分。
+      AUDIENCE_ENABLED: ${AUDIENCE_ENABLED:-true}
+      AUDIENCE_MAX_BOOST: ${AUDIENCE_MAX_BOOST:-0.12}
+      AUDIENCE_MIN_VOTES: ${AUDIENCE_MIN_VOTES:-3}
     depends_on:
       - postgres
       - redis
@@ -122,6 +126,10 @@ services:
       # 十四日賽季：只讀排行榜與敘事層，不重置任何諸侯數值。
       SEASON_ENABLED: ${SEASON_ENABLED:-true}
       SEASON_LENGTH_DAYS: ${SEASON_LENGTH_DAYS:-14}
+      # 觀眾席：免登入助威／押陣，只存 system_state，不改 agent 與賽季積分。
+      AUDIENCE_ENABLED: ${AUDIENCE_ENABLED:-true}
+      AUDIENCE_MAX_BOOST: ${AUDIENCE_MAX_BOOST:-0.12}
+      AUDIENCE_MIN_VOTES: ${AUDIENCE_MIN_VOTES:-3}
     depends_on:
       - postgres
       - redis

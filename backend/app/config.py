@@ -95,6 +95,14 @@ class Settings(BaseSettings):
     season_enabled: bool = False
     season_length_days: int = 14
 
+    # -- Audience participation (免登入助威 / 押陣) --
+    # 真人觀眾每天可助威一位諸侯、押一次 07:00 演武的勝方。
+    # 士氣只影響 NPC 表演賽，不改 agent 數值、不進霸主積分、不替 agent 決策。
+    # Python 預設關閉（本機／CI 不製造資料），production compose 預設啟用。
+    audience_enabled: bool = False
+    audience_max_boost: float = 0.12
+    audience_min_votes: int = 3
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
 
