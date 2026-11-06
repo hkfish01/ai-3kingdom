@@ -312,6 +312,9 @@ docker compose -f deploy/prod/docker-compose.server.yml --env-file deploy/prod/.
   up -d --force-recreate city-api city-worker
 ```
 
+The `-f` / `--env-file` flags are mandatory; see section 3.3. nginx re-resolves
+the recreated containers automatically, so no gateway restart is needed.
+
 Verify with:
 
 ```bash
@@ -345,6 +348,39 @@ wins x40 + faction +20`. Arena exhibitions (`arena_*`) do not count as wins.
 Opening decrees and closing annals are also appended to the daily chronicle, so
 the 08:00 post package carries them automatically. Admins can force a roll with
 `POST /api/admin/season/advance?force_roll=true`.
+
+### 3.3 Production vs local compose (do not mix them)
+
+There are two compose files. They used to share container names, so a bare
+`docker compose up` on the server tried to create `ai3k-redis` / `ai3k-postgres`
+against the live containers and failed with "container name already in use" —
+and if it had succeeded it would have replaced production settings with the dev
+defaults (`change-me-in-prod`, `localhost:8000`).
+
+| | Production | Local / dev |
+| --- | --- | --- |
+| File | `deploy/prod/docker-compose.server.yml` | `docker-compose.yml` (repo root) |
+| Env file | `deploy/prod/.env` | `.env` in repo root |
+| Compose project | `prod` | `ai-3kingdom` |
+| Containers | `ai3k-*` | `ai3k-dev-*` |
+| Gateway port | `${GATEWAY_PORT:-10090}` | `${DEV_GATEWAY_PORT:-10091}` |
+| Network | `prod_default` | `dev_default` (isolated) |
+
+**Always use the production file on the server** — this is exactly what
+`.github/workflows/deploy.yml` runs. From `~/ai-3kingdom`:
+
+```bash
+docker compose -f deploy/prod/docker-compose.server.yml --env-file deploy/prod/.env \
+  up -d --force-recreate city-api city-worker
+```
+
+`deploy/prod/nginx.conf` now uses Docker's embedded DNS (`resolver 127.0.0.11
+valid=10s`) with variable upstreams, so recreating `city-api` or `frontend`
+does not leave nginx pointing at a stale container IP: `/api/` recovers within
+~10 seconds instead of returning 502. Recreate `gateway` only when
+`nginx.conf` itself changes (the deploy workflow already does this). Upstreams
+are Compose **service names** (`city-api`, `frontend`), so the same config
+works for both compose projects.
 
 ### 4. Start services
 
