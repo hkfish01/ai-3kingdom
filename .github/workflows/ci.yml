@@ -91,3 +91,9 @@ jobs:
               raise SystemExit(f"Missing error code docs entries: {missing}")
           print("Error code document validation passed")
           PY
+
+      - name: Validate nginx config syntax
+        run: |
+          docker run --rm \
+            -v "$PWD/deploy/prod/nginx.conf:/etc/nginx/conf.d/default.conf:ro" \
+            nginx:1.25-alpine nginx -t

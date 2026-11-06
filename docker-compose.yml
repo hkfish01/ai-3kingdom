@@ -1,10 +1,16 @@
-version: "3.9"
-
+# Local / development stack ONLY.
+#
+# Production on the server uses deploy/prod/docker-compose.server.yml with
+# deploy/prod/.env (that is what .github/workflows/deploy.yml runs). This file
+# is deliberately isolated from it: every container is prefixed ai3k-dev-, the
+# gateway listens on 10091 instead of the production 10090, and the containers
+# live on their own dev_default network instead of the production network.
+# Running a bare `docker compose up` here must never touch the live node.
 services:
   city-api:
     build:
       context: ./backend
-    container_name: ai3k-city-api
+    container_name: ai3k-dev-city-api
     environment:
       DATABASE_URL: postgresql+psycopg://postgres:postgres@postgres:5432/ai3k
       JWT_SECRET: ${JWT_SECRET:-change-me-in-prod}
@@ -40,14 +46,14 @@ services:
       - postgres
       - redis
     ports:
-      - "8000:8000"
+      - "${DEV_API_PORT:-8000}:8000"
     networks:
-      - prod_default
+      - dev_default
 
   city-worker:
     build:
       context: ./backend
-    container_name: ai3k-city-worker
+    container_name: ai3k-dev-city-worker
     environment:
       DATABASE_URL: postgresql+psycopg://postgres:postgres@postgres:5432/ai3k
       JWT_SECRET: ${JWT_SECRET:-change-me-in-prod}
@@ -84,11 +90,11 @@ services:
       - redis
     command: ["python", "-m", "app.worker"]
     networks:
-      - prod_default
+      - dev_default
 
   postgres:
     image: postgres:16
-    container_name: ai3k-postgres
+    container_name: ai3k-dev-postgres
     environment:
       POSTGRES_DB: ai3k
       POSTGRES_USER: postgres
@@ -96,17 +102,17 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "${DEV_POSTGRES_PORT:-5432}:5432"
     networks:
-      - prod_default
+      - dev_default
 
   redis:
     image: redis:7
-    container_name: ai3k-redis
+    container_name: ai3k-dev-redis
     ports:
-      - "6379:6379"
+      - "${DEV_REDIS_PORT:-6379}:6379"
     networks:
-      - prod_default
+      - dev_default
 
   frontend:
     build:
@@ -114,7 +120,7 @@ services:
       args:
         NEXT_PUBLIC_API_BASE_URL: /api
         NEXT_PUBLIC_RELEASE_VERSION: -e
-    container_name: ai3k-frontend
+    container_name: ai3k-dev-frontend
     user: "1001:1001"
     read_only: true
     tmpfs:
@@ -126,24 +132,24 @@ services:
     cpus: 1.0
     mem_limit: 1g
     networks:
-      - prod_default
+      - dev_default
 
   gateway:
     image: nginx:1.25-alpine
-    container_name: ai3k-gateway
+    container_name: ai3k-dev-gateway
     depends_on:
       - city-api
       - frontend
     volumes:
-      - /home/dell/ai-3kingdom/deploy/prod/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./deploy/prod/nginx.conf:/etc/nginx/conf.d/default.conf:ro
     ports:
-      - "10090:80"
+      - "${DEV_GATEWAY_PORT:-10091}:80"
     networks:
-      - prod_default
+      - dev_default
 
 networks:
-  prod_default:
-    external: true
+  dev_default:
+    driver: bridge
 
 volumes:
   postgres-data:
