@@ -184,6 +184,52 @@ def test_webhook_payload_has_links_without_breaking_legacy_fields():
     assert discord["embeds"][0]["url"] == "https://example/s/abc12345"
 
 
+def test_discord_payload_uses_the_webhook_channel_short_link():
+    """Discord 是獨立通路：內文與 embed 都不能誤掛 X 的短碼。"""
+    package = {
+        "date": DAY,
+        "headline": "標題",
+        "caption": "三回合回放 → https://example.com/battle/replay/arena_1",
+        "caption_long": "長文案",
+        "hashtags": "#AI三國",
+        "image_url": "https://example.com/card.png",
+        "link": "https://example.com/chronicle",
+        "share_url": "https://example.com/s/xxxx1111",
+        "links": {
+            "x": {
+                "url": "https://example.com/s/xxxx1111",
+                "caption": "X 文案",
+                "caption_long": "X 長文案",
+            },
+            "webhook": {
+                "url": "https://example.com/s/wwww2222",
+                "caption": "三回合回放 → https://example.com/s/wwww2222",
+                "caption_long": "長文案 → https://example.com/s/wwww2222",
+            },
+        },
+    }
+    payload = _webhook_payload(package, "discord")
+    assert "wwww2222" in payload["content"]
+    assert "xxxx1111" not in payload["content"]
+    assert payload["embeds"][0]["url"] == "https://example.com/s/wwww2222"
+    assert payload["embeds"][0]["image"]["url"] == "https://example.com/card.png"
+
+    legacy = dict(package)
+    legacy["links"] = {"x": package["links"]["x"]}
+    assert _webhook_payload(legacy, "discord")["embeds"][0]["url"] == "https://example.com/s/xxxx1111"
+
+
+def test_discord_payload_from_real_package_is_not_attributed_to_x():
+    _seed()
+    with SessionLocal() as db:
+        package = current_post_package(db, "zh")
+    payload = _webhook_payload(package, "discord")
+    webhook = package["links"]["webhook"]
+    assert payload["embeds"][0]["url"] == webhook["url"]
+    assert payload["embeds"][0]["url"] != package["links"]["x"]["url"]
+    assert payload["content"] == webhook["caption"]
+
+
 def test_stats_aggregate_human_clicks_by_channel():
     rows = _codes()
     x = next(c for c, m in rows.items() if m["channel"] == "x")
