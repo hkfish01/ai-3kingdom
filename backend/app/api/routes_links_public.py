@@ -14,6 +14,7 @@ from ..errors import AppError
 from ..models import User
 from ..services.chronicle_publish import current_post_package
 from ..services.link_tracking import (
+    admin_stats,
     link_status,
     recent_outbox,
     record_click,
@@ -79,6 +80,17 @@ def follow_short_link(
     if target is None:
         raise AppError("LINK_NOT_FOUND", "Short link not found.", status_code=404)
     return RedirectResponse(url=target, status_code=302, headers=NO_CACHE)
+
+
+@admin_router.get("/stats")
+def admin_link_stats(
+    days: int = Query(default=7, ge=1, le=30),
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(get_current_admin),
+):
+    """近 N 日成效：日期 × 通路 × 目標頁明細（需 admin token）。"""
+    _ = current_admin
+    return {"success": True, "data": admin_stats(db, days=days)}
 
 
 @admin_router.get("/status")

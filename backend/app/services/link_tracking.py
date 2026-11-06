@@ -369,6 +369,58 @@ def stats(db: Session, days: int = 7, now: datetime | None = None) -> dict[str, 
     }
 
 
+def admin_stats(db: Session, days: int = 7, now: datetime | None = None) -> dict[str, Any]:
+    """管理用成效：在公開聚合報表上再加「日期 × 通路 × 目標頁」明細。
+
+    公開版為了能給 `/share` 直接讀，只回最粗的數字；管理版需要回答
+    「哪個通路把人帶去哪一頁」，但依舊只有計數，不存 IP／UA／訪客識別。
+    """
+    base = stats(db, days=days, now=now)
+    today = date.fromisoformat(hkt_date(now))
+    by_target: dict[str, int] = {}
+    top: list[dict[str, Any]] = []
+    detail_days: list[dict[str, Any]] = []
+    for offset in range(base["days"] - 1, -1, -1):
+        day_str = (today - timedelta(days=offset)).isoformat()
+        day = _load_day(db, day_str)
+        rows: list[dict[str, Any]] = []
+        day_targets: dict[str, int] = {}
+        for code, meta in day.get("links", {}).items():
+            clicks = int(meta.get("clicks", 0))
+            human = int(meta.get("human_clicks", 0))
+            if not clicks:
+                continue
+            channel = str(meta.get("channel", ""))
+            target = str(meta.get("target", ""))
+            row = {
+                "code": code,
+                "channel": channel,
+                "target": target,
+                "clicks": clicks,
+                "human_clicks": human,
+            }
+            rows.append(row)
+            top.append({**row, "date": day_str})
+            day_targets[target] = day_targets.get(target, 0) + human
+            by_target[target] = by_target.get(target, 0) + human
+        rows.sort(key=lambda r: (-r["human_clicks"], -r["clicks"], r["channel"]))
+        detail_days.append({"date": day_str, "by_target": day_targets, "rows": rows})
+    top.sort(key=lambda r: (-r["human_clicks"], -r["clicks"], r["date"], r["channel"]))
+
+    patched = dict(base)
+    patched["per_day"] = [
+        {**summary, "by_target": detail["by_target"], "rows": detail["rows"]}
+        for summary, detail in zip(base["per_day"], detail_days)
+    ]
+    patched["by_target"] = by_target
+    patched["top_links"] = top[:10]
+    patched["note"] = (
+        base["note"]
+        + " 管理版另含日期 × 通路 × 目標頁明細；依舊不含 IP、UA 或訪客識別。"
+    )
+    return patched
+
+
 def write_outbox(
     db: Session,
     date_str: str,
