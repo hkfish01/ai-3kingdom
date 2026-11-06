@@ -795,17 +795,55 @@ X / Threads plus a long caption for Xiaohongshu.
 X / Threads / Xiaohongshu cannot be posted to directly without platform
 credentials, so there are two supported paths:
 
-1. **Manual (works today):** open `/chronicle`, copy the post caption, download the
-   card, and paste it into X / Threads / Xiaohongshu. The card and copy are already
-   prepared at 08:00 every day.
+1. **Manual (works today):** open `/share`, pick a channel, copy its caption and
+   download the card, then paste into X / Threads / Xiaohongshu. `/chronicle` has
+   a link to the share desk. Every channel gets its own tracked short link, so
+   manual posting is still measurable.
 2. **Semi-automatic:** set `CHRONICLE_CARD_WEBHOOK_URLS` to an n8n / Make / IFTTT
    webhook (or a Discord webhook with `CHRONICLE_CARD_WEBHOOK_TYPE=discord`). The
    worker POSTs the package at 08:00 and the automation service forwards it to X /
-   Threads. Xiaohongshu still needs a manual post (no public posting API).
+   Threads. Xiaohongshu still needs a manual post (no public posting API). Discord
+   webhooks are free and need no review: Server Settings > Integrations > Webhooks >
+   New Webhook > choose a channel > Copy Webhook URL. After editing `.env`, recreate
+   the worker with the production compose file (see section 3.3):
+   `sudo docker compose -f deploy/prod/docker-compose.server.yml --env-file deploy/prod/.env up -d --force-recreate city-worker`.
 
-Native X / Threads API posting can be plugged in later once API credentials exist;
-the card renderer and scheduler do not need to change. Set
-`CHRONICLE_CARD_ENABLED=false` in `deploy/prod/.env` to disable the whole pipeline.
+### Tracked short links and the outbox
+
+`backend/app/services/link_tracking.py` closes the measurement loop with **no
+platform credentials and no schema changes** (everything lives in `system_state`):
+
+| Part | Endpoint / page |
+|---|---|
+| Short link | `/s/{code}` (Next.js route handler) 302s to `/world/public/s/{code}`, which validates, counts a click and redirects to a whitelisted in-site path |
+| Channel links | `GET /world/public/links/today?lang=zh` — one link and one caption per channel (`x`, `threads`, `xhs`, `webhook`, `audience`, `direct`) |
+| Clicks | `GET /world/public/links/stats?days=7` — aggregated numbers only; `GET /admin/links/status` for ops |
+| Outbox | `GET /world/public/links/outbox?days=7` — last 7 days of prepared/sent packages, no webhook URLs or error details |
+| Share desk | `/share` — card preview, copy buttons, per-channel stats, recent outbox |
+
+`current_post_package()` keeps every existing field unchanged and only adds
+`links`, `share_url` and `tracking_note`; the webhook payload adds `links` and
+`channel_captions` while preserving `text` / `link` for existing automations.
+Redirect targets are restricted to a whitelist of in-site relative paths, so a
+forged index cannot turn a short link into an open redirect. Clicks are
+**approximate**: common link-preview crawlers are excluded by User-Agent into
+`human_clicks`, but caching and previews can still distort totals. This is a
+relative channel comparison, not an analytics product.
+
+#### Why there is no native X / Threads publisher yet
+
+As of 2026-11, the X API has no free tier and no subscriptions: it is pay-per-use
+(about US$0.015 per post, US$0.20 for a post containing a URL). Since the whole
+point of this loop is a link back to the site, posting through the X API would
+cost roughly 13x more than a plain post — manual posting plus our own short link
+is cheaper and also covers Threads and Xiaohongshu. The Threads API itself is
+free (Meta app + OAuth, optional App Review for accounts outside your own org),
+so it is the first candidate for a native publisher once there is traffic worth
+automating. Xiaohongshu has no public personal posting API. See
+`deploy/prod/.env.example` for the webhook settings.
+
+Set `CHRONICLE_CARD_ENABLED=false` in `deploy/prod/.env` to disable card
+generation (the short-link service itself has no flag).
 
 ### Battle replays (three-round animation)
 
