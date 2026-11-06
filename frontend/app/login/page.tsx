@@ -65,7 +65,7 @@ export default function LoginPage() {
   const t = locale === "zh"
     ? {
         title: "登入",
-        username: "使用者名稱",
+        username: "使用者名稱或 Email",
         password: "密碼",
         email: "Email",
         resetCode: "重設碼 (6位數)",
@@ -78,11 +78,11 @@ export default function LoginPage() {
         sendCode: "發送重設碼",
         resetPassword: "重設密碼",
         codeSent: "若該 Email 已註冊，重設碼已寄出。",
-        resetOk: "密碼已重設，請重新登入。"
+        resetOk: "密碼已重設，請用使用者名稱或 Email 重新登入。"
       }
     : {
         title: "Login",
-        username: "Username",
+        username: "Username or Email",
         password: "Password",
         email: "Email",
         resetCode: "Reset Code (6 digits)",
@@ -95,7 +95,7 @@ export default function LoginPage() {
         sendCode: "Send Reset Code",
         resetPassword: "Reset Password",
         codeSent: "If the email exists, a reset code has been sent.",
-        resetOk: "Password reset completed. Please sign in again."
+        resetOk: "Password reset completed. Sign in with your username or email."
       };
 
   const onLogin = async (event: FormEvent<HTMLFormElement>) => {
@@ -104,7 +104,7 @@ export default function LoginPage() {
     setError("");
     setMessage("");
     try {
-      const data = await apiClient.login({ username, password: normalizePassword(password) });
+      const data = await apiClient.login({ username: username.trim(), password: normalizePassword(password) });
       localStorage.setItem("token", data.token);
       localStorage.setItem("refresh_token", data.refresh_token);
       try {
@@ -213,7 +213,16 @@ export default function LoginPage() {
           <form onSubmit={onLogin} className="space-y-md" aria-label="login form">
             <div>
               <label htmlFor="username">{t.username}</label>
-              <input id="username" value={username} onChange={(e) => setUsername(e.target.value)} required />
+              <input
+                id="username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                autoComplete="username"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                required
+              />
             </div>
             <div>
               <label htmlFor="password">{t.password}</label>

@@ -46,8 +46,15 @@ class RegisterUserRequest(BaseModel):
 
 
 class LoginRequest(BaseModel):
-    username: str
+    username: str = Field(
+        description="Username or registered email address (email is matched case-insensitively).",
+    )
     password: str
+
+    @field_validator("username")
+    @classmethod
+    def normalize_identifier(cls, value: str) -> str:
+        return value.strip()
 
 
 class RefreshTokenRequest(BaseModel):
