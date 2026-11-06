@@ -23,6 +23,7 @@ from ..config import settings
 from .battle_replay import latest_public_battle
 from .chronicle_card import build_post_package
 from .daily_chronicle import build_story_from_db, generate_daily_chronicle, get_latest_story
+from .link_tracking import tracked_package, write_outbox
 from .system_state import get_state, set_state
 
 LAST_DATE_KEY = "chronicle_card_last_date"
@@ -75,7 +76,9 @@ def current_post_package(db: Session, lang: str = "zh") -> dict[str, Any]:
         if not story or story.get("lang") != lang:
             story = build_story_from_db(db, lang=lang)
         package = build_post_package(story, battle=battle)
-    return _with_audience_note(db, _with_season_notice(db, package, lang), lang)
+    # 通路專屬短連結即時算（冪等）；既有欄位一個都不改，只新增 links / share_url。
+    patched = _with_audience_note(db, _with_season_notice(db, package, lang), lang)
+    return tracked_package(db, patched, lang)
 
 
 def _insert_before_hashtags(text: str, addition: str) -> str:
@@ -146,12 +149,14 @@ def _webhook_payload(package: dict[str, Any], kind: str) -> dict[str, Any]:
             "embeds": [
                 {
                     "title": package["headline"],
-                    "url": package["link"],
+                    "url": package.get("share_url") or package["link"],
                     "image": {"url": package["image_url"]},
                 }
             ],
         }
     # generic：n8n / Make / IFTTT / 自建服務都能直接吃
+    # 舊欄位維持原樣，追蹤連結放在新增欄位，既有自動化流程不會壞。
+    links = package.get("links", {})
     return {
         "type": "chronicle_card",
         "date": package["date"],
@@ -161,6 +166,16 @@ def _webhook_payload(package: dict[str, Any], kind: str) -> dict[str, Any]:
         "hashtags": package["hashtags"],
         "image_url": package["image_url"],
         "link": package["link"],
+        "share_url": package.get("share_url", ""),
+        "links": links,
+        "channel_captions": {
+            channel: {
+                "url": meta.get("url", ""),
+                "caption": meta.get("caption", ""),
+                "caption_long": meta.get("caption_long", ""),
+            }
+            for channel, meta in links.items()
+        },
         "battle": package.get("battle"),
         "battle_image_url": package.get("battle_image_url", ""),
         "package": package,
@@ -201,7 +216,7 @@ def publish_daily_post(
     # 08:00 HKT 時 worker 的 UTC 01:00 史記還沒跑；用 PR #9 的冪等 upsert 先補齊當日。
     # 校場演武排在這個時段之前，所以發文包會帶到當日戰報與回放連結。
     story = generate_daily_chronicle(db, lang="zh", force=True, date_str=date_str)
-    package = build_post_package(story, battle=latest_public_battle(db, "zh"))
+    package = tracked_package(db, build_post_package(story, battle=latest_public_battle(db, "zh")))
     set_state(db, PACKAGE_KEY, json.dumps(package, ensure_ascii=False))
 
     urls = [u.strip() for u in settings.chronicle_card_webhook_urls.split(",") if u.strip()]
@@ -247,6 +262,8 @@ def publish_daily_post(
         ),
     )
     db.commit()
+    # 待發佇列：只存公開可見的文案與短連結，不存 webhook URL 或失敗細節。
+    write_outbox(db, date_str, package, status, kind if urls else "manual")
     return {
         "status": status,
         "date": date_str,

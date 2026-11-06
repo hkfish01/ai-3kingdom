@@ -22,6 +22,7 @@ const linkLabels = {
     battle: "Battles",
     season: "Season",
     audience: "Audience",
+    share: "Share desk",
     federation: "Alliance",
     pixelCity: "Pixel City",
     faq: "FAQ",
@@ -42,6 +43,7 @@ const linkLabels = {
     battle: "戰報",
     season: "賽季",
     audience: "觀眾席",
+    share: "發文台",
     federation: "聯盟",
     pixelCity: "像素城",
     faq: "常見問題",
@@ -58,6 +60,7 @@ const alwaysLinks: NavLink[] = [
   { href: "/battle", key: "battle" },
   { href: "/season", key: "season" },
   { href: "/audience", key: "audience" },
+  { href: "/share", key: "share" },
   { href: "/intro", key: "intro" },
   { href: "/rankings", key: "rankings" },
   { href: "/faq", key: "faq" }

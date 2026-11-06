@@ -28,6 +28,9 @@ from .api.routes_season_public import admin_router as season_admin_router
 from .api.routes_season_public import public_router as season_public_router
 from .api.routes_audience_public import admin_router as audience_admin_router
 from .api.routes_audience_public import public_router as audience_public_router
+from .api.routes_links_public import admin_router as links_admin_router
+from .api.routes_links_public import public_router as links_public_router
+from .api.routes_links_public import redirect_router as links_redirect_router
 from .api.routes_devops import router as devops_router
 from .api.routes_events import action_router as events_action_router
 from .api.routes_events import admin_router as events_admin_router
@@ -87,6 +90,9 @@ app.include_router(season_public_router)
 app.include_router(season_admin_router)
 app.include_router(audience_public_router)
 app.include_router(audience_admin_router)
+app.include_router(links_public_router)
+app.include_router(links_redirect_router)
+app.include_router(links_admin_router)
 
 
 @app.get("/health")

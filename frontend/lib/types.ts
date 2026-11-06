@@ -525,3 +525,59 @@ export interface AudiencePostPackage {
   votes: { challenger: number; defender: number };
   morale: AudienceMorale;
 }
+
+export interface TrackedChannelLink {
+  code: string;
+  url: string;
+  label: string;
+  target: string;
+  clicks: number;
+  human_clicks: number;
+  caption: string;
+  caption_long: string;
+}
+
+export interface LinkToday {
+  date: string;
+  lang: string;
+  links: Record<string, TrackedChannelLink>;
+  share_url: string;
+  headline: string;
+  image_url: string;
+  note: string;
+}
+
+export interface LinkStatsDay {
+  date: string;
+  clicks: number;
+  human_clicks: number;
+  by_channel: Record<string, number>;
+}
+
+export interface LinkStats {
+  days: number;
+  total_clicks: number;
+  total_human_clicks: number;
+  by_channel: Record<string, number>;
+  per_day: LinkStatsDay[];
+  note: string;
+}
+
+export interface OutboxItem {
+  date: string;
+  status: string;
+  provisional?: boolean;
+  channel?: string;
+  headline?: string;
+  caption?: string;
+  caption_long?: string;
+  image_url?: string;
+  share_url?: string;
+  links?: Record<string, TrackedChannelLink>;
+}
+
+export interface LinkOutbox {
+  days: number;
+  items: OutboxItem[];
+  count: number;
+}

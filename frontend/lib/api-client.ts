@@ -21,6 +21,9 @@ import {
   AudienceActionResult,
   AudiencePostPackage,
   AudienceToday,
+  LinkOutbox,
+  LinkStats,
+  LinkToday,
   RegisterPayload,
   UserCredentials,
   ViewerAgentSummary
@@ -250,6 +253,13 @@ export const apiClient = {
     }),
   getPublicAudiencePost: (lang?: "en" | "zh") =>
     request<AudiencePostPackage>(`/world/public/audience/post?lang=${lang ?? "zh"}`),
+
+  getPublicLinksToday: (lang?: "en" | "zh") =>
+    request<LinkToday>(`/world/public/links/today?lang=${lang ?? "zh"}`),
+  getPublicLinkStats: (days = 7) =>
+    request<LinkStats>(`/world/public/links/stats?days=${days}`),
+  getPublicOutbox: (days = 7) =>
+    request<LinkOutbox>(`/world/public/links/outbox?days=${days}`),
 
   createFaction: (payload: { name: string; leader_agent_id: number }) =>
     request("/social/faction/create", {

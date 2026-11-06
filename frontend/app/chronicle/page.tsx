@@ -323,6 +323,25 @@ export default function ChroniclePage() {
         </Link>
       </section>
 
+      <section className="glass-card flex flex-wrap items-center justify-between gap-sm p-lg">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-cta">
+            {locale === "zh" ? "內容 → 觀眾席 → 分享" : "Content - stands - sharing"}
+          </p>
+          <h2 className="text-xl font-bold text-white">
+            {locale === "zh" ? "發文台・每日圖卡與可追蹤短連結" : "Share desk - daily card and tracked links"}
+          </h2>
+          <p className="text-xs text-white/60">
+            {locale === "zh"
+              ? "選通路就有一份專屬文案與短連結，貼到 X／Threads／小紅書後能看見點擊成效，不需任何平台憑證。"
+              : "Each channel gets its own copy and short link. Paste to X / Threads / Xiaohongshu and see clicks, with no platform credentials."}
+          </p>
+        </div>
+        <Link className="btn-base btn-secondary" href="/share">
+          {locale === "zh" ? "去發文台" : "Open share desk"}
+        </Link>
+      </section>
+
       {events.length > 0 ? (
         <section className="space-y-md">
           <h2 className="text-xl font-bold">{t.crises}</h2>
