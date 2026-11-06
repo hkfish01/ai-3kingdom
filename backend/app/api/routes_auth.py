@@ -3,6 +3,7 @@ import logging
 import unicodedata
 
 from fastapi import APIRouter, Depends
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..auth import create_access_token, create_refresh_token, hash_password, verify_password
@@ -33,6 +34,34 @@ def _normalize_utc(dt):
     return dt.astimezone(timezone.utc)
 
 
+def _find_user_by_email(db: Session, email: str) -> User | None:
+    """Case-insensitive email lookup.
+
+    Registration/forgot/reset all normalize emails to lowercase, but rows
+    created before that convention (or by a direct DB import) may not be.
+    """
+    value = email.strip().lower()
+    if not value:
+        return None
+    return db.query(User).filter(func.lower(User.email) == value).first()
+
+
+def _find_login_user(db: Session, identifier: str) -> User | None:
+    """Accept a username *or* the registered email address.
+
+    Password reset is entirely email-based, so users naturally type the same
+    address into the login form. Username is matched first so an existing
+    username is never shadowed by a different account's email.
+    """
+    value = identifier.strip()
+    if not value:
+        return None
+    user = db.query(User).filter(User.username == value).first()
+    if user is not None:
+        return user
+    return _find_user_by_email(db, value)
+
+
 def _issue_tokens(db: Session, user_id: int) -> dict:
     now = utc_now()
     refresh = create_refresh_token()
@@ -59,7 +88,7 @@ def register(payload: RegisterUserRequest, db: Session = Depends(get_db)):
     exists = db.query(User).filter(User.username == payload.username).first()
     if exists:
         raise AppError("USERNAME_EXISTS", "Username already exists.", status_code=409)
-    if db.query(User).filter(User.email == payload.email).first():
+    if _find_user_by_email(db, payload.email):
         raise AppError("EMAIL_EXISTS", "Email already exists.", status_code=409)
 
     admins = {name.strip() for name in settings.admin_usernames.split(",") if name.strip()}
@@ -84,7 +113,7 @@ def register(payload: RegisterUserRequest, db: Session = Depends(get_db)):
 
 @router.post("/login")
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.username == payload.username).first()
+    user = _find_login_user(db, payload.username)
     normalized_password = unicodedata.normalize("NFKC", payload.password)
     if not user or not verify_password(normalized_password, user.password_hash):
         raise AppError("INVALID_CREDENTIALS", "Invalid username or password.", status_code=401)
@@ -170,7 +199,7 @@ def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db
     elif health["degraded"]:
         global_reason = REASON_DELIVERY_FAILED
 
-    user = db.query(User).filter(User.email == payload.email).first()
+    user = _find_user_by_email(db, payload.email)
     if not user:
         if global_reason:
             return _delivery_failure(global_reason)
@@ -206,7 +235,7 @@ def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db
 
 @router.post("/reset-password")
 def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == payload.email).first()
+    user = _find_user_by_email(db, payload.email)
     if not user:
         raise AppError("RESET_CODE_INVALID", "Reset code is invalid or expired.", status_code=400)
 
