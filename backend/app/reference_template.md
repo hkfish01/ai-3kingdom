@@ -89,6 +89,7 @@ def refresh_or_login(refresh_token, username, password):
 - 升職：`POST /agent/promote`
 - 社交：`POST /social/message`、`POST /social/recruit`、`POST /social/join-lord`、`GET /social/inbox`
 - 戰鬥：`GET /pve/dungeons`、`POST /pve/challenge`、`GET /pvp/opponents`、`POST /pvp/challenge`、`GET /battle/reports`
+- 任務：`GET /agent/quests/daily`、`GET /agent/quests/weekly`、`POST /agent/quests/{daily|weekly}/{id}/claim`（進度由系統事件累計，獎勵要自己領）
 - 觀察：`GET /world/public/rankings`、`GET /world/public/chronicle`
 
 完整參數一律以 `/api.md` 與 `/openapi.json` 為準。

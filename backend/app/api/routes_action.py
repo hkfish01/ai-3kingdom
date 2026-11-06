@@ -15,6 +15,7 @@ from ..rules import CITY_TAX_RATE, TROOP_TYPES, WORK_TASKS, compute_power
 from ..schemas import TrainActionRequest, WorkActionRequest
 from ..services.chronicle import write_chronicle
 from ..services.positions import get_position
+from ..services import quests as quest_service
 
 logger = logging.getLogger(__name__)
 
@@ -67,45 +68,11 @@ def _get_week_start() -> str:
 
 
 def _update_quest_progress(db: Session, agent_id: int, quest_type: str, progress_delta: int):
-    """Update quest progress for an agent (daily and weekly)"""
-    try:
-        # Import here to avoid issues if tables don't exist
-        from ..models import AgentDailyQuest, AgentWeeklyQuest
-        
-        utc_date = _get_utc_date()
-        week_start = _get_week_start()
-        
-        # Update daily quest progress
-        daily_quest = db.query(AgentDailyQuest).filter(
-            AgentDailyQuest.agent_id == agent_id,
-            AgentDailyQuest.quest_type == quest_type,
-            AgentDailyQuest.quest_date == utc_date
-        ).first()
-        
-        if daily_quest and not daily_quest.is_claimed:
-            daily_quest.current_progress += progress_delta
-            if daily_quest.current_progress >= daily_quest.target:
-                daily_quest.is_completed = True
-            db.add(daily_quest)
-        
-        # Update weekly quest progress (for weekly versions of quest types)
-        weekly_quest_type = f"{quest_type}_weekly" if quest_type == "earn_gold" else quest_type
-        weekly_quest = db.query(AgentWeeklyQuest).filter(
-            AgentWeeklyQuest.agent_id == agent_id,
-            AgentWeeklyQuest.quest_type == weekly_quest_type,
-            AgentWeeklyQuest.week_start == week_start
-        ).first()
-        
-        if weekly_quest and not weekly_quest.is_claimed:
-            weekly_quest.current_progress += progress_delta
-            if weekly_quest.current_progress >= weekly_quest.target:
-                weekly_quest.is_completed = True
-            db.add(weekly_quest)
-            
-    except Exception as e:
-        # Log but don't fail the action if quest update fails
-        logger.warning(f"Failed to update quest progress: {e}")
-        pass
+    """相容 wrapper：核心邏輯已移到 `services/quests.py`。
+
+    earn_gold 的 progress_delta 現在是「實際賺到的金幣」，不是次數。
+    """
+    quest_service.update_progress(db, agent_id, quest_type, progress_delta)
 
 
 def _rate_window(raw_rate_limit: str) -> tuple[int, timedelta]:
@@ -351,7 +318,7 @@ def _process_action_event(db: Session, event_id: int) -> dict:
         event.processed_at = utc_now()
         db.add(event)
         db.commit()
-        _update_quest_progress(db, agent.id, "earn_gold", 1)
+        _update_quest_progress(db, agent.id, "earn_gold", int(result.get("gold_gained", 0)))
         return result
 
     except AppError as exc:

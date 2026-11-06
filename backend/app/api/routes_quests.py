@@ -1,247 +1,74 @@
-from datetime import datetime, timezone, timedelta
-from typing import Optional
+"""每日／每週任務路由。
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import func
+核心邏輯已移到 `services/quests.py`，這裡只做授權與回傳組裝。
+既有 5 個端點的簽章與回傳結構保持不變（純加法：多回傳獎勵與描述）。
+
+新增 `agent_router`（`/agent/quests/*`）讓 **agent 用 bootstrap 拿到的 API key**
+就能查詢與領取自己的任務；原本 `/quests/*` 全用 JWT，agent 自己打不到。
+"""
+
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from ..api.deps import get_current_user
+from ..api.deps import AgentAuthContext, get_current_agent_auth, get_current_user
 from ..db import get_db
-from ..models import Agent, AgentDailyQuest, AgentWeeklyQuest, DailyQuestTemplate, User
-from ..config import settings
+from ..models import Agent, User
+from ..services import quests as quest_service
 
 router = APIRouter(prefix="/quests", tags=["quests"])
+agent_router = APIRouter(prefix="/agent/quests", tags=["quests-agent"])
+
+# 向後相容：舊程式可能直接 import 這兩個常數。
+DEFAULT_DAILY_QUESTS = quest_service.DEFAULT_DAILY_QUESTS
+DEFAULT_WEEKLY_QUESTS = quest_service.DEFAULT_WEEKLY_QUESTS
+get_utc_date = quest_service.utc_date
+get_week_start = quest_service.week_start
+ensure_quest_templates = quest_service.ensure_templates
 
 
-def get_utc_date() -> str:
-    """Get current UTC date string (YYYY-MM-DD)"""
-    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+def _lang(value: str | None) -> str:
+    return "en" if value == "en" else "zh"
 
 
-def get_week_start() -> str:
-    """Get current week's Monday UTC date string"""
-    now = datetime.now(timezone.utc)
-    monday = now - timedelta(days=now.weekday())
-    return monday.strftime("%Y-%m-%d")
+def _my_agent_ids(db: Session, user_id: int) -> list[int]:
+    return [
+        row.id
+        for row in db.query(Agent).filter(Agent.owner_user_id == user_id).order_by(Agent.id).all()
+    ]
 
 
-# Default daily quest templates
-DEFAULT_DAILY_QUESTS = [
-    {
-        "quest_type": "earn_gold",
-        "target": 100,
-        "reward_gold": 50,
-        "reward_food": 0,
-        "reward_reputation": 0,
-        "description_zh": "賺取 100 金幣",
-        "description_en": "Earn 100 gold",
-    },
-    {
-        "quest_type": "train_troops",
-        "target": 50,
-        "reward_gold": 30,
-        "reward_food": 0,
-        "reward_reputation": 0,
-        "description_zh": "訓練 50 兵力",
-        "description_en": "Train 50 troops",
-    },
-    {
-        "quest_type": "send_messages",
-        "target": 3,
-        "reward_gold": 20,
-        "reward_food": 0,
-        "reward_reputation": 0,
-        "description_zh": "發送 3 條訊息",
-        "description_en": "Send 3 messages",
-    },
-    {
-        "quest_type": "complete_battle",
-        "target": 1,
-        "reward_gold": 40,
-        "reward_food": 20,
-        "reward_reputation": 10,
-        "description_zh": "完成 1 次戰鬥",
-        "description_en": "Complete 1 battle",
-    },
-]
-
-# Default weekly quest templates
-DEFAULT_WEEKLY_QUESTS = [
-    {
-        "quest_type": "earn_gold_weekly",
-        "target": 1000,
-        "reward_gold": 200,
-        "reward_food": 0,
-        "reward_reputation": 0,
-        "description_zh": "累積 1000 金幣",
-        "description_en": "Accumulate 1000 gold",
-    },
-    {
-        "quest_type": "complete_dungeon",
-        "target": 5,
-        "reward_gold": 150,
-        "reward_food": 100,
-        "reward_reputation": 50,
-        "description_zh": "挑戰 5 次副本",
-        "description_en": "Challenge 5 dungeons",
-    },
-    {
-        "quest_type": "join_federation",
-        "target": 1,
-        "reward_gold": 100,
-        "reward_food": 50,
-        "reward_reputation": 30,
-        "description_zh": "加入聯盟",
-        "description_en": "Join a federation",
-    },
-]
+def _list_for_user(db: Session, user_id: int, weekly: bool, lang: str) -> dict:
+    result = quest_service.list_quests(db, _my_agent_ids(db, user_id), weekly=weekly, lang=lang)
+    if weekly:
+        return {"week_start": result["period"], "quests": result["quests"]}
+    return {"date": result["period"], "quests": result["quests"]}
 
 
-def ensure_quest_templates(db: Session):
-    """Ensure default quest templates exist in database"""
-    for quest_data in DEFAULT_DAILY_QUESTS:
-        existing = db.query(DailyQuestTemplate).filter(
-            DailyQuestTemplate.quest_type == quest_data["quest_type"],
-            DailyQuestTemplate.is_active == True
-        ).first()
-        
-        if not existing:
-            template = DailyQuestTemplate(
-                quest_type=quest_data["quest_type"],
-                target=quest_data["target"],
-                reward_gold=quest_data["reward_gold"],
-                reward_food=quest_data["reward_food"],
-                reward_reputation=quest_data["reward_reputation"],
-                description_zh=quest_data["description_zh"],
-                description_en=quest_data["description_en"],
-            )
-            db.add(template)
-    
-    db.commit()
-
-
-def generate_daily_quests_for_agent(db: Session, agent_id: int, date: str):
-    """Generate daily quests for an agent if they don't exist"""
-    existing = db.query(AgentDailyQuest).filter(
-        AgentDailyQuest.agent_id == agent_id,
-        AgentDailyQuest.quest_date == date
-    ).first()
-    
-    if existing:
-        return  # Already generated
-    
-    for quest_data in DEFAULT_DAILY_QUESTS:
-        quest = AgentDailyQuest(
-            agent_id=agent_id,
-            quest_type=quest_data["quest_type"],
-            target=quest_data["target"],
-            current_progress=0,
-            is_completed=False,
-            is_claimed=False,
-            quest_date=date,
-        )
-        db.add(quest)
-    
-    db.commit()
-
-
-def generate_weekly_quests_for_agent(db: Session, agent_id: int, week_start: str):
-    """Generate weekly quests for an agent if they don't exist"""
-    existing = db.query(AgentWeeklyQuest).filter(
-        AgentWeeklyQuest.agent_id == agent_id,
-        AgentWeeklyQuest.week_start == week_start
-    ).first()
-    
-    if existing:
-        return  # Already generated
-    
-    for quest_data in DEFAULT_WEEKLY_QUESTS:
-        quest = AgentWeeklyQuest(
-            agent_id=agent_id,
-            quest_type=quest_data["quest_type"],
-            target=quest_data["target"],
-            current_progress=0,
-            is_completed=False,
-            is_claimed=False,
-            week_start=week_start,
-        )
-        db.add(quest)
-    
-    db.commit()
+def _list_for_agent(db: Session, auth: AgentAuthContext, weekly: bool, lang: str) -> dict:
+    result = quest_service.list_quests(db, [auth.agent.id], weekly=weekly, lang=lang)
+    if weekly:
+        return {"week_start": result["period"], "quests": result["quests"]}
+    return {"date": result["period"], "quests": result["quests"]}
 
 
 @router.get("/daily")
 def get_daily_quests(
+    lang: str | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Get current daily quests for the user's agents"""
-    ensure_quest_templates(db)
-    
-    agents = db.query(Agent).filter(Agent.user_id == current_user.id).all()
-    if not agents:
-        return {"success": True, "data": {"date": get_utc_date(), "quests": []}}
-    
-    utc_date = get_utc_date()
-    
-    all_quests = []
-    for agent in agents:
-        generate_daily_quests_for_agent(db, agent.id, utc_date)
-        
-        quests = db.query(AgentDailyQuest).filter(
-            AgentDailyQuest.agent_id == agent.id,
-            AgentDailyQuest.quest_date == utc_date
-        ).all()
-        
-        for quest in quests:
-            all_quests.append({
-                "id": quest.id,
-                "agent_id": agent.id,
-                "agent_name": agent.name,
-                "type": quest.quest_type,
-                "target": quest.target,
-                "current_progress": quest.current_progress,
-                "is_completed": quest.is_completed,
-                "is_claimed": quest.is_claimed,
-            })
-    
-    return {"success": True, "data": {"date": utc_date, "quests": all_quests}}
+    """取得自己所有 agent 的當日任務（懶產生，冪等）。"""
+    return {"success": True, "data": _list_for_user(db, current_user.id, False, _lang(lang))}
 
 
 @router.get("/weekly")
 def get_weekly_quests(
+    lang: str | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Get current weekly quests for the user's agents"""
-    agents = db.query(Agent).filter(Agent.user_id == current_user.id).all()
-    if not agents:
-        return {"success": True, "data": {"week_start": get_week_start(), "quests": []}}
-    
-    week_start = get_week_start()
-    
-    all_quests = []
-    for agent in agents:
-        generate_weekly_quests_for_agent(db, agent.id, week_start)
-        
-        quests = db.query(AgentWeeklyQuest).filter(
-            AgentWeeklyQuest.agent_id == agent.id,
-            AgentWeeklyQuest.week_start == week_start
-        ).all()
-        
-        for quest in quests:
-            all_quests.append({
-                "id": quest.id,
-                "agent_id": agent.id,
-                "agent_name": agent.name,
-                "type": quest.quest_type,
-                "target": quest.target,
-                "current_progress": quest.current_progress,
-                "is_completed": quest.is_completed,
-                "is_claimed": quest.is_claimed,
-            })
-    
-    return {"success": True, "data": {"week_start": week_start, "quests": all_quests}}
+    """取得自己所有 agent 的本週任務（懶產生，冪等）。"""
+    return {"success": True, "data": _list_for_user(db, current_user.id, True, _lang(lang))}
 
 
 @router.post("/daily/{quest_id}/claim")
@@ -250,40 +77,10 @@ def claim_daily_reward(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Claim reward for a completed daily quest"""
-    quest = db.query(AgentDailyQuest).filter(AgentDailyQuest.id == quest_id).first()
-    
-    if not quest:
-        raise HTTPException(status_code=404, detail="Quest not found")
-    
-    if quest.is_claimed:
-        raise HTTPException(status_code=400, detail="Reward already claimed")
-    
-    if not quest.is_completed:
-        raise HTTPException(status_code=400, detail="Quest not completed")
-    
-    agent = db.query(Agent).filter(Agent.id == quest.agent_id).first()
-    if not agent or agent.user_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Not authorized")
-    
-    # Grant rewards
-    agent.gold = (agent.gold or 0) + quest.reward_gold
-    agent.food = (agent.food or 0) + quest.reward_food
-    agent.reputation = (agent.reputation or 0) + quest.reward_reputation
-    
-    quest.is_claimed = True
-    db.commit()
-    
+    """領取已完成的每日任務獎勵。"""
     return {
         "success": True,
-        "data": {
-            "reward_gold": quest.reward_gold,
-            "reward_food": quest.reward_food,
-            "reward_reputation": quest.reward_reputation,
-            "new_gold": agent.gold,
-            "new_food": agent.food,
-            "new_reputation": agent.reputation,
-        }
+        "data": quest_service.claim(db, quest_id, current_user.id, weekly=False),
     }
 
 
@@ -293,40 +90,10 @@ def claim_weekly_reward(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Claim reward for a completed weekly quest"""
-    quest = db.query(AgentWeeklyQuest).filter(AgentWeeklyQuest.id == quest_id).first()
-    
-    if not quest:
-        raise HTTPException(status_code=404, detail="Quest not found")
-    
-    if quest.is_claimed:
-        raise HTTPException(status_code=400, detail="Reward already claimed")
-    
-    if not quest.is_completed:
-        raise HTTPException(status_code=400, detail="Quest not completed")
-    
-    agent = db.query(Agent).filter(Agent.id == quest.agent_id).first()
-    if not agent or agent.user_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Not authorized")
-    
-    # Grant rewards
-    agent.gold = (agent.gold or 0) + quest.reward_gold
-    agent.food = (agent.food or 0) + quest.reward_food
-    agent.reputation = (agent.reputation or 0) + quest.reward_reputation
-    
-    quest.is_claimed = True
-    db.commit()
-    
+    """領取已完成的每週任務獎勵。"""
     return {
         "success": True,
-        "data": {
-            "reward_gold": quest.reward_gold,
-            "reward_food": quest.reward_food,
-            "reward_reputation": quest.reward_reputation,
-            "new_gold": agent.gold,
-            "new_food": agent.food,
-            "new_reputation": agent.reputation,
-        }
+        "data": quest_service.claim(db, quest_id, current_user.id, weekly=True),
     }
 
 
@@ -336,46 +103,66 @@ def update_quest_progress(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Update quest progress for an agent"""
-    agent_id = payload.get("agent_id")
-    quest_type = payload.get("quest_type")
-    progress_delta = payload.get("progress", 1)
-    
-    if not agent_id or not quest_type:
-        raise HTTPException(status_code=400, detail="Missing required fields")
-    
-    agent = db.query(Agent).filter(Agent.id == agent_id, Agent.user_id == current_user.id).first()
-    if not agent:
-        raise HTTPException(status_code=403, detail="Not authorized")
-    
-    utc_date = get_utc_date()
-    week_start = get_week_start()
-    
-    # Update daily quest progress
-    daily_quest = db.query(AgentDailyQuest).filter(
-        AgentDailyQuest.agent_id == agent_id,
-        AgentDailyQuest.quest_type == quest_type,
-        AgentDailyQuest.quest_date == utc_date
-    ).first()
-    
-    if daily_quest and not daily_quest.is_claimed:
-        daily_quest.current_progress += progress_delta
-        if daily_quest.current_progress >= daily_quest.target:
-            daily_quest.is_completed = True
-        db.commit()
-    
-    # Update weekly quest progress (for weekly versions of quest types)
-    weekly_quest_type = f"{quest_type}_weekly" if quest_type == "earn_gold" else quest_type
-    weekly_quest = db.query(AgentWeeklyQuest).filter(
-        AgentWeeklyQuest.agent_id == agent_id,
-        AgentWeeklyQuest.quest_type == weekly_quest_type,
-        AgentWeeklyQuest.week_start == week_start
-    ).first()
-    
-    if weekly_quest and not weekly_quest.is_claimed:
-        weekly_quest.current_progress += progress_delta
-        if weekly_quest.current_progress >= weekly_quest.target:
-            weekly_quest.is_completed = True
-        db.commit()
-    
-    return {"success": True}
+    """Legacy 相容端點：**唯讀回報**目前進度，不再接受外部任意增量。
+
+    舊版允許使用者自己帶 `progress=1000` 直接完成任務領獎，是明顯的刷獎漏洞；
+    進度現在只由系統事件（工作、練兵、戰鬥、發訊息、副本、加入勢力）推進。
+    """
+    agent_id = payload.get("agent_id") if isinstance(payload, dict) else None
+    agent_ids = _my_agent_ids(db, current_user.id)
+    if isinstance(agent_id, int) and agent_id in agent_ids:
+        agent_ids = [agent_id]
+    weekly = bool(payload.get("weekly")) if isinstance(payload, dict) else False
+    return {
+        "success": True,
+        "data": {
+            **_list_for_user(db, current_user.id, weekly, "zh"),
+            "note": "Quest progress is driven by in-game events; this endpoint is read-only.",
+        },
+    }
+
+
+@agent_router.get("/daily")
+def agent_get_daily_quests(
+    lang: str | None = None,
+    db: Session = Depends(get_db),
+    auth: AgentAuthContext = Depends(get_current_agent_auth),
+):
+    """Agent 用 API key 查自己的當日任務。"""
+    return {"success": True, "data": _list_for_agent(db, auth, False, _lang(lang))}
+
+
+@agent_router.get("/weekly")
+def agent_get_weekly_quests(
+    lang: str | None = None,
+    db: Session = Depends(get_db),
+    auth: AgentAuthContext = Depends(get_current_agent_auth),
+):
+    """Agent 用 API key 查自己的本週任務。"""
+    return {"success": True, "data": _list_for_agent(db, auth, True, _lang(lang))}
+
+
+@agent_router.post("/daily/{quest_id}/claim")
+def agent_claim_daily_reward(
+    quest_id: int,
+    db: Session = Depends(get_db),
+    auth: AgentAuthContext = Depends(get_current_agent_auth),
+):
+    """Agent 用 API key 領取自己的每日任務獎勵（含糧食）。"""
+    return {
+        "success": True,
+        "data": quest_service.claim(db, quest_id, auth.user.id, weekly=False),
+    }
+
+
+@agent_router.post("/weekly/{quest_id}/claim")
+def agent_claim_weekly_reward(
+    quest_id: int,
+    db: Session = Depends(get_db),
+    auth: AgentAuthContext = Depends(get_current_agent_auth),
+):
+    """Agent 用 API key 領取自己的每週任務獎勵（含糧食）。"""
+    return {
+        "success": True,
+        "data": quest_service.claim(db, quest_id, auth.user.id, weekly=True),
+    }

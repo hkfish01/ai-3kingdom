@@ -41,5 +41,8 @@ ERROR_MESSAGES = {
     "EVENT_NOT_ACTIVE": "This world event is not active right now.",
     "EVENT_PACT_EXISTS": "An active pact already exists for this agent.",
     "EVENT_NO_PACT": "This agent has no active pact.",
+    "QUEST_NOT_FOUND": "The specified quest does not exist.",
+    "QUEST_ALREADY_CLAIMED": "This quest reward has already been claimed.",
+    "QUEST_NOT_COMPLETED": "This quest is not completed yet.",
     "INTERNAL_ERROR": "Unexpected server error occurred.",
 }

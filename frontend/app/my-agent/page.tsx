@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { EyeIcon, UserCircleIcon } from "@heroicons/react/24/outline";
 import { apiClient } from "@/lib/api-client";
-import { ViewerAgentSummary } from "@/lib/types";
+import { QuestRow, ViewerAgentSummary } from "@/lib/types";
 import { useLocale } from "@/lib/locale";
 
 interface AgentOverview {
@@ -110,8 +110,9 @@ export default function MyAgentPage() {
   const [selected, setSelected] = useState<number | null>(null);
   const [overview, setOverview] = useState<AgentOverview | null>(null);
   const [message, setMessage] = useState("");
-  const [dailyQuests, setDailyQuests] = useState<any[]>([]);
-  const [weeklyQuests, setWeeklyQuests] = useState<any[]>([]);
+  const [dailyQuests, setDailyQuests] = useState<QuestRow[]>([]);
+  const [weeklyQuests, setWeeklyQuests] = useState<QuestRow[]>([]);
+  const [claiming, setClaiming] = useState<number | null>(null);
   const [dailyDate, setDailyDate] = useState("");
   const [weeklyWeekStart, setWeeklyWeekStart] = useState("");
   const [actionPage, setActionPage] = useState(1);
@@ -165,23 +166,47 @@ export default function MyAgentPage() {
 
 
   const loadQuests = async () => {
+    const lang = locale === "zh" ? "zh" : "en";
     try {
-      const daily = await apiClient.getDailyQuests();
+      const daily = await apiClient.getDailyQuests(lang);
       if (daily.quests) {
-        const agentQuests = daily.quests.filter((q: any) => q.agent_id === selected);
+        const agentQuests = daily.quests.filter((q) => q.agent_id === selected);
         setDailyQuests(agentQuests);
         setDailyDate(daily.date);
       }
     } catch (err) { console.error("Failed to load daily quests", err); }
     try {
-      const weekly = await apiClient.getWeeklyQuests();
+      const weekly = await apiClient.getWeeklyQuests(lang);
       if (weekly.quests) {
-        const agentQuests = weekly.quests.filter((q: any) => q.agent_id === selected);
+        const agentQuests = weekly.quests.filter((q) => q.agent_id === selected);
         setWeeklyQuests(agentQuests);
         setWeeklyWeekStart(weekly.week_start);
       }
     } catch (err) { console.error("Failed to load weekly quests", err); }
   };
+  const claimQuest = async (kind: "daily" | "weekly", questId: number) => {
+    if (claiming !== null) return;
+    setClaiming(questId);
+    setMessage("");
+    try {
+      const reward = kind === "daily"
+        ? await apiClient.claimDailyReward(questId)
+        : await apiClient.claimWeeklyReward(questId);
+      await loadQuests();
+      if (selected) await loadOverview(selected);
+      setMessage(
+        locale === "zh"
+          ? `✓ 已領取：金 +${reward.reward_gold}・糧 +${reward.reward_food}・聲望 +${reward.reward_reputation}`
+          : `✓ Claimed: +${reward.reward_gold} gold / +${reward.reward_food} food / +${reward.reward_reputation} reputation`
+      );
+    } catch (err) {
+      if (handleAuthExpired(err)) return;
+      setMessage(err instanceof Error ? err.message : t.statusFail);
+    } finally {
+      setClaiming(null);
+    }
+  };
+
   useEffect(() => {
     const token = typeof window === "undefined" ? null : localStorage.getItem("token");
     if (!token) {
@@ -207,7 +232,7 @@ export default function MyAgentPage() {
     if (selected && authReady) {
       void loadQuests();
     }
-  }, [selected, authReady]);
+  }, [selected, authReady, locale]);
 
   useEffect(() => {
     setActionPage(1);
@@ -258,7 +283,7 @@ export default function MyAgentPage() {
         <p className="mt-xs text-sm text-white/75">{t.subtitle}</p>
       </header>
 
-      {message ? <p className="rounded-lg bg-red-500/20 p-sm text-sm">{message}</p> : null}
+      {message ? <p className="rounded-lg bg-white/10 p-sm text-sm">{message}</p> : null}
 
       <section className="grid gap-md md:grid-cols-[320px_1fr]">
         <div className="space-y-md">
@@ -328,13 +353,23 @@ export default function MyAgentPage() {
                             <span className={quest.is_completed ? "text-green-400" : "text-white/70"}>
                               {quest.is_completed ? "✓" : "○"}
                             </span>{" "}
-                            {quest.type} ({quest.current_progress}/{quest.target})
+                            {quest.description || quest.type} ({quest.current_progress}/{quest.target})
+                            <span className="ml-2 text-xs text-white/50">
+                              {locale === "zh" ? "獎" : "Reward"}: 金 +{quest.reward_gold} / 糧 +{quest.reward_food} / 望 +{quest.reward_reputation}
+                            </span>
                           </span>
                           <span className="text-xs">
                             {quest.is_claimed ? (
                               <span className="text-white/40">{t.claimed}</span>
                             ) : quest.is_completed ? (
-                              <button className="btn-base btn-cta text-xs px-2 py-1">{t.claimReward}</button>
+                              <button
+                                type="button"
+                                className="btn-base btn-cta text-xs px-2 py-1 disabled:opacity-50"
+                                disabled={claiming !== null}
+                                onClick={() => void claimQuest("daily", quest.id)}
+                              >
+                                {claiming === quest.id ? "…" : t.claimReward}
+                              </button>
                             ) : (
                               <span className="text-white/40">{t.notCompleted}</span>
                             )}
@@ -355,13 +390,23 @@ export default function MyAgentPage() {
                             <span className={quest.is_completed ? "text-green-400" : "text-white/70"}>
                               {quest.is_completed ? "✓" : "○"}
                             </span>{" "}
-                            {quest.type} ({quest.current_progress}/{quest.target})
+                            {quest.description || quest.type} ({quest.current_progress}/{quest.target})
+                            <span className="ml-2 text-xs text-white/50">
+                              {locale === "zh" ? "獎" : "Reward"}: 金 +{quest.reward_gold} / 糧 +{quest.reward_food} / 望 +{quest.reward_reputation}
+                            </span>
                           </span>
                           <span className="text-xs">
                             {quest.is_claimed ? (
                               <span className="text-white/40">{t.claimed}</span>
                             ) : quest.is_completed ? (
-                              <button className="btn-base btn-cta text-xs px-2 py-1">{t.claimReward}</button>
+                              <button
+                                type="button"
+                                className="btn-base btn-cta text-xs px-2 py-1 disabled:opacity-50"
+                                disabled={claiming !== null}
+                                onClick={() => void claimQuest("weekly", quest.id)}
+                              >
+                                {claiming === quest.id ? "…" : t.claimReward}
+                              </button>
                             ) : (
                               <span className="text-white/40">{t.notCompleted}</span>
                             )}

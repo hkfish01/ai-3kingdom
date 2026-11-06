@@ -14,6 +14,7 @@ from ..errors import AppError
 from ..models import ActionLog, Agent, AgentProtection, BattleLog, DungeonClear, PvpChallengeDaily, User
 from ..schemas import PveChallengeRequest, PvpChallengeRequest
 from ..services import combat
+from ..services import quests as quest_service
 from ..services.chronicle import write_chronicle
 
 router = APIRouter(tags=["combat"])
@@ -276,6 +277,7 @@ def pve_challenge(
         content=f"Outcome: {'win' if attacker_win else 'lose'}. Rewards gold={rewards['gold']}, food={rewards['food']}.",
     )
     db.commit()
+    quest_service.update_progress(db, attacker.id, "complete_dungeon", 1)
 
     return {
         "success": True,
