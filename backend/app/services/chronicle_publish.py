@@ -144,12 +144,19 @@ def _with_audience_note(db: Session, package: dict[str, Any], lang: str) -> dict
 
 def _webhook_payload(package: dict[str, Any], kind: str) -> dict[str, Any]:
     if kind == "discord":
+        # webhook 是獨立通路，有自己的短碼：內文與 embed 都要用它。
+        # 否則 Discord 帶來的點擊會被算到 X（share_url），或完全沒被追蹤。
+        channels = package.get("links", {})
+        webhook_meta = channels.get("webhook") if isinstance(channels, dict) else None
+        webhook_meta = webhook_meta if isinstance(webhook_meta, dict) else {}
+        caption = webhook_meta.get("caption") or package["caption"]
+        url = webhook_meta.get("url") or package.get("share_url") or package["link"]
         return {
-            "content": package["caption"],
+            "content": caption,
             "embeds": [
                 {
                     "title": package["headline"],
-                    "url": package.get("share_url") or package["link"],
+                    "url": url,
                     "image": {"url": package["image_url"]},
                 }
             ],
