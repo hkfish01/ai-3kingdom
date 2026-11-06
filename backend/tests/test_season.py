@@ -2,7 +2,7 @@
 
 import io
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 import pytest
 from fastapi.testclient import TestClient
@@ -217,7 +217,9 @@ def test_settlement_never_mutates_agent_state():
     assert [_snapshot(agent_id) for agent_id in agent_ids] == before
 
 
-def test_leaderboard_exposes_only_public_fields():
+def test_leaderboard_exposes_only_public_fields(monkeypatch):
+    # days_left 是相對「今天 HKT」算出來的；固定住日期，測試才不會隔天就失敗。
+    monkeypatch.setattr(season_service, "_hkt_date", lambda _now=None: date(2026, 11, 6))
     _seed()
     db = SessionLocal()
     try:

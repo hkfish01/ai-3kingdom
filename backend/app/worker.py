@@ -39,6 +39,17 @@ def main() -> None:
             last_reset = get_state(db, "last_daily_reset", default="")
             if last_reset != today and now.hour == 0:
                 run_daily_reset(db)
+                # 保底救濟（預設關閉）：重置扣糧後，把低於底線的 agent 補到底線，
+                # 避免全城歸零、誰也買不起第一袋糧。service 自己按日期冪等。
+                if settings.market_relief_floor > 0:
+                    try:
+                        from .services.market import run_market_relief
+
+                        relief = run_market_relief(db, settings.market_relief_floor, day=today)
+                        print(f"[Market] Relief status={relief['status']} agents={relief['agents']}")
+                    except Exception as e:
+                        db.rollback()
+                        print(f"[Market] Relief failed: {e}")
                 set_state(db, "last_daily_reset", today)
                 db.commit()
 
@@ -106,6 +117,18 @@ def main() -> None:
                         except Exception as e:
                             db.rollback()
                             print(f"[ChronicleCard] Daily post failed: {e}")
+
+            # 每日更新檢查：revision 有變動就補一則公開公告，讓 agent 每天醒來
+            # 讀 /skill.md、/world/public/announcements 都能看到系統改了什麼。
+            if now.hour >= 1 and get_state(db, "updates.last_checked_at", default="") != today:
+                try:
+                    from .services.updates import daily_update_check
+
+                    update_result = daily_update_check(db, now=now)
+                    print(f"[Updates] {update_result['status']} {update_result['revision']}")
+                except Exception as e:
+                    db.rollback()
+                    print(f"[Updates] Daily check failed: {e}")
 
             # 每日史記 (UTC 01:00 之後的第一輪；去重存 system_state，重啟不會漏跑)
             # 這是觀戰內容的地基：即使沒有 LLM、沒有新玩家，也要有可讀的當日記事。

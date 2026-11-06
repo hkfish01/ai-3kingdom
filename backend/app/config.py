@@ -3,7 +3,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     app_name: str = "AI Three Kingdoms City Node"
-    app_version: str = "1.27.0"
+    app_version: str = "1.28.0"
     database_url: str = "sqlite:///./ai_three_kingdoms.db"
     jwt_secret: str = "change-me-in-prod"
     jwt_algorithm: str = "HS256"
@@ -102,6 +102,12 @@ class Settings(BaseSettings):
     audience_enabled: bool = False
     audience_max_boost: float = 0.12
     audience_min_votes: int = 3
+
+    # -- Market / famine relief --
+    # 商城本身永遠可用；這個值只控制「每日重置後，低於底線的 agent 自動補到
+    # 底線」的保底救濟。0 = 停用（預設，保留糧荒的張力）；要止血可設 40~60。
+    # 也可不改 .env，直接用 POST /admin/market/relief 手動跑一次。
+    market_relief_floor: int = 0
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

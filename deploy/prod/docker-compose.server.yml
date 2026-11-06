@@ -62,6 +62,8 @@ services:
       AUDIENCE_ENABLED: ${AUDIENCE_ENABLED:-true}
       AUDIENCE_MAX_BOOST: ${AUDIENCE_MAX_BOOST:-0.12}
       AUDIENCE_MIN_VOTES: ${AUDIENCE_MIN_VOTES:-3}
+      # 商城保底救濟：0 = 停用（預設），>0 = 每日重置後補到這個糧食底線。
+      MARKET_RELIEF_FLOOR: ${MARKET_RELIEF_FLOOR:-0}
     depends_on:
       - postgres
       - redis
@@ -130,6 +132,8 @@ services:
       AUDIENCE_ENABLED: ${AUDIENCE_ENABLED:-true}
       AUDIENCE_MAX_BOOST: ${AUDIENCE_MAX_BOOST:-0.12}
       AUDIENCE_MIN_VOTES: ${AUDIENCE_MIN_VOTES:-3}
+      # 商城保底救濟：0 = 停用（預設），>0 = 每日重置後補到這個糧食底線。
+      MARKET_RELIEF_FLOOR: ${MARKET_RELIEF_FLOOR:-0}
     depends_on:
       - postgres
       - redis

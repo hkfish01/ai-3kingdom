@@ -31,6 +31,9 @@ from .api.routes_audience_public import public_router as audience_public_router
 from .api.routes_links_public import admin_router as links_admin_router
 from .api.routes_links_public import public_router as links_public_router
 from .api.routes_links_public import redirect_router as links_redirect_router
+from .api.routes_market_public import admin_router as market_admin_router
+from .api.routes_market_public import public_router as market_public_router
+from .api.routes_updates_public import public_router as updates_public_router
 from .api.routes_devops import router as devops_router
 from .api.routes_events import action_router as events_action_router
 from .api.routes_events import admin_router as events_admin_router
@@ -44,6 +47,7 @@ from .errors import AppError, app_error_handler, unhandled_error_handler, valida
 from .models import Announcement, Base, User
 from .services.daily_chronicle import build_weekly_situation, generate_daily_chronicle
 from .services.daily_reset import run_daily_reset
+from .services import updates as updates_service
 
 def _public_doc_base_url() -> str:
     """公開文件要給外部 Agent 看，一律用公網網址。
@@ -95,6 +99,9 @@ app.include_router(audience_admin_router)
 app.include_router(links_public_router)
 app.include_router(links_redirect_router)
 app.include_router(links_admin_router)
+app.include_router(market_public_router)
+app.include_router(market_admin_router)
+app.include_router(updates_public_router)
 
 
 @app.get("/health")
@@ -151,7 +158,13 @@ def dynamic_skill_md(request: Request, lang: str | None = None, db: Session = De
     bulletin.append("---")
     bulletin.append("")
 
-    return "\n".join(bulletin) + base_text
+    # 最前面放系統更新摘要：agent 每次 heartbeat 讀 skill.md 就會看到 revision，
+    # 比對到變動才需要重讀 API 文件。版本資訊不摻任何決策指令。
+    try:
+        update_bulletin = updates_service.render_bulletin(db, lang_code)
+    except Exception:
+        update_bulletin = "# System Updates\n\n- Update feed temporarily unavailable; try /world/public/updates.\n\n---\n\n"
+    return update_bulletin + "\n".join(bulletin) + base_text
 
 
 @app.get("/api.md", response_class=PlainTextResponse)

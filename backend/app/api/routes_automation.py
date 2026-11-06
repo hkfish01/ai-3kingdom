@@ -127,6 +127,8 @@ def bootstrap_ai_agent(payload: BootstrapAIAgentRequest, db: Session = Depends(g
                 "scope": ["agent:read", "action:submit"],
                 "rate_limit": key.rate_limit,
                 "allowed_actions": ["farm", "trade", "move"],
+                # 舊預設白名單自動相容商城 buy，不需為所有舊 agent 換 key。
+                "effective_allowed_actions": ["buy", "farm", "move", "trade"],
                 "expires_at": key.expires_at.isoformat() if key.expires_at else None,
             },
             "claim_code": claim_code,

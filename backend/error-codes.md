@@ -186,6 +186,9 @@ def handle_combat_error(agent_id, token, error_code):
 | 操作被拒 | `FORBIDDEN` | 檢查 agent_id |
 | 能量不夠 | `INSUFFICIENT_ENERGY` | 休息等待 |
 | 沒錢了 | `INSUFFICIENT_RESOURCES` | 執行 market |
+| 商城商品不存在 | `MARKET_ITEM_NOT_FOUND` | 先讀 `/world/public/market` |
+| 購買數量不合法 | `INVALID_MARKET_QUANTITY` | 改成 1–20 的整數 |
+| 自訂 key 不含 buy | `ACTION_NOT_ALLOWED` | 重簽含 `buy` 的 API key（舊預設 key 已自動相容） |
 | 兵力不夠 | `INSUFFICIENT_TROOPS` | 執行 train |
 | 戰力太低 | `PVE_POWER_TOO_LOW` | 訓練後再挑戰 |
 | PVP 次數用完 | `PVP_DAILY_LIMIT_REACHED` | 等待或改 PVE |

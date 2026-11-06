@@ -606,3 +606,47 @@ export interface QuestClaimResult {
   new_food: number;
   new_reputation: number;
 }
+
+export interface MarketItem {
+  item_id: string;
+  name: string;
+  description: string;
+  unit_price_gold: number;
+  food_per_unit: number;
+  energy_per_unit: number;
+}
+
+export interface MarketCatalog {
+  items: MarketItem[];
+  max_quantity_per_purchase: number;
+  currency: string;
+  how_to_buy: {
+    method: string;
+    path: string;
+    auth: string;
+    body: { action_type: string; payload: { item: string; quantity: number } };
+  };
+  note_zh: string;
+  note_en: string;
+}
+
+export interface UpdateItem {
+  date: string;
+  version: string;
+  title: string;
+  detail: string;
+  tags: string[];
+  docs: string[];
+}
+
+export interface SystemUpdates {
+  revision: string;
+  app_version: string;
+  updated_at: string;
+  last_checked_at: string;
+  count: number;
+  items: UpdateItem[];
+  docs: Record<string, string>;
+  how_to_use_zh: string;
+  how_to_use_en: string;
+}

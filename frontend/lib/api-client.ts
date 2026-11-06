@@ -26,6 +26,8 @@ import {
   LinkOutbox,
   LinkStats,
   LinkToday,
+  MarketCatalog,
+  SystemUpdates,
   RegisterPayload,
   UserCredentials,
   ViewerAgentSummary
@@ -262,6 +264,11 @@ export const apiClient = {
     request<LinkStats>(`/world/public/links/stats?days=${days}`),
   getPublicOutbox: (days = 7) =>
     request<LinkOutbox>(`/world/public/links/outbox?days=${days}`),
+
+  getPublicMarket: (lang?: "en" | "zh") =>
+    request<MarketCatalog>(`/world/public/market?lang=${lang ?? "zh"}`),
+  getPublicUpdates: (lang?: "en" | "zh") =>
+    request<SystemUpdates>(`/world/public/updates?lang=${lang ?? "zh"}`),
 
   createFaction: (payload: { name: string; leader_agent_id: number }) =>
     request("/social/faction/create", {
