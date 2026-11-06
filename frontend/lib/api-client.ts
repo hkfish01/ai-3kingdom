@@ -14,6 +14,10 @@ import {
   BattlePostPackage,
   BattleReplay,
   BattleReportItem,
+  SeasonArchive,
+  SeasonHistoryItem,
+  SeasonPostPackage,
+  SeasonSummary,
   RegisterPayload,
   UserCredentials,
   ViewerAgentSummary
@@ -211,6 +215,19 @@ export const apiClient = {
     request<BattlePostPackage>(
       `/world/public/battle/post?lang=${lang ?? "zh"}${battleId ? `&battle_id=${encodeURIComponent(battleId)}` : ""}`
     ),
+
+  getPublicSeasonCurrent: (lang?: "en" | "zh") =>
+    request<SeasonSummary>(`/world/public/season/current?lang=${lang ?? "zh"}`),
+  getPublicSeasonHistory: (lang?: "en" | "zh", limit = 12) =>
+    request<{ items: SeasonHistoryItem[]; total: number }>(
+      `/world/public/season/history?limit=${limit}&lang=${lang ?? "zh"}`
+    ),
+  getPublicSeasonArchive: (seasonId: string, lang?: "en" | "zh") =>
+    request<SeasonArchive>(
+      `/world/public/season/archive/${encodeURIComponent(seasonId)}?lang=${lang ?? "zh"}`
+    ),
+  getPublicSeasonPost: (lang?: "en" | "zh") =>
+    request<SeasonPostPackage>(`/world/public/season/post?lang=${lang ?? "zh"}`),
 
   createFaction: (payload: { name: string; leader_agent_id: number }) =>
     request("/social/faction/create", {

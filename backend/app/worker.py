@@ -42,6 +42,22 @@ def main() -> None:
                 set_state(db, "last_daily_reset", today)
                 db.commit()
 
+            # 十四日賽季：開季詔書／季末本紀（冪等，一天最多開或結一次）。
+            # 排在史記與 07:00 演武之前，開季當天的史記與 08:00 發文包才帶得到詔書。
+            if settings.season_enabled:
+                try:
+                    from .services.season import ensure_season
+
+                    season_result = ensure_season(db, now=now)
+                    if season_result["action"] != "none":
+                        print(
+                            f"[Season] {season_result['action']} "
+                            f"{season_result.get('season', {}).get('season_id', '')}"
+                        )
+                except Exception as e:
+                    db.rollback()
+                    print(f"[Season] Advance failed: {e}")
+
             # 世界事件推進 (必須排在每日史記之前，當日事件才會被寫進史記)
             if settings.world_events_enabled:
                 last_event_eval = get_state(db, "world.event.last_eval", default="")
