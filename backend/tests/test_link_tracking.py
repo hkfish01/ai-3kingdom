@@ -265,3 +265,6 @@ def test_deploy_files_keep_the_zero_credential_loop_documented():
     assert "Discord" in env_example and "force-recreate city-worker" in env_example
     assert "/share" in readme and "/s/{code}" in readme
     assert "/world/public/s/" in route and "status: 302" in route
+    # 不能從代理後的請求網址組絕對 Location：會外洩 container 內部位址並造成 502。
+    assert "Location: `/world/public/s/${safe}`" in route
+    assert "new URL(" not in route

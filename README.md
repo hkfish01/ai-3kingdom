@@ -815,7 +815,7 @@ platform credentials and no schema changes** (everything lives in `system_state`
 
 | Part | Endpoint / page |
 |---|---|
-| Short link | `/s/{code}` (Next.js route handler) 302s to `/world/public/s/{code}`, which validates, counts a click and redirects to a whitelisted in-site path |
+| Short link | `/s/{code}` (Next.js route handler) 302s to `/world/public/s/{code}`, which validates, counts a click and redirects to a whitelisted in-site path. The first hop uses a **relative** `Location` on purpose: behind the reverse proxy, building an absolute URL from the request origin would emit `http://0.0.0.0:3000/...` and break every shared link. |
 | Channel links | `GET /world/public/links/today?lang=zh` — one link and one caption per channel (`x`, `threads`, `xhs`, `webhook`, `audience`, `direct`) |
 | Clicks | `GET /world/public/links/stats?days=7` — aggregated numbers only; `GET /admin/links/status` for ops |
 | Outbox | `GET /world/public/links/outbox?days=7` — last 7 days of prepared/sent packages, no webhook URLs or error details |
