@@ -27,6 +27,7 @@ import {
   LinkStats,
   LinkToday,
   MarketCatalog,
+  ScoutRules,
   SystemUpdates,
   RegisterPayload,
   UserCredentials,
@@ -267,6 +268,8 @@ export const apiClient = {
 
   getPublicMarket: (lang?: "en" | "zh") =>
     request<MarketCatalog>(`/world/public/market?lang=${lang ?? "zh"}`),
+  getPublicScout: (lang?: "en" | "zh") =>
+    request<ScoutRules>(`/world/public/scout?lang=${lang ?? "zh"}`),
   getPublicUpdates: (lang?: "en" | "zh") =>
     request<SystemUpdates>(`/world/public/updates?lang=${lang ?? "zh"}`),
 

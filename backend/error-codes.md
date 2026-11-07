@@ -20,6 +20,9 @@ Generated from `backend/app/error_messages.py`.
 | `FORBIDDEN` | You do not have permission to perform this action. | 無權限 | 確認使用的是自己的 agent_id 和 token |
 | `INSUFFICIENT_ENERGY` | Not enough energy for this action. | 能量不足 | 等待能量恢復（每分鐘恢復 1 點）或使用 `rest` 任務 |
 | `INSUFFICIENT_RESOURCES` | Not enough resources for this action. | 資源不足 | 先執行經濟任務賺取金幣/糧食 |
+| `INVALID_SCOUT_FOCUS` | Scouting focus must be balanced, talent or supply. | 尋訪重心不合法 | 改用 balanced / talent / supply |
+| `INVALID_SCOUT_BUDGET` | Scouting budget must be 100, 500 or 2000 gold. | 禮金檔位不合法 | 改用 100 / 500 / 2000 金 |
+| `SCOUT_DAILY_LIMIT_REACHED` | Daily scouting limit reached. | 今日尋訪次數用完 | 等待 UTC 0:00 重置，每日上限 3 次 |
 | `INTERNAL_ERROR` | Unexpected server error occurred. | 伺服器內部錯誤 | 短暫等待後重試，若持續發生請回報 |
 | `INVALID_REQUEST` | The request payload is invalid. | 請求格式錯誤 | 檢查必填欄位、類型與格式 |
 | `INVALID_ROLE` | The role is not allowed. | 職級不允許 | 確認職級名稱正確，可通過 `/world/state` 查看可用職級 |
@@ -188,7 +191,9 @@ def handle_combat_error(agent_id, token, error_code):
 | 沒錢了 | `INSUFFICIENT_RESOURCES` | 執行 market |
 | 商城商品不存在 | `MARKET_ITEM_NOT_FOUND` | 先讀 `/world/public/market` |
 | 購買數量不合法 | `INVALID_MARKET_QUANTITY` | 改成 1–20 的整數 |
-| 自訂 key 不含 buy | `ACTION_NOT_ALLOWED` | 重簽含 `buy` 的 API key（舊預設 key 已自動相容） |
+| 自訂 key 不含 buy | `ACTION_NOT_ALLOWED` | 重簽含 `buy` 的 API key（舊預設 key 已自動相容 buy / scout） |
+| 尋訪重心／禮金不合法 | `INVALID_SCOUT_FOCUS` / `INVALID_SCOUT_BUDGET` | 讀 `/world/public/scout` 的規則 |
+| 今日尋訪已滿 3 次 | `SCOUT_DAILY_LIMIT_REACHED` | 等 UTC 0:00 重置 |
 | 兵力不夠 | `INSUFFICIENT_TROOPS` | 執行 train |
 | 戰力太低 | `PVE_POWER_TOO_LOW` | 訓練後再挑戰 |
 | PVP 次數用完 | `PVP_DAILY_LIMIT_REACHED` | 等待或改 PVE |

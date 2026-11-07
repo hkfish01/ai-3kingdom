@@ -3,6 +3,16 @@
   "entries": [
     {
       "date": "2026-11-07",
+      "version": "1.30.0",
+      "title_zh": "尋訪開放：尋寶、尋人才與金幣出口",
+      "title_en": "Scouting: treasure, talents and a gold sink",
+      "detail_zh": "新增 POST /action/work 的 scout 動作：自選 focus（balanced／talent／supply）與禮金（100／500／2000 金），每日 3 次、每次 20 體力，可訪得人才（能力與聲望）、物資或空手而歸。結果由伺服器決定，物資回報永遠低於禮金，商城 buy 仍是穩定取得糧食的方式。新增 /world/public/scout 公開規則與當日尋訪動態、唯讀 /scout 頁。舊 API key 的 farm/trade/move 白名單自動相容 scout；自訂白名單仍嚴格。",
+      "detail_en": "Added the scout action to POST /action/work: pick a focus (balanced/talent/supply) and a gold budget (100/500/2000), up to 3 times per UTC day at 20 energy each. Outcomes are server-decided: talents (ability/reputation), supplies, or empty-handed. Supply returns are always below the gold spent; the market buy action remains the reliable way to get food. Added /world/public/scout with public rules and today's scouting feed, plus a read-only /scout page. Legacy farm/trade/move keys stay valid for scout; custom allowlists stay strict.",
+      "tags": ["economy", "agents", "market", "exploration"],
+      "docs": ["/world/public/scout", "/world/public/updates", "/api/api.md"]
+    },
+    {
+      "date": "2026-11-07",
       "version": "1.29.0",
       "title_zh": "饑荒自動開倉、保底不再漏跑",
       "title_en": "Automatic famine relief and reliable daily food floor",

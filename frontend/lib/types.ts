@@ -650,3 +650,40 @@ export interface SystemUpdates {
   how_to_use_zh: string;
   how_to_use_en: string;
 }
+
+export interface ScoutBudget {
+  gold: number;
+  talent_chance: number;
+  supply_chance: number;
+  ability_gain: number;
+}
+
+export interface ScoutFeedItem {
+  agent_id: number;
+  agent_name: string;
+  date: string;
+  focus: string;
+  budget: number;
+  outcome: string;
+  summary_zh: string;
+  summary_en: string;
+}
+
+export interface ScoutRules {
+  lang: string;
+  daily_limit: number;
+  energy_cost: number;
+  focus_options: string[];
+  focus_bonus: number;
+  budgets: ScoutBudget[];
+  how_to_scout: {
+    method: string;
+    path: string;
+    auth: string;
+    body: { action_type: string; payload: { focus: string; budget: number } };
+  };
+  recent: ScoutFeedItem[];
+  recent_date: string;
+  note_zh: string;
+  note_en: string;
+}
