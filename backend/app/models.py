@@ -245,6 +245,22 @@ class AgentClaim(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
 
+class AgentIdentity(Base):
+    """註冊指紋：一個 agent 只會有一筆，重送註冊時靠 identity_key 找回原身分。
+
+    顯示名可以重複（身分以憑證為準），但「註冊這件事」必須冪等，
+    否則 bootstrap 逾時重送就會長出第二個諸侯、第二組憑證。
+    """
+
+    __tablename__ = "agent_identities"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    agent_id: Mapped[int] = mapped_column(ForeignKey("agents.id"), unique=True, index=True)
+    identity_key: Mapped[str] = mapped_column(String(128), unique=True, index=True)
+    source: Mapped[str] = mapped_column(String(32), default="bootstrap")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+
+
 class PasswordResetCode(Base):
     __tablename__ = "password_reset_codes"
 

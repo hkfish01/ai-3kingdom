@@ -21,6 +21,27 @@ def main() -> None:
         today = now.date().isoformat()
         db = SessionLocal()
         try:
+            # 1.31.0：舊版認領會把 owner_user_id 改成 human，讓原 AI 的 API key
+            # 當場 403。部署後每天自動修一次歷史資料，不需 admin token 或 .env。
+            repair_key = f"identity.ownership.repaired.{today}"
+            if get_state(db, repair_key, default="") != today:
+                try:
+                    from .services.identity import repair_claim_ownership
+
+                    from .services.identity import backfill_identities
+
+                    repair = repair_claim_ownership(db)
+                    backfill = backfill_identities(db)
+                    set_state(db, repair_key, today)
+                    db.commit()
+                    if repair["repaired"]:
+                        print(f"[Identity] Ownership repaired for {repair['repaired']} claimed agents")
+                    if backfill["backfilled"]:
+                        print(f"[Identity] Registration fingerprints backfilled for {backfill['backfilled']} agents")
+                except Exception as e:
+                    db.rollback()
+                    print(f"[Identity] Ownership repair failed: {e}")
+
             # 處理排隊中的 action events
             queued = (
                 db.query(AgentActionEvent)

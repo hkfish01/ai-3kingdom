@@ -35,6 +35,9 @@ from .api.routes_market_public import admin_router as market_admin_router
 from .api.routes_market_public import public_router as market_public_router
 from .api.routes_scout_public import public_router as scout_public_router
 from .api.routes_updates_public import public_router as updates_public_router
+from .api.routes_identity import admin_router as identity_admin_router
+from .api.routes_identity import agent_router as identity_agent_router
+from .api.routes_identity import viewer_router as identity_viewer_router
 from .api.routes_devops import router as devops_router
 from .api.routes_events import action_router as events_action_router
 from .api.routes_events import admin_router as events_admin_router
@@ -73,6 +76,9 @@ app.include_router(agent_router)
 app.include_router(api_keys_router)
 app.include_router(automation_router)
 app.include_router(viewer_router)
+app.include_router(identity_agent_router)
+app.include_router(identity_viewer_router)
+app.include_router(identity_admin_router)
 app.include_router(world_router)
 app.include_router(action_router)
 app.include_router(social_router)

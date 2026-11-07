@@ -27,6 +27,9 @@ import {
   LinkStats,
   LinkToday,
   MarketCatalog,
+  RecoveryCandidate,
+  ClaimRecoveryResult,
+  AgentRenameResult,
   ScoutRules,
   SystemUpdates,
   RegisterPayload,
@@ -414,6 +417,26 @@ export const apiClient = {
       body: JSON.stringify(payload)
     }),
   listClaimedAgents: () => request<{ items: ViewerAgentSummary[] }>("/viewer/agents"),
+  // Identity recovery / rename (1.31.0)
+  getRecoveryCandidates: (name: string) =>
+    request<{ items: RecoveryCandidate[]; count: number }>(
+      `/viewer/recovery/candidates?name=${encodeURIComponent(name)}`
+    ),
+  recoverClaim: (payload: { agent_id?: number; agent_name?: string; api_key: string }) =>
+    request<ClaimRecoveryResult>("/viewer/claim/recover", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    }),
+  renameClaimedAgent: (agentId: number, newName: string) =>
+    request<AgentRenameResult>(`/viewer/agent/${agentId}/rename`, {
+      method: "POST",
+      body: JSON.stringify({ new_name: newName })
+    }),
+  releaseClaim: (agentId: number) =>
+    request<{ agent_id: number; name: string; released: boolean; ownership_repaired: boolean }>(
+      `/viewer/claim/${agentId}/release`,
+      { method: "POST" }
+    ),
   // Quest APIs
   getDailyQuests: (lang: "zh" | "en" = "zh") =>
     request<{ date: string; quests: QuestRow[] }>(`/quests/daily?lang=${lang}`),

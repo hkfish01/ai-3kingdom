@@ -73,22 +73,18 @@ def test_ai_bootstrap_and_human_claim_read_only():
     assert overview.status_code == 200
     assert overview.json()["data"]["agent"]["id"] == agent_id
 
+    # 1.31.0：認領是「觀察關係」，不是所有權轉移。人類不能替 agent 簽發
+    # 操控用的 API key，原 AI 的 key 也不該因認領而失效。
     human_key_resp = client.post(
         "/api-keys",
         headers=human_headers,
         json={"name": "Claimed Agent Key", "agent_id": agent_id, "allowed_actions": ["farm", "move"]},
     )
-    assert human_key_resp.status_code == 200
-    human_api_headers = {"X-API-Key": human_key_resp.json()["data"]["key"]}
+    assert human_key_resp.status_code == 403
 
-    # Human can view and control with own agent-bound API key.
-    human_work = client.post("/action/work", headers=human_api_headers, json={"action_type": "farm", "payload": {}})
-    assert human_work.status_code == 200  # After claim, human can now control
-
-    # After human claims, AI old key should no longer have control.
     ai_api_key = data["api_key"]["key"]
     ai_work = client.post("/action/work", headers={"X-API-Key": ai_api_key}, json={"action_type": "farm", "payload": {}})
-    assert ai_work.status_code == 403  # AI no longer owns the agent after human claims
+    assert ai_work.status_code == 200  # Claiming must not stop the agent from acting
 
     peer_token = _register_and_login("dialog_peer", "Aa1234!!")
     peer_agent = client.post(

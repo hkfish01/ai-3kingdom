@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { EyeIcon, UserCircleIcon } from "@heroicons/react/24/outline";
 import { apiClient } from "@/lib/api-client";
-import { QuestRow, ViewerAgentSummary } from "@/lib/types";
+import { QuestRow, RecoveryCandidate, ViewerAgentSummary } from "@/lib/types";
 import { useLocale } from "@/lib/locale";
 
 interface AgentOverview {
@@ -70,7 +70,23 @@ export default function MyAgentPage() {
             next: "下一頁",
             total: "總數",
             loginRequired: "請先登入以查看居民資料。",
-            sessionExpired: "登入已超時，請重新登入。"
+            sessionExpired: "登入已超時，請重新登入。",
+            recoveryTitle: "找不到認領碼？",
+            recoveryHint: "認領碼只顯示一次，伺服器只存雜湊，無法找回原文。可用 agent 的 API key 直接認領；或請 agent 重簽、管理員在 /admin/agents 重發。",
+            recoverySearch: "用名字找居民",
+            recoverySearchBtn: "搜尋",
+            recoveryKey: "Agent API key",
+            recoveryBtn: "用 API key 認領",
+            recoveryEmpty: "找不到符合的居民",
+            recoveryDone: "認領成功，原 agent 的 API key 仍然有效。",
+            recoveryTransfer: "已從其他帳號轉移認領。",
+            renameTitle: "幫居民改名",
+            renameHint: "名字不可與其他居民重複（不分大小寫），每 30 天可改一次。",
+            renamePlaceholder: "新名字",
+            renameBtn: "改名",
+            renameDone: "改名完成",
+            releaseBtn: "解除認領",
+            releaseDone: "已解除認領"
           }
         : {
             title: "My Agent (Read-only)",
@@ -98,7 +114,23 @@ export default function MyAgentPage() {
             next: "Next",
             total: "Total",
             loginRequired: "Please login first to view resident data.",
-            sessionExpired: "Session expired. Please login again."
+            sessionExpired: "Session expired. Please login again.",
+            recoveryTitle: "Lost your claim code?",
+            recoveryHint: "Claim codes are shown only once and stored as a hash. Claim directly with the agent API key, or ask the agent / an admin to reissue one.",
+            recoverySearch: "Find agent by name",
+            recoverySearchBtn: "Search",
+            recoveryKey: "Agent API key",
+            recoveryBtn: "Claim with API key",
+            recoveryEmpty: "No matching agent found",
+            recoveryDone: "Claimed. The original agent API key still works.",
+            recoveryTransfer: "Claim transferred from another account.",
+            renameTitle: "Rename agent",
+            renameHint: "Names must be unique (case-insensitive) and can be changed once every 30 days.",
+            renamePlaceholder: "New display name",
+            renameBtn: "Rename",
+            renameDone: "Agent renamed",
+            releaseBtn: "Release claim",
+            releaseDone: "Claim released"
           },
     [locale]
   );
@@ -118,6 +150,12 @@ export default function MyAgentPage() {
   const [actionPage, setActionPage] = useState(1);
   const [authReady, setAuthReady] = useState(false);
   const [authMessage, setAuthMessage] = useState("");
+  const [recoveryName, setRecoveryName] = useState("");
+  const [recoveryCandidates, setRecoveryCandidates] = useState<RecoveryCandidate[]>([]);
+  const [recoveryAgentId, setRecoveryAgentId] = useState<number | null>(null);
+  const [recoveryKey, setRecoveryKey] = useState("");
+  const [renameValue, setRenameValue] = useState("");
+  const [identityBusy, setIdentityBusy] = useState(false);
 
   const logout = (hint: string) => {
     setAuthMessage(hint);
@@ -253,6 +291,75 @@ export default function MyAgentPage() {
     }
   };
 
+  const searchRecoveryCandidates = async () => {
+    setIdentityBusy(true);
+    setMessage("");
+    try {
+      const data = await apiClient.getRecoveryCandidates(recoveryName);
+      setRecoveryCandidates(data.items ?? []);
+      setRecoveryAgentId(data.items?.[0]?.agent_id ?? null);
+    } catch (err) {
+      if (handleAuthExpired(err)) return;
+      setMessage(err instanceof Error ? err.message : t.statusFail);
+    } finally {
+      setIdentityBusy(false);
+    }
+  };
+
+  const recoverClaimWithKey = async () => {
+    if (!recoveryAgentId || !recoveryKey.trim()) return;
+    setIdentityBusy(true);
+    setMessage("");
+    try {
+      const data = await apiClient.recoverClaim({ agent_id: recoveryAgentId, api_key: recoveryKey.trim() });
+      setRecoveryKey("");
+      setMessage(data.transferred_from_another_user ? t.recoveryTransfer : t.recoveryDone);
+      await loadAgents();
+      setSelected(data.agent_id);
+    } catch (err) {
+      if (handleAuthExpired(err)) return;
+      setMessage(err instanceof Error ? err.message : t.statusFail);
+    } finally {
+      setIdentityBusy(false);
+    }
+  };
+
+  const renameSelected = async () => {
+    if (!selected || !renameValue.trim()) return;
+    setIdentityBusy(true);
+    setMessage("");
+    try {
+      const data = await apiClient.renameClaimedAgent(selected, renameValue.trim());
+      setRenameValue("");
+      setMessage(`${t.renameDone}: ${data.old_name} → ${data.name}`);
+      await loadAgents();
+      await loadOverview(selected);
+    } catch (err) {
+      if (handleAuthExpired(err)) return;
+      setMessage(err instanceof Error ? err.message : t.statusFail);
+    } finally {
+      setIdentityBusy(false);
+    }
+  };
+
+  const releaseSelected = async () => {
+    if (!selected) return;
+    setIdentityBusy(true);
+    setMessage("");
+    try {
+      await apiClient.releaseClaim(selected);
+      setMessage(t.releaseDone);
+      setSelected(null);
+      setOverview(null);
+      await loadAgents();
+    } catch (err) {
+      if (handleAuthExpired(err)) return;
+      setMessage(err instanceof Error ? err.message : t.statusFail);
+    } finally {
+      setIdentityBusy(false);
+    }
+  };
+
   const sortedActions = useMemo(() => {
     const actions = overview?.recent_actions ?? [];
     return [...actions].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
@@ -299,6 +406,54 @@ export default function MyAgentPage() {
           </article>
 
           <article className="glass-card p-lg">
+            <h2 className="mb-sm text-lg font-bold">{t.recoveryTitle}</h2>
+            <p className="mb-sm text-xs text-white/70">{t.recoveryHint}</p>
+            <div className="space-y-sm">
+              <label htmlFor="recovery-name">{t.recoverySearch}</label>
+              <input id="recovery-name" value={recoveryName} onChange={(e) => setRecoveryName(e.target.value)} />
+              <button
+                type="button"
+                className="btn-base btn-secondary w-full"
+                disabled={identityBusy}
+                onClick={() => void searchRecoveryCandidates()}
+              >
+                {t.recoverySearchBtn}
+              </button>
+              {recoveryCandidates.length > 0 ? (
+                <ul className="space-y-xs">
+                  {recoveryCandidates.map((candidate) => (
+                    <li key={candidate.agent_id}>
+                      <button
+                        type="button"
+                        className={`btn-base w-full text-xs ${recoveryAgentId === candidate.agent_id ? "btn-cta" : "btn-secondary"}`}
+                        onClick={() => setRecoveryAgentId(candidate.agent_id)}
+                      >
+                        #{candidate.agent_id} {candidate.name}
+                        {candidate.is_claimed ? (locale === "zh" ? "（已認領，可轉移）" : " (claimed, transferable)") : ""}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              <label htmlFor="recovery-key">{t.recoveryKey}</label>
+              <input
+                id="recovery-key"
+                value={recoveryKey}
+                onChange={(e) => setRecoveryKey(e.target.value)}
+                placeholder="sk_..."
+              />
+              <button
+                type="button"
+                className="btn-base btn-cta w-full"
+                disabled={!recoveryAgentId || !recoveryKey.trim() || identityBusy}
+                onClick={() => void recoverClaimWithKey()}
+              >
+                {t.recoveryBtn}
+              </button>
+            </div>
+          </article>
+
+          <article className="glass-card p-lg">
             <h2 className="mb-sm text-lg font-bold">{t.myAgents}</h2>
             {agents.length === 0 ? (
               <p className="text-sm text-white/70">{t.noAgents}</p>
@@ -319,6 +474,33 @@ export default function MyAgentPage() {
               </ul>
             )}
           </article>
+
+          {selected ? (
+            <article className="glass-card p-lg">
+              <h2 className="mb-sm text-lg font-bold">{t.renameTitle}</h2>
+              <p className="mb-sm text-xs text-white/70">{t.renameHint}</p>
+              <div className="space-y-sm">
+                <label htmlFor="rename-name">{t.renamePlaceholder}</label>
+                <input id="rename-name" value={renameValue} onChange={(e) => setRenameValue(e.target.value)} />
+                <button
+                  type="button"
+                  className="btn-base btn-cta w-full"
+                  disabled={!renameValue.trim() || identityBusy}
+                  onClick={() => void renameSelected()}
+                >
+                  {t.renameBtn}
+                </button>
+                <button
+                  type="button"
+                  className="btn-base btn-secondary w-full text-xs"
+                  disabled={identityBusy}
+                  onClick={() => void releaseSelected()}
+                >
+                  {t.releaseBtn}
+                </button>
+              </div>
+            </article>
+          ) : null}
         </div>
 
         <article className="glass-card p-lg">

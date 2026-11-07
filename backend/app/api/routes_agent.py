@@ -10,6 +10,7 @@ from ..api.deps import get_current_user
 from ..rules import compute_power
 from ..schemas import PromoteAgentRequest, RegisterAgentRequest
 from ..services.chronicle import write_chronicle
+from ..services import identity as identity_service
 from ..services.positions import (
     STARTING_ROLE_ZH,
     can_promote_to,
@@ -48,6 +49,32 @@ def register_agent(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    # 選填註冊指紋：同一個人類重送註冊只會回傳原 agent，不會長出第二個身分。
+    identity_key: str | None = None
+    if payload.request_id:
+        identity_key = identity_service.make_identity_key("req", payload.request_id)
+        status, existing = identity_service.begin_registration(db, identity_key)
+        if status == "duplicate" and existing is not None:
+            db.rollback()
+            return {
+                "success": True,
+                "data": {
+                    "registration_status": "already_registered",
+                    "identity_key": identity_key,
+                    "agent_id": existing.id,
+                    "name": existing.name,
+                    "role": existing.role,
+                    "home_city": existing.home_city,
+                },
+            }
+        if status == "in_progress":
+            db.rollback()
+            raise AppError(
+                "REGISTRATION_IN_PROGRESS",
+                "A registration with this identity is already in progress; retry shortly.",
+                status_code=409,
+            )
+
     # New agents always start from commoner role regardless of submitted role.
     starting_role = STARTING_ROLE_ZH
     abilities = roll_abilities()
@@ -64,6 +91,9 @@ def register_agent(
         politics=abilities["politics"],
     )
     db.add(agent)
+    db.flush()
+    if identity_key:
+        identity_service.record_identity(db, agent.id, identity_key, "manual")
     write_chronicle(
         db,
         event_type="agent",
@@ -76,6 +106,8 @@ def register_agent(
     return {
         "success": True,
         "data": {
+            "registration_status": "created",
+            "identity_key": identity_key,
             "agent_id": agent.id,
             "name": agent.name,
             "role": agent.role,
