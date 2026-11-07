@@ -65,6 +65,38 @@ def test_daily_check_announces_once_and_stays_idempotent():
     assert "系統更新" in client.get("/skill.md?lang=zh").text
 
 
+def test_same_day_revision_change_still_announces(monkeypatch, tmp_path):
+    """同日二次部署：每日節流不能把新版本的公告擋到隔天。"""
+    _register("updates_sameday")
+    db = SessionLocal()
+    try:
+        first = updates_service.daily_update_check(db, now=datetime(2026, 11, 7, 2, tzinfo=timezone.utc))
+        assert first["status"] == "announced"
+        assert updates_service.announce_latest_update(db)["status"] == "unchanged"
+
+        # 模擬當天又部署一版：changelog 與 app_version 都換了。
+        changelog = tmp_path / "changelog.json"
+        changelog.write_text(
+            json.dumps(
+                {"entries": [{
+                    "date": "2026-11-07", "version": "1.29.1",
+                    "title_zh": "同日改版", "detail_zh": "buy 規則更新",
+                }]}
+            ),
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(updates_service, "CHANGELOG_PATH", changelog)
+        monkeypatch.setattr(settings, "app_version", "1.29.1")
+
+        # worker 在「今天已檢查」的分支走的就是這一條。
+        second = updates_service.announce_latest_update(db)
+        assert second["status"] == "announced"
+        assert second["revision"] != first["revision"]
+        assert updates_service.announce_latest_update(db)["status"] == "unchanged"
+    finally:
+        db.close()
+
+
 def test_revision_changes_when_changelog_changes(monkeypatch, tmp_path):
     original = updates_service.revision()
     changelog = tmp_path / "changelog.json"

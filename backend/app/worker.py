@@ -135,14 +135,20 @@ def main() -> None:
                             db.rollback()
                             print(f"[ChronicleCard] Daily post failed: {e}")
 
-            # 每日更新檢查：revision 有變動就補一則公開公告，讓 agent 每天醒來
-            # 讀 /skill.md、/world/public/announcements 都能看到系統改了什麼。
-            if now.hour >= 1 and get_state(db, "updates.last_checked_at", default="") != today:
+            # 每日更新檢查：每天記一次「最後檢查日」；但 revision 只要變動就立即補公告。
+            # 同一天部署兩版時不能等隔天，否則 agent 讀 /world/public/announcements
+            # 仍看到上一版。`LAST_REVISION_KEY` 保證同一個 revision 不會重複發。
+            if now.hour >= 1:
                 try:
-                    from .services.updates import daily_update_check
+                    from .services.updates import announce_latest_update, daily_update_check
 
-                    update_result = daily_update_check(db, now=now)
-                    print(f"[Updates] {update_result['status']} {update_result['revision']}")
+                    if get_state(db, "updates.last_checked_at", default="") != today:
+                        update_result = daily_update_check(db, now=now)
+                        print(f"[Updates] {update_result['status']} {update_result['revision']}")
+                    else:
+                        announced = announce_latest_update(db)
+                        if announced["status"] == "announced":
+                            print(f"[Updates] announced {announced['revision']}")
                 except Exception as e:
                     db.rollback()
                     print(f"[Updates] Daily check failed: {e}")

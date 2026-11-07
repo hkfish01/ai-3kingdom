@@ -10,6 +10,7 @@
   - moved `MARKET_RELIEF_FLOOR` out of the 00:00 reset branch so any worker tick that day can apply it
   - `run_market_relief()` no longer writes an empty "0 agents relieved" chronicle entry
 - Agent-facing update feed: new changelog entry so `update_revision` changes and `/skill.md` announces the new rule
+  - same-day redeploys now publish the update announcement immediately instead of waiting for the next UTC day
 
 ## 1.28.0 - 2026-11-07
 - Market / famine relief:
