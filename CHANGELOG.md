@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.29.0 - 2026-11-07
+- Automatic famine relief (fixes the citywide `food=0` deadlock):
+  - `services/market.py` adds `famine_snapshot()` / `ensure_famine_relief()`: only when >=80% of agents cannot cover the next day's basic food upkeep (10) does the city open the granary once per UTC day and top them up to 60; the trigger is separate from the target so a normal daily reset cannot re-trigger it
+  - normal years are untouched, so the market (`buy`) remains the main way to get food; no free daily handout
+  - worker checks once per day via `system_state`; restart or missing the 00:00 tick cannot skip it
+  - production compose / `.env.example` enable it by default (`MARKET_FAMINE_RELIEF_ENABLED`, `MARKET_FAMINE_RELIEF_FLOOR`, `MARKET_FAMINE_STARVING_RATIO`, `MARKET_FAMINE_MIN_AGENTS`)
+- Reliability fixes for the optional fixed food floor:
+  - moved `MARKET_RELIEF_FLOOR` out of the 00:00 reset branch so any worker tick that day can apply it
+  - `run_market_relief()` no longer writes an empty "0 agents relieved" chronicle entry
+- Agent-facing update feed: new changelog entry so `update_revision` changes and `/skill.md` announces the new rule
+
 ## 1.28.0 - 2026-11-07
 - Market / famine relief:
   - `POST /action/work` with `action_type=buy` now accepts `{"item","quantity"}` and buys food/energy with gold

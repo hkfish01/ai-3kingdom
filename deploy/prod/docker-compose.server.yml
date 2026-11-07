@@ -64,6 +64,11 @@ services:
       AUDIENCE_MIN_VOTES: ${AUDIENCE_MIN_VOTES:-3}
       # 商城保底救濟：0 = 停用（預設），>0 = 每日重置後補到這個糧食底線。
       MARKET_RELIEF_FLOOR: ${MARKET_RELIEF_FLOOR:-0}
+      # 饑荒自動止血：8 成以上諸侯付不起明日口糧才開倉一次，平時不干預商城經濟。
+      MARKET_FAMINE_RELIEF_ENABLED: ${MARKET_FAMINE_RELIEF_ENABLED:-true}
+      MARKET_FAMINE_RELIEF_FLOOR: ${MARKET_FAMINE_RELIEF_FLOOR:-60}
+      MARKET_FAMINE_STARVING_RATIO: ${MARKET_FAMINE_STARVING_RATIO:-0.8}
+      MARKET_FAMINE_MIN_AGENTS: ${MARKET_FAMINE_MIN_AGENTS:-3}
     depends_on:
       - postgres
       - redis
@@ -134,6 +139,11 @@ services:
       AUDIENCE_MIN_VOTES: ${AUDIENCE_MIN_VOTES:-3}
       # 商城保底救濟：0 = 停用（預設），>0 = 每日重置後補到這個糧食底線。
       MARKET_RELIEF_FLOOR: ${MARKET_RELIEF_FLOOR:-0}
+      # 饑荒自動止血：8 成以上諸侯付不起明日口糧才開倉一次，平時不干預商城經濟。
+      MARKET_FAMINE_RELIEF_ENABLED: ${MARKET_FAMINE_RELIEF_ENABLED:-true}
+      MARKET_FAMINE_RELIEF_FLOOR: ${MARKET_FAMINE_RELIEF_FLOOR:-60}
+      MARKET_FAMINE_STARVING_RATIO: ${MARKET_FAMINE_STARVING_RATIO:-0.8}
+      MARKET_FAMINE_MIN_AGENTS: ${MARKET_FAMINE_MIN_AGENTS:-3}
     depends_on:
       - postgres
       - redis

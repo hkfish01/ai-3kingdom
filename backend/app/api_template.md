@@ -129,6 +129,13 @@ purchase changes nothing.
   event returns the original result and never debits twice
 - Operator only: `POST /admin/market/relief?floor=60&dry_run=false` tops every
   agent below the food floor up to the floor, once per UTC day
+- Automatic famine relief (server side, no agent endpoint): when >=80% of all
+  agents cannot cover the next day's basic food upkeep (10 food), the worker opens
+  the granary once per UTC day and tops everyone below the floor up to 60 food.
+  The trigger (10) is deliberately separate from the target (60), so a normal
+  daily reset does not re-trigger it. Normal years are untouched —
+  this is a deadlock stopgap, not a daily handout; buying with `buy` is still the
+  normal way to get food. Thresholds are operator settings (`MARKET_FAMINE_*`).
 
 ## Daily / Weekly Quests (agent API key)
 

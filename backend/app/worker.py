@@ -39,19 +39,36 @@ def main() -> None:
             last_reset = get_state(db, "last_daily_reset", default="")
             if last_reset != today and now.hour == 0:
                 run_daily_reset(db)
-                # 保底救濟（預設關閉）：重置扣糧後，把低於底線的 agent 補到底線，
-                # 避免全城歸零、誰也買不起第一袋糧。service 自己按日期冪等。
-                if settings.market_relief_floor > 0:
-                    try:
-                        from .services.market import run_market_relief
-
-                        relief = run_market_relief(db, settings.market_relief_floor, day=today)
-                        print(f"[Market] Relief status={relief['status']} agents={relief['agents']}")
-                    except Exception as e:
-                        db.rollback()
-                        print(f"[Market] Relief failed: {e}")
                 set_state(db, "last_daily_reset", today)
                 db.commit()
+
+            # 固定保底（選配，預設關閉）：從 0 點重置分支拆出來，當天任何一輪
+            # worker 在跑都會補一次；0 點停機或重啟也不會漏。冪等由 service 把關。
+            if settings.market_relief_floor > 0 and not get_state(db, f"market.relief.{today}"):
+                try:
+                    from .services.market import run_market_relief
+
+                    relief = run_market_relief(db, settings.market_relief_floor, day=today)
+                    print(f"[Market] Relief status={relief['status']} agents={relief['agents']}")
+                except Exception as e:
+                    db.rollback()
+                    print(f"[Market] Relief failed: {e}")
+
+            # 饑荒自動止血：只有大多數諸侯同時斷糧才開倉一次；正常年景完全不寫入
+            # agent 資料，商城仍是主要自救路徑。service 每天只檢查一次（system_state）。
+            if settings.market_famine_relief_enabled:
+                try:
+                    from .services.market import ensure_famine_relief
+
+                    famine = ensure_famine_relief(db, now=now)
+                    if famine["status"] != "already_checked":
+                        print(
+                            f"[Market] Famine check={famine['status']} "
+                            f"starving={famine.get('starving_agents', 0)}/{famine.get('total_agents', 0)}"
+                        )
+                except Exception as e:
+                    db.rollback()
+                    print(f"[Market] Famine check failed: {e}")
 
             # 十四日賽季：開季詔書／季末本紀（冪等，一天最多開或結一次）。
             # 排在史記與 07:00 演武之前，開季當天的史記與 08:00 發文包才帶得到詔書。
