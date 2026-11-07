@@ -28,7 +28,9 @@ def test_public_updates_payload_and_revision_endpoint():
     assert data["app_version"] == settings.app_version
     assert data["count"] >= 1
     assert data["items"][0]["title"]
-    assert "buy" in data["items"][0]["detail"]
+    # 最新一筆 changelog 必須跟著版本號走，避免改版忘了寫更新摘要。
+    assert data["items"][0]["version"] == settings.app_version
+    assert data["items"][0]["detail"]
     assert data["docs"]["skill"].startswith(settings.public_site_url)
 
     plain = client.get("/world/public/updates/revision")

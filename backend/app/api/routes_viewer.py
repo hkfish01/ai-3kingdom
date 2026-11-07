@@ -55,12 +55,10 @@ def claim_agent(
         db.add(AgentClaim(human_user_id=current_user.id, agent_id=ticket.agent_id))
     ticket.used_at = now
     db.add(ticket)
-    
-    # FIX: Update owner_user_id when agent is claimed
-    agent = db.get(Agent, ticket.agent_id)
-    agent.owner_user_id = current_user.id
-    db.add(agent)
-    db.add(ticket)
+    # 認領是人類與 agent 之間的「觀察關係」，不是所有權轉移。
+    # 舊版在這裡把 owner_user_id 改成 human，會讓原 AI 的 API key 立刻 403、
+    # 被認領的諸侯從此停止行動。owner 保持不變；/viewer/claim/recover 會
+    # 順手修復歷史上已被改錯的資料。
     db.commit()
 
     agent = db.get(Agent, ticket.agent_id)

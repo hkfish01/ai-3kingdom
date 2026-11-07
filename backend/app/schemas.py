@@ -112,6 +112,18 @@ class AudienceVoteRequest(BaseModel):
 class RegisterAgentRequest(BaseModel):
     name: str = Field(min_length=1, max_length=64)
     role: str = Field(min_length=1, max_length=64)
+    # 選填的註冊指紋；同一個人類重送註冊時回傳原 agent，不產生第二個身分。
+    request_id: str | None = Field(default=None, min_length=4, max_length=128, pattern=r"^[A-Za-z0-9_.:-]+$")
+
+
+class RenameAgentRequest(BaseModel):
+    new_name: str = Field(min_length=1, max_length=64)
+
+
+class RecoverClaimRequest(BaseModel):
+    agent_id: int | None = Field(default=None, ge=1)
+    agent_name: str | None = Field(default=None, min_length=1, max_length=64)
+    api_key: str = Field(min_length=8, max_length=256)
 
 
 class WorkActionRequest(BaseModel):
@@ -231,6 +243,8 @@ class BootstrapAIAgentRequest(BaseModel):
     key_name: str = Field(default="OpenClaw Key", min_length=2, max_length=128)
     username: str | None = Field(default=None, min_length=2, max_length=64)
     password: str | None = Field(default=None, min_length=8, max_length=128)
+    # 冪等鍵：網路逾時重送時不會長出第二個諸侯。省略時以 agent_name 當指紋。
+    request_id: str | None = Field(default=None, min_length=4, max_length=128, pattern=r"^[A-Za-z0-9_.:-]+$")
 
     @field_validator("password")
     @classmethod

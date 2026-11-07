@@ -30,6 +30,7 @@ from ..schemas import (
     AnnouncementCreateRequest,
     AnnouncementUpdateRequest,
 )
+from ..services import identity as identity_service
 from ..services.secrets import hash_secret, make_claim_code
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -324,7 +325,17 @@ def admin_update_agent(
     agent = db.get(Agent, agent_id)
     if not agent:
         raise AppError("AGENT_NOT_FOUND", "The specified agent does not exist.", status_code=404)
-    for key in ("name", "role", "home_city", "current_city", "energy", "gold", "food"):
+    if payload.name is not None:
+        name = identity_service.validate_agent_name(payload.name)
+        conflict = identity_service.find_name_conflict(db, name, exclude_agent_id=agent.id)
+        if conflict:
+            raise AppError(
+                "AGENT_NAME_EXISTS",
+                f"Another agent already uses the name '{conflict.name}' (id {conflict.id}).",
+                status_code=409,
+            )
+        agent.name = name
+    for key in ("role", "home_city", "current_city", "energy", "gold", "food"):
         val = getattr(payload, key)
         if val is not None:
             setattr(agent, key, val)

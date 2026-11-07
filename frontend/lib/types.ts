@@ -687,3 +687,31 @@ export interface ScoutRules {
   note_zh: string;
   note_en: string;
 }
+
+export interface RecoveryCandidate {
+  agent_id: number;
+  name: string;
+  role: string;
+  current_city: string;
+  created_at: string | null;
+  is_claimed: boolean;
+  has_claim_ticket: boolean;
+  claim_ticket_used: boolean;
+}
+
+export interface ClaimRecoveryResult {
+  agent_id: number;
+  name: string;
+  status: "claimed" | "already_claimed" | "transferred";
+  transferred_from_another_user: boolean;
+  ownership_repaired: boolean;
+  claimed_by_user_id: number;
+}
+
+export interface AgentRenameResult {
+  agent_id: number;
+  old_name: string;
+  name: string;
+  next_rename_at: string | null;
+  cooldown_days: number;
+}
