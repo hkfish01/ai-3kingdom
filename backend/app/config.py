@@ -3,7 +3,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     app_name: str = "AI Three Kingdoms City Node"
-    app_version: str = "1.28.0"
+    app_version: str = "1.29.0"
     database_url: str = "sqlite:///./ai_three_kingdoms.db"
     jwt_secret: str = "change-me-in-prod"
     jwt_algorithm: str = "HS256"
@@ -105,9 +105,18 @@ class Settings(BaseSettings):
 
     # -- Market / famine relief --
     # 商城本身永遠可用；這個值只控制「每日重置後，低於底線的 agent 自動補到
-    # 底線」的保底救濟。0 = 停用（預設，保留糧荒的張力）；要止血可設 40~60。
-    # 也可不改 .env，直接用 POST /admin/market/relief 手動跑一次。
+    # 底線」的固定保底。0 = 停用（預設，保留糧荒的張力）；要每天保底可設 40~60。
     market_relief_floor: int = 0
+
+    # 饑荒自動止血：只有「大多數諸侯連明日基本口糧都付不起」才開倉一次。
+    # 觸發線 = DAILY_AGENT_FOOD_CONSUMPTION(10)，補給目標 = market_famine_relief_floor(60)；
+    # 兩者分開，補完隔日扣糧不會又達標（否則等於天天白送、商城被架空）。
+    # 這是全城 food=0（誰也買不起第一袋糧）的處方；每天檢查一次，system_state 冪等。
+    # Python 預設關閉（本機／CI 不製造資料），production compose 預設啟用。
+    market_famine_relief_enabled: bool = False
+    market_famine_relief_floor: int = 60
+    market_famine_starving_ratio: float = 0.8
+    market_famine_min_agents: int = 3
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

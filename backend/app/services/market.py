@@ -18,6 +18,7 @@ from ..errors import AppError
 from ..models import Agent
 from ..rules import MARKET_ITEMS, MARKET_MAX_QUANTITY
 from .chronicle import write_chronicle
+from .positions import DAILY_AGENT_FOOD_CONSUMPTION
 from .system_state import get_state, set_state
 
 
@@ -170,6 +171,12 @@ def run_market_relief(
         .order_by(Agent.id.asc())
         .all()
     )
+    if not rows:
+        # 沒有人低於底線時不要刷一則「0 人受賑」的史記，也不要重複寫入。
+        set_state(db, state_key, "no_starving_agents")
+        db.commit()
+        return {"status": "no_starving_agents", "applied": False, "date": date_key, **preview}
+
     for row in rows:
         row.food = floor
         db.add(row)
@@ -186,3 +193,69 @@ def run_market_relief(
     set_state(db, state_key, f"floor={floor};agents={len(rows)};food={preview['food_to_grant']}")
     db.commit()
     return {"status": "applied", "applied": True, "date": date_key, **preview}
+
+
+def famine_snapshot(db: Session, floor: int) -> dict:
+    """只讀糧食欄位，判斷是不是「全城一起餓到付不起明日口糧」。
+
+    觸發線（基本口糧 `DAILY_AGENT_FOOD_CONSUMPTION`）與賑濟目標（`floor`）故意
+    分開：若拿 floor 當觸發線，補到 60 後隔日重置扣 10 又會達標，等於天天白送，
+    商城經濟會被架空。food=50 這種「還活得下去」的狀態不該觸發開倉。
+    """
+    rows = db.query(Agent.food).all()
+    total = len(rows)
+    trigger = DAILY_AGENT_FOOD_CONSUMPTION
+    starving = sum(1 for row in rows if row[0] < trigger)
+    zero = sum(1 for row in rows if row[0] <= 0)
+    return {
+        "floor": floor,
+        "trigger_food": trigger,
+        "total_agents": total,
+        "starving_agents": starving,
+        "zero_food_agents": zero,
+        "starving_ratio": round(starving / total, 4) if total else 0.0,
+    }
+
+
+def ensure_famine_relief(
+    db: Session,
+    *,
+    now: datetime | None = None,
+    force: bool = False,
+) -> dict:
+    """全城饑荒才開倉；正常年景不寫入任何 agent 資料，商城仍是主要自救路徑。
+
+    每天只檢查一次（system_state `market.famine.checked.<date>`），重複呼叫不會
+    重複補糧；真正的補糧交給 `run_market_relief`，它自己還有第二層日期冪等。
+    """
+    day = (now or datetime.now(timezone.utc)).date().isoformat()
+    floor = settings.market_famine_relief_floor
+    if floor < 1:
+        return {"status": "disabled", "date": day, "applied": False}
+
+    check_key = f"market.famine.checked.{day}"
+    if not force and get_state(db, check_key):
+        return {"status": "already_checked", "date": day, "applied": False}
+
+    snapshot = famine_snapshot(db, floor)
+    ratio = min(1.0, max(0.01, settings.market_famine_starving_ratio))
+    triggered = (
+        snapshot["total_agents"] >= settings.market_famine_min_agents
+        and snapshot["starving_ratio"] >= ratio
+    )
+
+    if not triggered:
+        set_state(db, check_key, f"healthy;ratio={snapshot['starving_ratio']}")
+        db.commit()
+        return {"status": "healthy", "date": day, "applied": False, **snapshot}
+
+    relief = run_market_relief(db, floor, day=day)
+    set_state(db, check_key, f"relief;{relief['status']};floor={floor}")
+    db.commit()
+    return {
+        "status": "relief_applied" if relief["applied"] else "relief_already_applied",
+        "date": day,
+        "applied": relief["applied"],
+        **snapshot,
+        "relief": relief,
+    }
