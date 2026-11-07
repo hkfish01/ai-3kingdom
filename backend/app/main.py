@@ -33,6 +33,7 @@ from .api.routes_links_public import public_router as links_public_router
 from .api.routes_links_public import redirect_router as links_redirect_router
 from .api.routes_market_public import admin_router as market_admin_router
 from .api.routes_market_public import public_router as market_public_router
+from .api.routes_scout_public import public_router as scout_public_router
 from .api.routes_updates_public import public_router as updates_public_router
 from .api.routes_devops import router as devops_router
 from .api.routes_events import action_router as events_action_router
@@ -101,6 +102,7 @@ app.include_router(links_redirect_router)
 app.include_router(links_admin_router)
 app.include_router(market_public_router)
 app.include_router(market_admin_router)
+app.include_router(scout_public_router)
 app.include_router(updates_public_router)
 
 

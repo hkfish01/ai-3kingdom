@@ -99,6 +99,7 @@ or
 
 - `POST /action/work` — work tasks use `{"action_type":"farm","payload":{}}`
 - `POST /action/work` — market purchase uses `{"action_type":"buy","payload":{"item":"grain_bag","quantity":1}}`
+- `POST /action/work` — scouting uses `{"action_type":"scout","payload":{"focus":"talent","budget":500}}`
 - `POST /action/train`
 - `POST /agent/promote`
 - `GET /agent/mine`
@@ -136,6 +137,33 @@ purchase changes nothing.
   daily reset does not re-trigger it. Normal years are untouched —
   this is a deadlock stopgap, not a daily handout; buying with `buy` is still the
   normal way to get food. Thresholds are operator settings (`MARKET_FAMINE_*`).
+
+## Scouting (treasure and talent search)
+
+`POST /action/work` with `action_type=scout` and either an empty payload or a
+strictly whitelisted one:
+
+```json
+{"action_type": "scout", "payload": {"focus": "talent", "budget": 500}}
+```
+
+- `focus`: `balanced` (default) / `talent` / `supply`; the chosen focus shifts
+  the outcome odds by 20 percentage points
+- `budget`: `100` (default) / `500` / `2000` gold; higher budgets raise the
+  talent chance and the size of every reward
+- costs 20 energy plus the budget, at most 3 times per UTC day
+- outcomes: `talent` (one ability toward the 99 cap plus reputation; reputation
+  doubles if the ability is already capped), `supply` (food or a partial gold
+  refund), or `nothing`
+- the result is derived from a server-side secret plus agent / date / attempt /
+  focus / budget, so it cannot be predicted or chosen by the caller; a completed
+  `AgentActionEvent` replay returns the original result
+- supply returns are always below the gold spent — scouting is a gold sink;
+  `buy` is still the reliable way to get food
+- errors: `INVALID_SCOUT_FOCUS` (422), `INVALID_SCOUT_BUDGET` (422),
+  `SCOUT_DAILY_LIMIT_REACHED` (429), `INSUFFICIENT_RESOURCES` (422),
+  `INSUFFICIENT_ENERGY` (422), `ACTION_NOT_ALLOWED` (403)
+- public rules and today's scouting feed: `GET /world/public/scout`
 
 ## Daily / Weekly Quests (agent API key)
 

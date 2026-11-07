@@ -15,6 +15,8 @@ from ..rules import (
     CITY_TAX_RATE,
     COMPAT_ALLOWED_ACTIONS,
     MARKET_BUY_ACTION,
+    SCOUT_ACTION,
+    SCOUT_ENERGY_COST,
     TROOP_TYPES,
     WORK_TASKS,
     compute_power,
@@ -24,13 +26,14 @@ from ..services.chronicle import write_chronicle
 from ..services.positions import get_position
 from ..services import market as market_service
 from ..services import quests as quest_service
+from ..services import scout as scout_service
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/action", tags=["action"])
 LORD_TO_VASSAL_BONUS_RATE = 0.01
 VASSAL_TO_LORD_BONUS_RATE = 0.001
-WORK_ACTION_ALLOWLIST = set(WORK_TASKS.keys()) | {"move", MARKET_BUY_ACTION}
+WORK_ACTION_ALLOWLIST = set(WORK_TASKS.keys()) | {"move", MARKET_BUY_ACTION, SCOUT_ACTION}
 BLOCKED_PAYLOAD_KEYS = {"command", "script", "url", "file_path", "path", "shell_args", "argv"}
 
 
@@ -140,6 +143,16 @@ def _validate_work_payload(action_type: str, payload: dict) -> dict:
             )
         deal = market_service.quote(raw_payload.get("item"), raw_payload.get("quantity"))
         return {"item": deal["item_id"], "quantity": deal["quantity"]}
+
+    # 尋訪：focus / budget 都可省略（各自有預設），但出現的欄位必須在白名單內。
+    if action_type == SCOUT_ACTION:
+        if not set(raw_payload) <= {"focus", "budget"}:
+            raise AppError(
+                "INVALID_ACTION_PAYLOAD",
+                "scout payload only accepts focus and budget.",
+                status_code=422,
+            )
+        return scout_service.validate_request(raw_payload.get("focus"), raw_payload.get("budget"))
 
     if raw_payload:
         raise AppError("INVALID_ACTION_PAYLOAD", f"{action_type} payload must be empty object.", status_code=422)
@@ -283,6 +296,35 @@ def _process_action_event(db: Session, event_id: int) -> dict:
                     f"{agent.name} spent {result['gold_spent']} gold at the market "
                     f"and received {result['food_gained']} food, {result['energy_gained']} energy."
                 ),
+            )
+            event.status = "completed"
+            event.result_json = json.dumps(result, ensure_ascii=False)
+            event.error_code = ""
+            event.error_message = ""
+            event.processed_at = utc_now()
+            db.add(event)
+            db.commit()
+            return result
+
+        # 尋訪：service 先檢查體力／金幣／當日次數，才「扣款 → 發獎」；
+        # 任何一項不過就整筆不動，外層 except 會把 event 標成 failed。
+        if action_type == SCOUT_ACTION:
+            result = scout_service.run_scout(db, agent, payload)
+            db.add(
+                ActionLog(
+                    agent_id=agent.id,
+                    city_name=settings.city_name,
+                    action_type="scout",
+                    payload_json=json.dumps(payload, ensure_ascii=False),
+                    energy_cost=SCOUT_ENERGY_COST,
+                    result_json=json.dumps(result, ensure_ascii=False),
+                )
+            )
+            write_chronicle(
+                db,
+                event_type="economy",
+                title=f"{agent.name} scouted ({result['outcome']})",
+                content=result["summary_en"],
             )
             event.status = "completed"
             event.result_json = json.dumps(result, ensure_ascii=False)

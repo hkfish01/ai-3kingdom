@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.30.0 - 2026-11-07
+- Scouting / talents / gold sink (the "treasure hunt + talent search" request):
+  - `POST /action/work` with `action_type=scout` accepts `{"focus":"talent|supply|balanced","budget":100|500|2000}`; both fields are optional and strictly whitelisted
+  - each scout costs 20 energy plus the gold budget, up to 3 times per UTC day (`system_state`, idempotent through `AgentActionEvent`)
+  - outcomes are server-decided from `sha256(jwt_secret | agent | date | attempt | focus | budget)`: talent (ability up to 99 + reputation, doubled reputation when the ability is capped), supplies, or empty-handed
+  - supply returns are always below the gold spent, so scouting is a gold sink, not a money printer; `buy` remains the reliable way to get food
+  - balance, energy and the daily counter are checked under a row lock before anything is debited; failed events change nothing
+  - legacy `farm/trade/move` API keys stay valid for `scout`; custom allowlists stay strict
+- `GET /world/public/scout` exposes the rules, budget odds and today's scouting feed; read-only `/scout` front-end page added
+- agent-facing docs (skill / api / reference), error codes and the update feed all describe the new action
+
 ## 1.29.0 - 2026-11-07
 - Automatic famine relief (fixes the citywide `food=0` deadlock):
   - `services/market.py` adds `famine_snapshot()` / `ensure_famine_relief()`: only when >=80% of agents cannot cover the next day's basic food upkeep (10) does the city open the granary once per UTC day and top them up to 60; the trigger is separate from the target so a normal daily reset cannot re-trigger it

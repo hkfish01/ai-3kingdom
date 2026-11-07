@@ -55,12 +55,48 @@ MARKET_ITEMS = {
 MARKET_BUY_ACTION = "buy"
 MARKET_MAX_QUANTITY = 20
 
+# 尋訪（尋寶／尋人才）：agent 自選「禮金」與「尋訪重心」出城，帶回人才、物資，
+# 或空手而歸。這也是金幣的主要出口——榜首諸侯已有數萬金，商城單次最多 3000 金
+# 仍不成比例。結果由伺服器秘密 + agent/日期/次數雜湊決定，不可預測也不可指定。
+SCOUT_ACTION = "scout"
+SCOUT_ENERGY_COST = 20
+SCOUT_DAILY_LIMIT = 3
+SCOUT_ABILITY_CAP = 99
+SCOUT_FOCUS = ("balanced", "talent", "supply")
+SCOUT_FOCUS_BONUS = 0.20
+SCOUT_BUDGETS = {
+    100: {
+        "talent_chance": 0.35, "supply_chance": 0.40, "ability_gain": 1,
+        "reputation": (5, 12), "food": (30, 60), "gold_back": (20, 40),
+    },
+    500: {
+        "talent_chance": 0.50, "supply_chance": 0.40, "ability_gain": 2,
+        "reputation": (25, 60), "food": (120, 250), "gold_back": (100, 200),
+    },
+    2000: {
+        "talent_chance": 0.65, "supply_chance": 0.30, "ability_gain": 3,
+        "reputation": (100, 240), "food": (400, 700), "gold_back": (300, 600),
+    },
+}
+SCOUT_ABILITY_NAMES = {
+    "martial": ("武藝", "Martial"),
+    "intelligence": ("智略", "Intelligence"),
+    "charisma": ("魅力", "Charisma"),
+    "politics": ("治才", "Politics"),
+}
+SCOUT_TALENT_TITLES = {
+    "martial": ("猛將", "a fierce general"),
+    "intelligence": ("策士", "a strategist"),
+    "charisma": ("說客", "a silver-tongued envoy"),
+    "politics": ("治才", "a gifted administrator"),
+}
+
 # bootstrap / 建立 API key 時的舊預設白名單。商城是新動作，舊 key 裡沒有它；
 # 若不向後相容，所有已在運行的 agent 都會被 ACTION_NOT_ALLOWED 擋在門外。
 LEGACY_ALLOWED_ACTIONS = {"farm", "trade", "move"}
-# 只對「舊預設白名單」自動放行這些後來新增的基礎生存動作；
+# 只對「舊預設白名單」自動放行這些後來新增的基礎動作；
 # 使用者自訂的白名單仍嚴格執行，不被悄悄放寬。
-COMPAT_ALLOWED_ACTIONS = {MARKET_BUY_ACTION}
+COMPAT_ALLOWED_ACTIONS = {MARKET_BUY_ACTION, SCOUT_ACTION}
 
 
 def compute_power(infantry: int, archer: int, cavalry: int) -> float:

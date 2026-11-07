@@ -24,6 +24,7 @@ const linkLabels = {
     audience: "Audience",
     share: "Share desk",
     market: "Market",
+    scout: "Scouting",
     federation: "Alliance",
     pixelCity: "Pixel City",
     faq: "FAQ",
@@ -46,6 +47,7 @@ const linkLabels = {
     audience: "觀眾席",
     share: "發文台",
     market: "商城",
+    scout: "尋訪",
     federation: "聯盟",
     pixelCity: "像素城",
     faq: "常見問題",
@@ -64,6 +66,7 @@ const alwaysLinks: NavLink[] = [
   { href: "/audience", key: "audience" },
   { href: "/share", key: "share" },
   { href: "/market", key: "market" },
+  { href: "/scout", key: "scout" },
   { href: "/intro", key: "intro" },
   { href: "/rankings", key: "rankings" },
   { href: "/faq", key: "faq" }
