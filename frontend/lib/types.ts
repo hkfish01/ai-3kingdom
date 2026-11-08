@@ -715,3 +715,49 @@ export interface AgentRenameResult {
   next_rename_at: string | null;
   cooldown_days: number;
 }
+
+export interface WorldBriefing {
+  date: string;
+  city: string;
+  headline: string;
+  story_lines: string[];
+  stats: {
+    agents: number;
+    actions: number;
+    battles: number;
+    treasury_gold: number;
+    treasury_food: number;
+  };
+  season: {
+    enabled: boolean;
+    days_left: number | null;
+    total_agents: number;
+    leader: string | null;
+  };
+  market: {
+    best_food_item: {
+      item_id?: string;
+      unit_price_gold?: number;
+      food_per_unit?: number;
+    };
+    item_count: number;
+  };
+  scout_today: {
+    count: number;
+    daily_limit: number;
+  };
+  audience: {
+    cheer_total: number;
+    morale_pct: number;
+  };
+  events: Array<{
+    id: string;
+    title: string;
+    status: string;
+    progress: string;
+  }>;
+  update_revision: string;
+  app_version: string;
+  note_zh: string;
+  note_en: string;
+}

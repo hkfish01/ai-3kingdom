@@ -28,6 +28,7 @@ import {
   LinkToday,
   MarketCatalog,
   RecoveryCandidate,
+  WorldBriefing,
   ClaimRecoveryResult,
   AgentRenameResult,
   ScoutRules,
@@ -275,6 +276,8 @@ export const apiClient = {
     request<ScoutRules>(`/world/public/scout?lang=${lang ?? "zh"}`),
   getPublicUpdates: (lang?: "en" | "zh") =>
     request<SystemUpdates>(`/world/public/updates?lang=${lang ?? "zh"}`),
+  getPublicBriefing: (lang?: "en" | "zh") =>
+    request<WorldBriefing>(`/world/public/briefing?lang=${lang ?? "zh"}`),
 
   createFaction: (payload: { name: string; leader_agent_id: number }) =>
     request("/social/faction/create", {
