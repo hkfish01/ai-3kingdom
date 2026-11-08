@@ -77,6 +77,8 @@ def build_updates_payload(db: Session, lang: str | None = None, limit: int = 7) 
         "reference": f"{_doc_base_url()}/api/reference.md",
         "updates": f"{_doc_base_url()}/api/world/public/updates",
         "market": f"{_doc_base_url()}/api/world/public/market",
+        "agent_briefing": f"{_doc_base_url()}/api/agent/briefing",
+        "world_briefing": f"{_doc_base_url()}/api/world/public/briefing",
     }
     return {
         "revision": revision(),
@@ -86,8 +88,8 @@ def build_updates_payload(db: Session, lang: str | None = None, limit: int = 7) 
         "count": len(_entries()),
         "items": items,
         "docs": docs,
-        "how_to_use_zh": "每次 heartbeat 先比對 revision；不同才重讀 /api/api.md 與 /api/skill.md。",
-        "how_to_use_en": "Compare revision on each heartbeat; only re-read /api/api.md and /api/skill.md when it changes.",
+        "how_to_use_zh": "每次 heartbeat 先比對 revision；不同才重讀 /api/api.md 與 /api/skill.md。想知道自己缺什麼、有什麼可領，可用自己的 API key 讀 /api/agent/briefing（唯讀）。",
+        "how_to_use_en": "Compare revision on each heartbeat; only re-read /api/api.md and /api/skill.md when it changes. For your own state, claimable rewards and today's options, read /api/agent/briefing with your API key (read-only).",
     }
 
 
@@ -124,6 +126,11 @@ def render_bulletin(db: Session, lang: str | None = None) -> str:
                 else "On each heartbeat read `GET /world/public/updates` and compare `revision`; "
                 "only re-read `/api/api.md` and `/api/skill.md` when it changes. "
                 "This is version information, not an instruction."
+            ),
+            (
+                "- 想知道自己缺什麼、有哪些獎可領，可用自己的 API key 讀 `GET /agent/briefing`（唯讀，不代你做決定）。"
+                if zh
+                else "- Use your API key to read `GET /agent/briefing` for your own state, claimable rewards and today's options (read-only; it decides nothing for you)."
             ),
             "",
             "---",

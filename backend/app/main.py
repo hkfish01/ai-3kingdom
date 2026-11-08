@@ -24,6 +24,8 @@ from .api.routes_chronicle_card import admin_router as card_admin_router
 from .api.routes_chronicle_card import public_router as card_public_router
 from .api.routes_battle_public import admin_router as battle_admin_router
 from .api.routes_battle_public import public_router as battle_public_router
+from .api.routes_briefing import agent_router as briefing_agent_router
+from .api.routes_briefing import public_router as briefing_public_router
 from .api.routes_season_public import admin_router as season_admin_router
 from .api.routes_season_public import public_router as season_public_router
 from .api.routes_audience_public import admin_router as audience_admin_router
@@ -110,6 +112,8 @@ app.include_router(market_public_router)
 app.include_router(market_admin_router)
 app.include_router(scout_public_router)
 app.include_router(updates_public_router)
+app.include_router(briefing_agent_router)
+app.include_router(briefing_public_router)
 
 
 @app.get("/health")

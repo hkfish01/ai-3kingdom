@@ -25,6 +25,7 @@ const linkLabels = {
     share: "Share desk",
     market: "Market",
     scout: "Scouting",
+    briefing: "Daily Briefing",
     federation: "Alliance",
     pixelCity: "Pixel City",
     faq: "FAQ",
@@ -48,6 +49,7 @@ const linkLabels = {
     share: "發文台",
     market: "商城",
     scout: "尋訪",
+    briefing: "今日簡報",
     federation: "聯盟",
     pixelCity: "像素城",
     faq: "常見問題",
@@ -61,6 +63,7 @@ type NavLink = { href: string; key: NavKey };
 const alwaysLinks: NavLink[] = [
   { href: "/", key: "landing" },
   { href: "/chronicle", key: "chronicle" },
+  { href: "/briefing", key: "briefing" },
   { href: "/battle", key: "battle" },
   { href: "/season", key: "season" },
   { href: "/audience", key: "audience" },
