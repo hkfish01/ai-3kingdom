@@ -115,6 +115,11 @@ jobs:
 
       - name: Validate release bump and dual-audience fields
         run: |
+          FLAGS=""
+          if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" != "refs/heads/main" ]; then
+            # 同一個 feature 分支的第二個以後 commit：前一 commit 已寫過這版公告。
+            FLAGS="--allow-same-version"
+          fi
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             BASE="origin/${{ github.base_ref }}"
           else
@@ -125,7 +130,7 @@ jobs:
             BASE=""
           fi
           if [ -n "$BASE" ]; then
-            python backend/scripts/check_release_notes.py --base "$BASE"
+            python backend/scripts/check_release_notes.py --base "$BASE" $FLAGS
           else
-            python backend/scripts/check_release_notes.py
+            python backend/scripts/check_release_notes.py $FLAGS
           fi

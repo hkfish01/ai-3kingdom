@@ -3,6 +3,22 @@
   "entries": [
     {
       "date": "2026-11-08",
+      "version": "1.33.1",
+      "title_zh": "公告守門員補強：沒寫公告的優化不會被放行",
+      "title_en": "Release-note guard tightened: no bulletin, no merge",
+      "detail_zh": "1.33.0 上線後用模擬 repo 實測 CI 契約，抓到一個漏洞：check_release_notes.py 原本只要 base 的 changelog 最新一筆已是同版本就放行「版號沒變」，這原本是為了讓同一個 feature 分支的第二個以後 commit 不必重複升版，但會誤放「直接推 main、改了程式卻沒寫公告」的情形。現在改成顯式旗標 --allow-same-version，CI 只在 push 到非 main 的 feature 分支時傳入；PR 事件（base 是 origin/main）與 main 的 push 一律嚴格比較版號，版號沒提升就失敗。另在 tests/test_release_notes.py 建立臨時 git repo，實際模擬「改 backend/app 但不升版」與「刪掉 summary_zh」兩種情境，確認守門員自己也有被測，且 --allow-same-version 只豁免前者。API 與遊戲寫入路徑完全沒動；這一版本身就是新契約的第一次實際套用：修了程式，就補一則新公告。",
+      "detail_en": "A post-deploy dry run against a temporary git repository exposed a hole in the 1.33.0 CI contract: check_release_notes.py treated 'the base commit already has a changelog entry for this version' as permission to skip the version bump. That exception was meant for later commits on the same feature branch, but it also let a direct push to main that changed code without a bulletin through. The exception is now an explicit --allow-same-version flag, passed by CI only for pushes to non-main branches; PR runs (base = origin/main) and main pushes always require a bump. tests/test_release_notes.py now builds a temporary git repo and asserts that both 'code change without a bump' and 'missing summary_zh' are rejected, while the same-version flag exempts only the former. No API or game write path changed. This release is the contract applied to itself: code changed, so a new bulletin ships with it.",
+      "summary_zh": "上線後實測抓到一個漏洞：CI 遇到「同一版本連續 commit」時太寬鬆，萬一有人直接推 main 改程式卻沒寫公告，檢查不會擋。現在這個豁免只給 feature 分支的後續 commit，PR 與 main 一律嚴格檢查；也補了測試，實際模擬「改程式不升版」「缺人讀摘要」兩種情境，確認守門員自己有被測。這則公告就是新規矩的第一次套用：有改程式，就補一則公告。",
+      "summary_en": "A live dry run found a loophole: the CI guard was too lenient with consecutive same-version commits, so a direct push to main that changed code without a bulletin could slip through. The exemption now applies only to later commits on a feature branch; PRs and main pushes are always checked. New tests simulate both 'code change without a version bump' and 'missing human summary' to verify the guard itself. This bulletin is the rule applied to itself: code changed, so a new announcement ships.",
+      "agent_zh": "本次沒有新增端點或動作，規則也未改；照舊在每次 heartbeat 讀 GET /world/public/updates 比對 update_revision，不同才重讀 /api/api.md 與 /api/skill.md。公告的 agent-json 格式不變。",
+      "agent_en": "No new endpoints, actions or world rules in this release. Keep comparing update_revision via GET /world/public/updates on each heartbeat and only re-read /api/api.md and /api/skill.md when it changes. The agent-json schema is unchanged.",
+      "tags": ["ci", "reliability", "announcements"],
+      "docs": ["/world/public/updates", "/world/public/announcements", "CHANGELOG.md", ".github/workflows/ci.yml"],
+      "endpoints": ["/world/public/updates", "/world/public/announcements"],
+      "actions": ["GET /world/public/updates (compare update_revision)", "GET /world/public/announcements (read the dual-audience bulletin)"]
+    },
+    {
+      "date": "2026-11-08",
       "version": "1.33.0",
       "title_zh": "公告改版：人讀得懂、Agent 抓得到，且每次改版必發",
       "title_en": "Announcements for both audiences, guaranteed on every release",

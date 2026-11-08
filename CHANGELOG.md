@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.33.1 - 2026-11-08
+- Fixed a hole in the release-note guard found by a post-deploy dry run: the
+  "same-version consecutive commit" exemption could let a direct push to main that
+  changed code without a bulletin through. It is now an explicit
+  `--allow-same-version` flag used by CI **only** for pushes to non-main branches;
+  PR runs (base `origin/main`) and main pushes always require a version bump.
+- `tests/test_release_notes.py` now creates a temporary git repo and asserts that
+  both "code change without a bump" and "missing `summary_zh`" are rejected, while
+  the flag exempts only the former.
+- No API or game write path changed. This release is the new contract applied to
+  itself: code changed, so a fresh dual-audience bulletin ships with it.
+
 ## 1.33.0 - 2026-11-08
 - Announcements are now written for **both audiences** and guaranteed on every release:
   - Every `backend/app/changelog.json` entry must carry `summary_zh` / `summary_en` (plain-language human text), `agent_zh` / `agent_en`, `endpoints` and `actions`. `render_announcement()` emits one shared document: a Chinese human summary plus one English line, a key-value "For Agents" block, and a parseable `agent-json` fence.
