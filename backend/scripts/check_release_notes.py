@@ -67,6 +67,11 @@ def version_tuple(value: str) -> tuple[int, ...]:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--base", default="", help="比較基準（PR: origin/main，push: HEAD^）")
+    parser.add_argument(
+        "--allow-same-version",
+        action="store_true",
+        help="同一個 feature 分支後續 commit 用：前一個 commit 已為此版寫好公告。main 的 push 不得使用。",
+    )
     args = parser.parse_args()
 
     version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
@@ -118,9 +123,15 @@ def main() -> None:
             except json.JSONDecodeError:
                 pass
 
-        # 同一個 PR 的第二個以後的 commit：前一個 commit 已經為這個版號寫好公告，
-        # 不該要求每次 push 都再升一次版。
-        already_bumped = base_version == version and base_head_version == version
+        # 只有同一個 feature 分支的後續 commit 可以放過「版號沒變」：
+        # 前一個 commit 已經為這個版號寫好公告，不該要求每次 push 都再升版。
+        # PR 事件的 base 是 main tip（舊版），main 的 push 也不允許放過，
+        # 否則「直接推 main、改了程式卻沒寫公告」會被誤判成同版連續 commit。
+        already_bumped = (
+            args.allow_same_version
+            and base_version == version
+            and base_head_version == version
+        )
         if base_version and changed is not None:
             code_changed = [p for p in changed.splitlines() if p.startswith(CODE_PREFIXES)]
             if already_bumped:

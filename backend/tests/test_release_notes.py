@@ -1,8 +1,10 @@
 """每次優化都要有公告：版號、changelog、CHANGELOG.md、README 必須同步。"""
 
 import json
+import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 from app.config import settings
@@ -50,3 +52,65 @@ def test_ci_release_notes_script_passes():
     )
     assert result.returncode == 0, result.stdout + result.stderr
     assert "Release notes OK" in result.stdout
+
+
+def test_ci_script_blocks_a_code_change_without_a_new_bulletin():
+    """守門員自己也要被測：改了程式卻沒升版／缺人讀欄位都要擋下。
+
+    只有 feature 分支的後續 commit 能用 --allow-same-version 放行；
+    PR 與 main 的 push 一律不給這個豁免。
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        for folder in ("backend/app", "backend/scripts", "frontend/app"):
+            (root / folder).mkdir(parents=True, exist_ok=True)
+        copies = {
+            "VERSION": "VERSION",
+            "CHANGELOG.md": "CHANGELOG.md",
+            "README.md": "README.md",
+            "backend/app/config.py": "backend/app/config.py",
+            "backend/app/changelog.json": "backend/app/changelog.json",
+            "backend/scripts/check_release_notes.py": "backend/scripts/check_release_notes.py",
+        }
+        for src, dest in copies.items():
+            shutil.copyfile(ROOT / src, root / dest)
+
+        def git(*args: str) -> None:
+            subprocess.run(
+                ["git", "-C", str(root), "-c", "user.email=t@example.com", "-c", "user.name=t", *args],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+        git("init", "-q")
+        git("add", "-A")
+        git("commit", "-qm", "base")
+        (root / "backend/app/new_feature.py").write_text("# optimisation\n", encoding="utf-8")
+        git("add", "-A")
+        git("commit", "-qm", "code change without a release note")
+
+        script = str(root / "backend/scripts/check_release_notes.py")
+
+        def check(*flags: str) -> subprocess.CompletedProcess:
+            return subprocess.run(
+                [sys.executable, script, "--base", "HEAD^", *flags],
+                cwd=root,
+                capture_output=True,
+                text=True,
+            )
+
+        strict = check()
+        assert strict.returncode != 0
+        assert "版號沒有提升" in strict.stdout + strict.stderr
+
+        allowed = check("--allow-same-version")
+        assert allowed.returncode == 0, allowed.stdout + allowed.stderr
+
+        changelog_path = root / "backend/app/changelog.json"
+        data = json.loads(changelog_path.read_text(encoding="utf-8"))
+        del data["entries"][0]["summary_zh"]
+        changelog_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        broken = check("--allow-same-version")
+        assert broken.returncode != 0
+        assert "summary_zh" in broken.stdout + broken.stderr
