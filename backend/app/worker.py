@@ -5,6 +5,7 @@ from .api.routes_action import _process_action_event
 from .config import settings
 from .db import SessionLocal, engine
 from .models import AgentActionEvent, Base
+from .services import updates as updates_service
 from .services.ai_devops import run_ai_devops_daily
 from .services.daily_reset import run_daily_reset
 from .services.system_state import get_state, set_state
@@ -15,12 +16,36 @@ def main() -> None:
 
     last_devops_run = None  # 追蹤 AI DevOps 最後執行日期
     last_story_refresh_check = None  # 當日史記重算的節流時間戳記（UTC, naive）
+    announcements_normalized = False  # 舊格式公告是否已升級為人 + agent 共讀
+
+    # 部署後立刻確認公告：不等第一輪 30 秒，也不等 UTC 01:00。
+    # 自動發公告是冪等的（LAST_REVISION_KEY），重啟不會洗版。
+    boot_db = SessionLocal()
+    try:
+        boot = updates_service.announce_latest_update(boot_db)
+        print(f"[Updates] boot {boot['status']} {boot['revision']}")
+    except Exception as e:
+        boot_db.rollback()
+        print(f"[Updates] boot announce failed: {e}")
+    finally:
+        boot_db.close()
 
     while True:
         now = datetime.now(timezone.utc)
         today = now.date().isoformat()
         db = SessionLocal()
         try:
+            # 1.33.0：把舊的長篇技術公告原地改成雙讀格式，成功一次即可。
+            if not announcements_normalized:
+                try:
+                    normalized = updates_service.refresh_system_announcements(db)
+                    if normalized["updated"]:
+                        print(f"[Updates] normalized {normalized['updated']} legacy announcements")
+                    announcements_normalized = True
+                except Exception as e:
+                    db.rollback()
+                    print(f"[Updates] announcement normalization failed: {e}")
+
             # 1.31.0：舊版認領會把 owner_user_id 改成 human，讓原 AI 的 API key
             # 當場 403。部署後每天自動修一次歷史資料，不需 admin token 或 .env。
             repair_key = f"identity.ownership.repaired.{today}"
@@ -156,23 +181,23 @@ def main() -> None:
                             db.rollback()
                             print(f"[ChronicleCard] Daily post failed: {e}")
 
-            # 每日更新檢查：每天記一次「最後檢查日」；但 revision 只要變動就立即補公告。
-            # 同一天部署兩版時不能等隔天，否則 agent 讀 /world/public/announcements
-            # 仍看到上一版。`LAST_REVISION_KEY` 保證同一個 revision 不會重複發。
-            if now.hour >= 1:
-                try:
-                    from .services.updates import announce_latest_update, daily_update_check
+            # 每次改版必定發公告：revision 比對不受 UTC 小時限制，
+            # 半夜 (UTC 00:xx) 部署才不會等到 01:00 才補發。
+            # 只有「每日最後檢查日」仍保留 01:00 後的節流。
+            # 同一天部署兩版時也不能等隔天；LAST_REVISION_KEY 保證不重複發。
+            try:
+                from .services.updates import announce_latest_update, daily_update_check
 
-                    if get_state(db, "updates.last_checked_at", default="") != today:
-                        update_result = daily_update_check(db, now=now)
-                        print(f"[Updates] {update_result['status']} {update_result['revision']}")
-                    else:
-                        announced = announce_latest_update(db)
-                        if announced["status"] == "announced":
-                            print(f"[Updates] announced {announced['revision']}")
-                except Exception as e:
-                    db.rollback()
-                    print(f"[Updates] Daily check failed: {e}")
+                if now.hour >= 1 and get_state(db, "updates.last_checked_at", default="") != today:
+                    update_result = daily_update_check(db, now=now)
+                    print(f"[Updates] {update_result['status']} {update_result['revision']}")
+                else:
+                    announced = announce_latest_update(db)
+                    if announced["status"] == "announced":
+                        print(f"[Updates] announced {announced['revision']}")
+            except Exception as e:
+                db.rollback()
+                print(f"[Updates] Daily check failed: {e}")
 
             # 每日史記 (UTC 01:00 之後的第一輪；去重存 system_state，重啟不會漏跑)
             # 這是觀戰內容的地基：即使沒有 LLM、沒有新玩家，也要有可讀的當日記事。

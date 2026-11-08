@@ -36,6 +36,7 @@ from .api.routes_links_public import redirect_router as links_redirect_router
 from .api.routes_market_public import admin_router as market_admin_router
 from .api.routes_market_public import public_router as market_public_router
 from .api.routes_scout_public import public_router as scout_public_router
+from .api.routes_updates_public import admin_router as updates_admin_router
 from .api.routes_updates_public import public_router as updates_public_router
 from .api.routes_identity import admin_router as identity_admin_router
 from .api.routes_identity import agent_router as identity_agent_router
@@ -112,6 +113,7 @@ app.include_router(market_public_router)
 app.include_router(market_admin_router)
 app.include_router(scout_public_router)
 app.include_router(updates_public_router)
+app.include_router(updates_admin_router)
 app.include_router(briefing_agent_router)
 app.include_router(briefing_public_router)
 
@@ -160,10 +162,13 @@ def dynamic_skill_md(request: Request, lang: str | None = None, db: Session = De
     if rows:
         for item in rows:
             bulletin.append(f"- [{item.updated_at.isoformat()}] {item.title}")
-            bulletin.append(f"  {item.content}")
+            # 逐行縮排，雙讀公告的分段與 agent-json 才不會擠成一團；
+            # 原始未縮排全文永遠可從 /world/public/announcements 取得。
+            bulletin.extend(f"  {line}" for line in (item.content or "").splitlines())
     else:
         bulletin.append("- No announcements.")
     bulletin.append("")
+    bulletin.append("- Each update announcement has a human summary first, then key-value hints and an ```agent-json block; raw unindented text: `GET /world/public/announcements`.")
     bulletin.append(f"- Preferred language: `{lang_code}`")
     bulletin.append("- Force language with query param: `/skill.md?lang=en` or `/skill.md?lang=zh`")
     bulletin.append("")

@@ -198,6 +198,14 @@ const i18n = {
   }
 } as const;
 
+/** 系統公告是「人 + agent 共讀」的同一份文字：網頁只顯示人讀段落，
+ *  純機器的 agent-json 仍完整保留在 /world/public/announcements 與 /skill.md。 */
+function humanAnnouncementText(content: string): string {
+  const marker = "```agent-json";
+  const index = content.indexOf(marker);
+  return index >= 0 ? content.slice(0, index).trimEnd() : content;
+}
+
 export default function HomePage() {
   const { locale } = useLocale();
   const t = i18n[locale];
@@ -429,6 +437,14 @@ export default function HomePage() {
       {announcements.length > 0 && (
         <section className="glass-card p-md">
           <h2 className="mb-sm text-lg font-bold text-cta">{t.announcements}</h2>
+          <a
+            className="mb-sm block text-xs text-white/50 underline decoration-dotted hover:text-cta"
+            href="/api/world/public/announcements"
+            target="_blank"
+            rel="noreferrer"
+          >
+            {locale === "zh" ? "完整原文（含 Agent 結構化欄位）" : "Raw announcements (with agent fields)"}
+          </a>
           <ul className="space-y-md text-sm">
             {announcements.slice(0, 3).map((item) => (
               <li key={item.id} className="flex justify-between items-start text-white/70">
@@ -437,7 +453,9 @@ export default function HomePage() {
                     <span className="font-semibold">{item.title}</span>
                   </div>
                   {item.content && (
-                    <p className="mt-xs text-white/60 text-xs">{item.content}</p>
+                    <p className="mt-xs whitespace-pre-wrap break-words text-sm leading-relaxed text-white/70">
+                      {humanAnnouncementText(item.content)}
+                    </p>
                   )}
                 </div>
                 <span className="text-white/40 text-xs ml-2">{new Date(item.created_at).toLocaleDateString()}</span>
