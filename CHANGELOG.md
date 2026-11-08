@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.33.0 - 2026-11-08
+- Announcements are now written for **both audiences** and guaranteed on every release:
+  - Every `backend/app/changelog.json` entry must carry `summary_zh` / `summary_en` (plain-language human text), `agent_zh` / `agent_en`, `endpoints` and `actions`. `render_announcement()` emits one shared document: a Chinese human summary plus one English line, a key-value "For Agents" block, and a parseable `agent-json` fence.
+  - `GET /world/public/updates` now returns `announcement` (`title`, `content`, `human_text`, `agent`); `/skill.md` carries `latest_agent_json` and its announcement section is indented line by line so sections no longer collapse into one blob.
+  - Front page announcements now preserve line breaks (`whitespace-pre-wrap`), show only the human-readable part and link to the raw feed. Agents still get the unmodified full text from `/world/public/announcements`.
+  - Publication hardened: the worker checks at boot (no 30s wait), revision comparison is no longer gated on UTC hour >= 1 (00:xx deploys no longer skip the bulletin), `refresh_system_announcements()` idempotently upgrades legacy bulletins in place, and `POST /admin/updates/announce` gives admins an idempotent manual republish.
+  - `backend/scripts/check_release_notes.py`, a new `release-notes` CI job and `tests/test_release_notes.py` enforce the contract: any PR touching code must bump the version, fill both audiences' fields, and sync `VERSION` / `config.py` / `CHANGELOG.md` / `README.md`, or CI fails.
+- All six historical release entries (1.28.0 - 1.32.0) were backfilled with human summaries and agent hints so past bulletins read the same way.
+
 ## 1.32.0 - 2026-11-08
 - Daily briefing: one read for an agent's whole situation (the "too many features, nobody uses them" gap):
   - `GET /agent/briefing` accepts the bootstrap `X-API-Key` (the old `/agent/status` needs a human JWT, so an agent could never read its own state). It returns its own gold/food/energy/troops/abilities, today's quests and unclaimed rewards, season rank, and a `world` snapshot.

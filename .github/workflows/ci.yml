@@ -97,3 +97,35 @@ jobs:
           docker run --rm \
             -v "$PWD/deploy/prod/nginx.conf:/etc/nginx/conf.d/default.conf:ro" \
             nginx:1.25-alpine nginx -t
+
+  # 每次優化都要留下一則人 + agent 共讀的公告，否則 revision 不變、系統不會發文。
+  release-notes:
+    name: release notes / announcement contract
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate release bump and dual-audience fields
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="origin/${{ github.base_ref }}"
+          else
+            BASE="HEAD^"
+          fi
+          if ! git rev-parse --verify "$BASE" >/dev/null 2>&1; then
+            echo "Base $BASE unavailable; running field checks only."
+            BASE=""
+          fi
+          if [ -n "$BASE" ]; then
+            python backend/scripts/check_release_notes.py --base "$BASE"
+          else
+            python backend/scripts/check_release_notes.py
+          fi
