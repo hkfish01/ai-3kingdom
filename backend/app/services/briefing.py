@@ -32,6 +32,7 @@ from ..config import settings
 from ..models import Agent
 from ..rules import SCOUT_DAILY_LIMIT, SCOUT_ENERGY_COST
 from . import audience as audience_service
+from . import delegation as delegation_service
 from . import market as market_service
 from . import quests as quest_service
 from . import scout as scout_service
@@ -102,6 +103,7 @@ def world_snapshot(db: Session, lang: str = "zh") -> dict[str, Any]:
     scouting = _safe(lambda: scout_service.catalog_payload(db, code), {}, "scout") or {}
     crowd = _safe(lambda: audience_service.today_snapshot(db, code), {}, "audience") or {}
     events = _safe(lambda: events_service.public_events(db, code), [], "events") or []
+    stewards = _safe(lambda: delegation_service.today_summary(db), {}, "delegation") or {}
 
     leaders = season.get("leaderboard") or []
     morale = crowd.get("morale") or {}
@@ -150,6 +152,13 @@ def world_snapshot(db: Session, lang: str = "zh") -> dict[str, Any]:
             "morale_pct": morale.get("boost_pct", 0),
         },
         "events": event_rows,
+        "delegation": {
+            "enabled": bool(stewards.get("enabled", False)),
+            "active_households": stewards.get("active_households", 0),
+            "settled_today": stewards.get("settled_today", 0),
+            "food_escrowed_today": stewards.get("food_escrowed_today", 0),
+            "skipped_by_cap_today": stewards.get("skipped_by_cap_today", 0),
+        },
         "update_revision": updates_service.revision(),
         "app_version": settings.app_version,
         "note_zh": "這是局勢，不是指令；諸侯自行決定要不要行動。",
@@ -345,6 +354,13 @@ def agent_briefing(
         },
         "season_rank": rank,
         "season_score": score,
+        # 自己的委任／待領天數。刻意不放進 next_actions：那是建議動作的量測口徑，
+        # 委任領取是「回來才看得到的提醒」，不該被算成簡報建議的採納率。
+        "delegation": _safe(
+            lambda: delegation_service.own_status(db, agent, code),
+            {"enabled": False, "active": None, "claimable_days": 0, "claimable_food": 0},
+            "own delegation",
+        ),
         "world": world,
         "next_actions": _next_actions(agent, claimable, world, code, allowed_actions),
         "update_revision": world["update_revision"],

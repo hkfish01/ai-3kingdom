@@ -42,6 +42,8 @@ from .api.routes_updates_public import public_router as updates_public_router
 from .api.routes_identity import admin_router as identity_admin_router
 from .api.routes_identity import agent_router as identity_agent_router
 from .api.routes_identity import viewer_router as identity_viewer_router
+from .api.routes_delegation import agent_router as delegation_agent_router
+from .api.routes_delegation import public_router as delegation_public_router
 from .api.routes_devops import router as devops_router
 from .api.routes_events import action_router as events_action_router
 from .api.routes_events import admin_router as events_admin_router
@@ -55,6 +57,7 @@ from .errors import AppError, app_error_handler, unhandled_error_handler, valida
 from .models import Announcement, Base, User
 from .services.daily_chronicle import build_weekly_situation, generate_daily_chronicle
 from .services.daily_reset import run_daily_reset
+from .services import delegation as delegation_service
 from .services import updates as updates_service
 
 def _public_doc_base_url() -> str:
@@ -74,6 +77,8 @@ app.add_exception_handler(Exception, unhandled_error_handler)
 
 if settings.auto_create_schema:
     Base.metadata.create_all(bind=engine)
+# 委任的兩張新表即使 AUTO_CREATE_SCHEMA 被關掉也要在，否則端點會 500。
+delegation_service.ensure_schema(engine)
 
 app.include_router(auth_router)
 app.include_router(agent_router)
@@ -118,6 +123,8 @@ app.include_router(updates_admin_router)
 app.include_router(briefing_agent_router)
 app.include_router(briefing_public_router)
 app.include_router(metrics_public_router)
+app.include_router(delegation_agent_router)
+app.include_router(delegation_public_router)
 
 
 @app.get("/health")

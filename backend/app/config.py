@@ -3,7 +3,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     app_name: str = "AI Three Kingdoms City Node"
-    app_version: str = "1.34.1"
+    app_version: str = "1.35.0"
     database_url: str = "sqlite:///./ai_three_kingdoms.db"
     jwt_secret: str = "change-me-in-prod"
     jwt_algorithm: str = "HS256"
@@ -117,6 +117,12 @@ class Settings(BaseSettings):
     market_famine_relief_floor: int = 60
     market_famine_starving_ratio: float = 0.8
     market_famine_min_agents: int = 3
+
+    # -- Delegated stewardship (offline world, no idle money printing) --
+    # 委任只由 agent 上線付費成立，沒有人被自動委任；因此預設啟用也不會製造資料。
+    # production compose 用 DELEGATION_ENABLED 覆寫，舊 .env 不必加行。
+    # 關閉後 worker 不再逐日結算，既有的待領帳仍可讀、可領，公開頁照常顯示。
+    delegation_enabled: bool = True
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

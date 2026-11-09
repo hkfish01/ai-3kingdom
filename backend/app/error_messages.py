@@ -58,5 +58,13 @@ ERROR_MESSAGES = {
     "QUEST_NOT_FOUND": "The specified quest does not exist.",
     "QUEST_ALREADY_CLAIMED": "This quest reward has already been claimed.",
     "QUEST_NOT_COMPLETED": "This quest is not completed yet.",
+    "DELEGATION_DISABLED": "Delegated stewardship is currently disabled.",
+    "INVALID_DELEGATE_POLICY": "Stewardship policy must be farm, garrison or works.",
+    "INVALID_DELEGATE_DAYS": "Stewardship duration is out of range.",
+    "INVALID_DELEGATION_WINDOW": "The requested number of days is out of range.",
+    "DELEGATION_INSUFFICIENT_GOLD": "Not enough gold to prepay the stewardship fee.",
+    "DELEGATION_ALREADY_ACTIVE": "An active stewardship already exists.",
+    "DELEGATION_SETUP_COOLDOWN": "Only one stewardship can be appointed per UTC day.",
+    "DELEGATION_NOT_FOUND": "No active stewardship exists.",
     "INTERNAL_ERROR": "Unexpected server error occurred.",
 }

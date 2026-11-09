@@ -69,6 +69,8 @@ services:
       MARKET_FAMINE_RELIEF_FLOOR: ${MARKET_FAMINE_RELIEF_FLOOR:-60}
       MARKET_FAMINE_STARVING_RATIO: ${MARKET_FAMINE_STARVING_RATIO:-0.8}
       MARKET_FAMINE_MIN_AGENTS: ${MARKET_FAMINE_MIN_AGENTS:-3}
+      # 委任內政：只由 agent 上線付費成立，舊 .env 沒這行也能啟動；設 false 可停止逐日結算。
+      DELEGATION_ENABLED: ${DELEGATION_ENABLED:-true}
     depends_on:
       - postgres
       - redis
@@ -144,6 +146,8 @@ services:
       MARKET_FAMINE_RELIEF_FLOOR: ${MARKET_FAMINE_RELIEF_FLOOR:-60}
       MARKET_FAMINE_STARVING_RATIO: ${MARKET_FAMINE_STARVING_RATIO:-0.8}
       MARKET_FAMINE_MIN_AGENTS: ${MARKET_FAMINE_MIN_AGENTS:-3}
+      # 委任內政：只由 agent 上線付費成立，舊 .env 沒這行也能啟動；設 false 可停止逐日結算。
+      DELEGATION_ENABLED: ${DELEGATION_ENABLED:-true}
     depends_on:
       - postgres
       - redis

@@ -25,6 +25,7 @@ from sqlalchemy.orm import Session
 from ..config import settings
 from ..models import ActionLog, Agent, BattleLog, ChronicleEntry, City, Faction, Message
 from .chronicle import write_chronicle
+from . import delegation as delegation_service
 from .system_state import get_state, set_state
 from .world_events import enrich_facts_with_events, event_lines
 
@@ -206,6 +207,10 @@ def collect_daily_facts(db: Session, hours: int = 24) -> dict[str, Any]:
         "quotes": quotes,
         "season_lines_zh": _season_announcement_lines(db, "zh"),
         "season_lines_en": _season_announcement_lines(db, "en"),
+        # 委任內政：就算今天沒有任何 agent 動作，管事仍讓世界往前走一步。
+        # 沒有委任活動時回空陣列，既有史記一個字都不會變。
+        "delegate_lines_zh": delegation_service.story_lines(db, "zh"),
+        "delegate_lines_en": delegation_service.story_lines(db, "en"),
         "window_hours": hours,
         "collected_at": now.isoformat(),
     }
@@ -317,6 +322,8 @@ def build_story(facts: dict[str, Any], lang: str = "zh", date_str: str | None = 
     lines.extend(facts.get("event_lines_zh" if zh else "event_lines_en", [])[:3])
     # 賽季開季詔書／季末本紀：一樣是加法，沒有賽季或不啟用時不影響既有史記。
     lines.extend(facts.get("season_lines_zh" if zh else "season_lines_en", [])[:2])
+    # 委任內政的「人不在，城仍在動」：全城合計、不含任何單一諸侯資料。
+    lines.extend(facts.get("delegate_lines_zh" if zh else "delegate_lines_en", [])[:1])
 
     quotes = [
         {"name": q["name"], "text": q["text"]}

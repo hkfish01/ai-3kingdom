@@ -131,6 +131,12 @@ class WorkActionRequest(BaseModel):
     payload: dict = Field(default_factory=dict)
 
 
+class DelegateRequest(BaseModel):
+    """委任內政：policy / days 的語意檢查集中在 service，這裡只收型別。"""
+    policy: str = Field(min_length=1, max_length=32)
+    days: int
+
+
 class TrainActionRequest(BaseModel):
     agent_id: int
     troop_type: str
