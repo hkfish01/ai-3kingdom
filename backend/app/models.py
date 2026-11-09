@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -437,6 +437,54 @@ class BriefingView(Base):
     day: Mapped[str] = mapped_column(String(10), index=True)  # UTC date: YYYY-MM-DD
     suggested_json: Mapped[str] = mapped_column(Text, default="[]")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, index=True)
+
+
+class Delegation(Base):
+    """委任內政：一筆 = 一位諸侯「上線付費」請管事在他離城時顧家。
+
+    費用（設定費 + 每日工錢 × 天數）在成立時一次預付並轉進國庫，
+    之後離線結算完全不碰 agent 的金幣 —— 不可能靠離線生出錢來。
+    每位諸侯同時最多一筆 active；status: active / expired / cancelled。
+    """
+
+    __tablename__ = "delegations"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    agent_id: Mapped[int] = mapped_column(ForeignKey("agents.id"), index=True)
+    policy: Mapped[str] = mapped_column(String(32), index=True)
+    days: Mapped[int] = mapped_column(Integer, default=0)
+    start_day: Mapped[str] = mapped_column(String(10), index=True)  # UTC YYYY-MM-DD
+    end_day: Mapped[str] = mapped_column(String(10), index=True)    # 最後一個可結算日（含）
+    last_settled_day: Mapped[str] = mapped_column(String(10), default="")
+    settled_days: Mapped[int] = mapped_column(Integer, default=0)
+    prepaid_gold: Mapped[int] = mapped_column(Integer, default=0)
+    status: Mapped[str] = mapped_column(String(16), default="active", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, onupdate=utc_now)
+
+
+class DelegationLedger(Base):
+    """每日結算的「待領帳」：離線期間只寫這裡，不進 agent 的任何數值欄位。
+
+    只有本人上線呼叫領取，才把 food_gain 轉進 agent.food，並把此列改成 claimed。
+    gold_gain 恆為 0；(delegation_id, day) 唯一，重跑同一天不會重複記帳。
+    """
+
+    __tablename__ = "delegation_ledgers"
+    __table_args__ = (
+        UniqueConstraint("delegation_id", "day", name="uq_delegation_ledger_day"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    delegation_id: Mapped[int] = mapped_column(ForeignKey("delegations.id"), index=True)
+    agent_id: Mapped[int] = mapped_column(ForeignKey("agents.id"), index=True)
+    day: Mapped[str] = mapped_column(String(10), index=True)  # UTC YYYY-MM-DD
+    policy: Mapped[str] = mapped_column(String(32), default="")
+    food_gain: Mapped[int] = mapped_column(Integer, default=0)
+    gold_gain: Mapped[int] = mapped_column(Integer, default=0)
+    status: Mapped[str] = mapped_column(String(16), default="pending", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+    claimed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
 class MarketListing(Base):

@@ -5,6 +5,7 @@ from .api.routes_action import _process_action_event
 from .config import settings
 from .db import SessionLocal, engine
 from .models import AgentActionEvent, Base
+from .services import delegation as delegation_service
 from .services import updates as updates_service
 from .services.ai_devops import run_ai_devops_daily
 from .services.daily_reset import run_daily_reset
@@ -13,6 +14,7 @@ from .services.system_state import get_state, set_state
 
 def main() -> None:
     Base.metadata.create_all(bind=engine)
+    delegation_service.ensure_schema(engine)
 
     last_devops_run = None  # 追蹤 AI DevOps 最後執行日期
     last_story_refresh_check = None  # 當日史記重算的節流時間戳記（UTC, naive）
@@ -115,6 +117,22 @@ def main() -> None:
                 except Exception as e:
                     db.rollback()
                     print(f"[Market] Famine check failed: {e}")
+
+            # 委任內政：agent 離線時「世界」每天照樣前進。
+            # 只結算今天、不補算過去、只寫待領帳與全城合計 pulse，
+            # 完全不碰 agent 的金幣／糧食／體力 —— 這是防掛機印鈔的關鍵。
+            # 排在每日史記之前，當日史記才帶得到「管事仍巡田」那一行。
+            if settings.delegation_enabled:
+                try:
+                    settled = delegation_service.settle_delegations(db, now=now)
+                    if settled["status"] == "settled":
+                        print(
+                            f"[Delegation] {settled['date']} households={settled['active_households']} "
+                            f"escrowed_food={settled['food_escrowed']} capped={settled['skipped_by_cap']}"
+                        )
+                except Exception as e:
+                    db.rollback()
+                    print(f"[Delegation] Settlement failed: {e}")
 
             # 十四日賽季：開季詔書／季末本紀（冪等，一天最多開或結一次）。
             # 排在史記與 07:00 演武之前，開季當天的史記與 08:00 發文包才帶得到詔書。

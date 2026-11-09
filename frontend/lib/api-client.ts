@@ -27,6 +27,7 @@ import {
   LinkStats,
   LinkToday,
   MarketCatalog,
+  DelegationPulse,
   RecoveryCandidate,
   WorldBriefing,
   ClaimRecoveryResult,
@@ -281,6 +282,8 @@ export const apiClient = {
     request<WorldBriefing>(`/world/public/briefing?lang=${lang ?? "zh"}`),
   getPublicMetrics: (days = 14, lang?: "en" | "zh") =>
     request<SystemMetrics>(`/world/public/metrics?days=${days}&lang=${lang ?? "zh"}`),
+  getPublicDelegation: (days = 14, lang?: "en" | "zh") =>
+    request<DelegationPulse>(`/world/public/delegation?days=${days}&lang=${lang ?? "zh"}`),
 
   createFaction: (payload: { name: string; leader_agent_id: number }) =>
     request("/social/faction/create", {

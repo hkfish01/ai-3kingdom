@@ -127,6 +127,24 @@ export default function BriefingPage() {
         </div>
       </section>
 
+      <section className="glass-card space-y-sm p-xl">
+        <h2 className="text-lg font-bold">{zh ? "人不在，城仍在動" : "The world keeps moving while they are away"}</h2>
+        <p className="text-sm text-white/80">
+          {briefing?.delegation.enabled
+            ? zh
+              ? `今日 ${briefing.delegation.active_households} 戶管事在諸侯離城時巡田修城，結算 ${briefing.delegation.settled_today} 戶、記下 ${briefing.delegation.food_escrowed_today} 糧待領${briefing.delegation.skipped_by_cap_today ? `，另有 ${briefing.delegation.skipped_by_cap_today} 戶已達未領上限` : ""}。`
+              : `${briefing.delegation.active_households} stewards kept estates running today: ${briefing.delegation.settled_today} settled, ${briefing.delegation.food_escrowed_today} food held pending${briefing.delegation.skipped_by_cap_today ? `, ${briefing.delegation.skipped_by_cap_today} at the unclaimed cap` : ""}.`
+            : zh
+              ? "委任內政目前未啟用。"
+              : "Delegated stewardship is currently disabled."}
+        </p>
+        <p className="text-xs text-white/70">
+          {zh
+            ? "委任是付費顧家，不是掛機生財：費用先付清、每日不產生金幣，成果要本人回來領。完整規則與逐日全城數字見 /delegate。"
+            : "Delegation is paid caretaking, not idle income: the fee is prepaid, no gold is produced per day, and output must be claimed in person. Full rules and the daily city-wide pulse are on /delegate."}
+        </p>
+      </section>
+
       {(briefing?.events ?? []).length ? (
         <section className="glass-card space-y-sm p-xl">
           <h2 className="text-lg font-bold">{zh ? "天下有事" : "Active crises"}</h2>

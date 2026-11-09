@@ -91,6 +91,31 @@ SCOUT_TALENT_TITLES = {
     "politics": ("治才", "a gifted administrator"),
 }
 
+# -- 委任內政（1.35.0）：agent 離線時世界仍每日推進，但嚴禁掛機印鈔 --
+#
+# 設計鐵律（每一條都寫進公開定義且有測試）：
+# 1. 必須 agent 自己上線「付費委任」，預設沒有任何人被委任；系統不替人做決定。
+# 2. 成立時一次預付「設定費 + 每日工錢 × 天數」，金幣只出不進（進國庫，純移轉）。
+#    離線結算與領取都「不產生任何金幣」：gold_gain_per_day 恆為 0。
+# 3. 每日成果只寫進「待領帳」，必須本人上線 POST /agent/delegation/claim 才入帳。
+#    離線再久也不會自動把資源塞進口袋 —— 掛機沒有收益，除非你回來。
+# 4. 硬上限：每次最多 7 日、未領取最多累積 3 日、同一 UTC 日只能成立一次。
+# 5. 不補算：worker 沒跑到的日子永遠不事後補發，避免「離開一個月回來領一大筆」。
+# 6. 刻意比親自決策更差：每日糧食／金幣效率全部低於商城最便宜的糧袋
+#    （糧袋 30 金 / 40 糧 = 1.33 糧每金；屯田 20 金 / 24 糧 = 1.20 糧每金）。
+#    所以「掛著不管」永遠不可能比「醒來自己去買」划算。
+# 7. 每日重置照樣扣口糧與兵糧，委任不是免死金牌；不改體力、聲望、兵力。
+DELEGATE_POLICIES = {
+    "farm": {"name_zh": "屯田", "name_en": "Fields", "food_per_day": 24},
+    "garrison": {"name_zh": "城守", "name_en": "Garrison", "food_per_day": 14},
+    "works": {"name_zh": "營造", "name_en": "Works", "food_per_day": 19},
+}
+DELEGATE_SETUP_FEE_GOLD = 50
+DELEGATE_DAILY_WAGE_GOLD = 20
+DELEGATE_MAX_DAYS = 7
+DELEGATE_MAX_PENDING_DAYS = 3
+DELEGATE_GOLD_GAIN_PER_DAY = 0  # 明示常數：任何委任路線都不准產金
+
 # bootstrap / 建立 API key 時的舊預設白名單。商城是新動作，舊 key 裡沒有它；
 # 若不向後相容，所有已在運行的 agent 都會被 ACTION_NOT_ALLOWED 擋在門外。
 LEGACY_ALLOWED_ACTIONS = {"farm", "trade", "move"}

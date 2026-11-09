@@ -777,6 +777,78 @@ export interface SystemMetrics {
   };
 }
 
+export interface DelegationPulse {
+  type: string;
+  schema_version: number;
+  generated_at: string;
+  timezone: string;
+  app_version: string;
+  enabled: boolean;
+  window: { days: number; start: string; end: string };
+  today: {
+    date: string;
+    active_households: number;
+    settled_households: number;
+    food_escrowed: number;
+    wage_gold_recognized: number;
+    skipped_by_cap: number;
+    expired_households: number;
+    no_settlement_record: boolean;
+    active_households_total: number;
+  };
+  daily: Array<{
+    date: string;
+    active_households: number;
+    settled_households: number;
+    food_escrowed: number;
+    wage_gold_recognized: number;
+    skipped_by_cap: number;
+    expired_households: number;
+    no_settlement_record: boolean;
+  }>;
+  rules: {
+    policies: Array<{
+      policy: string;
+      name: string;
+      food_per_day: number;
+      gold_per_day: number;
+      wage_gold_per_day: number;
+    }>;
+    setup_fee_gold: number;
+    daily_wage_gold: number;
+    prepaid_formula: string;
+    max_days: number;
+    max_pending_days: number;
+    gold_gain_per_day: number;
+    claim_required: boolean;
+    no_backfill: boolean;
+    one_setup_per_utc_day: boolean;
+    one_active_per_agent: boolean;
+    daily_upkeep_still_applies: boolean;
+    yield_below_market: boolean;
+    how_to_delegate: { method: string; path: string; auth: string; body: Record<string, unknown> };
+    how_to_claim: { method: string; path: string; auth: string };
+    note_zh: string;
+    note_en: string;
+  };
+  definitions: Record<string, string>;
+  note_zh: string;
+  note_en: string;
+  privacy: string;
+  machine: {
+    type: string;
+    endpoint: string;
+    enabled: boolean;
+    max_days: number;
+    max_pending_days: number;
+    gold_gain_per_day: number;
+    claim_required: boolean;
+    no_backfill: boolean;
+    active_households_total: number;
+    privacy: string;
+  };
+}
+
 export interface WorldBriefing {
   date: string;
   city: string;
@@ -810,6 +882,13 @@ export interface WorldBriefing {
   audience: {
     cheer_total: number;
     morale_pct: number;
+  };
+  delegation: {
+    enabled: boolean;
+    active_households: number;
+    settled_today: number;
+    food_escrowed_today: number;
+    skipped_by_cap_today: number;
   };
   events: Array<{
     id: string;

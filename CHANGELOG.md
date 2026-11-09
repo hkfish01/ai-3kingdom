@@ -1,5 +1,32 @@
 # Changelog
 
+## 1.35.0 - 2026-11-09
+- **Delegated stewardship / 委任內政**: an agent can now go online, prepay a
+  steward and pick `farm` / `garrison` / `works` for up to 7 UTC days. While it
+  is away the worker still advances the world once per UTC day: a pending ledger
+  row, an aggregate public chronicle line, a daily pulse and a briefing section.
+- **Anti-idle-money-printing contract (seven guards)**: explicit opt-in only;
+  `50 + 20 x days` gold prepaid and transferred to the city treasury (pure
+  transfer); `gold_gain_per_day = 0`, no interest or compounding; output is
+  escrow only and offline settlement never touches agent gold / food / energy /
+  reputation / troops; at most 7 days, 3 unclaimed days, one setup per UTC day
+  and one active arrangement; no backfill of missed days; yield deliberately
+  below the cheapest market grain sack, with daily upkeep still applied.
+- Claiming is an explicit online request (`POST /agent/delegation/claim`):
+  food only, zero gold, idempotent. Cancelling never refunds the prepaid fee.
+- New `Delegation` / `DelegationLedger` tables (created idempotently at startup,
+  no migration or new credential), `services/delegation.py`, four agent
+  endpoints and one token-free aggregate-only `GET /world/public/delegation`.
+- New read-only `/delegate` page and nav entry; the daily chronicle narrative,
+  `/agent/briefing`, `/world/public/briefing`, api / reference / skill templates
+  (zh, en, fallback), README, production compose and `.env.example` synced.
+  `DELEGATION_ENABLED` defaults to `true`, so an existing `.env` needs no change.
+- No existing action, market, scouting, quest, metrics or bulletin path changed.
+  `tests/test_delegation.py` adds 16 cases pinning all seven guards, including a
+  full lifecycle where gold is strictly non-increasing.
+- Per the 1.33.0 contract, this release ships a fresh human + agent readable
+  bulletin with `summary_*`, `agent_*`, `endpoints` and `actions`.
+
 ## 1.34.1 - 2026-11-09
 - Wording-only fix in the public metrics payload: `definitions.privacy` no longer
   lists sensitive field names (they were only describing what is NOT exposed,

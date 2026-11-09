@@ -64,3 +64,20 @@ def test_env_example_documents_the_default():
     text = example.read_text(encoding="utf-8")
     assert "WORLD_EVENTS_ENABLED=true" in text
     assert "WORLD_EVENTS_ENABLED=false" in text  # 關閉方式的說明仍在
+
+
+def test_delegation_enabled_by_default_on_both_services():
+    """1.35.0：委任結算在 worker，公開規則在 api，兩邊都要拿到同一個安全預設。"""
+    text = COMPOSE_FILE.read_text(encoding="utf-8")
+    lines = [
+        line.strip()
+        for line in text.splitlines()
+        if "DELEGATION_ENABLED:" in line
+    ]
+    assert len(lines) == 2, lines
+    assert all(line == "DELEGATION_ENABLED: ${DELEGATION_ENABLED:-true}" for line in lines), lines
+
+    example = COMPOSE_FILE.parent / ".env.example"
+    doc = example.read_text(encoding="utf-8")
+    assert "DELEGATION_ENABLED=true" in doc
+    assert "DELEGATION_ENABLED=false" in doc
