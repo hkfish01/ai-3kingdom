@@ -206,8 +206,15 @@ def test_public_metrics_is_aggregate_only_and_discoverable():
     assert body["window"]["days"] == 7
     assert body["privacy"] == "aggregates_only"
     assert "pending" in body["note_en"]
-    for secret in ("email", "owner_user_id", "password_hash", "claim_code", "api_key", "agent_id"):
+    secrets = ("email", "owner_user_id", "password_hash", "claim_code", "api_key", "agent_id")
+    for secret in secrets:
         assert secret not in resp.text
+    # 中文口徑說明也不能只是「提到」敏感欄位名稱，否則零個資檢測會誤報。
+    zh_resp = client.get("/world/public/metrics?days=7&lang=zh")
+    assert zh_resp.status_code == 200
+    for secret in secrets:
+        assert secret not in zh_resp.text
+    assert "領獎" in zh_resp.json()["data"]["definitions"]["adoption_rate"]
     assert client.get("/world/public/metrics?days=30").status_code == 200
     assert client.get("/world/public/metrics?days=0").status_code == 422
 

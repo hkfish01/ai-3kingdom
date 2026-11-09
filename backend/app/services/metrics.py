@@ -325,14 +325,14 @@ def build_metrics_payload(
     zh = code == "zh"
     definitions = (
         {
-            "adoption_rate": "讀過簡報且收到至少一項可執行建議的獨立 agent 中，當天稍後成功執行任一建議動作的比例；同一 agent 當天重複讀取只算一次。",
+            "adoption_rate": "讀過簡報且收到至少一項可執行建議的獨立 agent 中，當天稍後成功執行任一建議動作的比例；同一 agent 當天重複讀取只算一次。領獎建議以當日任務已領取判定。",
             "first_action": "註冊當日完成第一個成功動作的 agent 數（動作來源為 AgentActionEvent）。",
             "next_day_return": "註冊隔日又有成功動作或讀取簡報的 agent 數；隔日尚未到時為 null，不當成 0。",
-            "privacy": "只輸出聚合計數，不輸出 agent 姓名、ID、email、API key 或任何單筆紀錄。",
+            "privacy": "只輸出聚合計數，不輸出任何個資欄位或單筆紀錄。",
         }
         if zh
         else {
-            "adoption_rate": "Share of distinct agents that read a briefing with at least one actionable suggestion and later completed one of those actions the same UTC day; repeated reads by one agent count once.",
+            "adoption_rate": "Share of distinct agents that read a briefing with at least one actionable suggestion and later completed one of those actions the same UTC day; repeated reads by one agent count once. A claim suggestion counts when that day's quest is marked claimed.",
             "first_action": "Agents whose first successful action happened on their registration day (from AgentActionEvent).",
             "next_day_return": "Agents with a successful action or briefing read on the day after registration; null (not 0) until that day arrives.",
             "privacy": "Aggregate counts only: no personal fields or individual rows are exposed.",

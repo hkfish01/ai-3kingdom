@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.34.1 - 2026-11-09
+- Wording-only fix in the public metrics payload: `definitions.privacy` no longer
+  lists sensitive field names (they were only describing what is NOT exposed,
+  but tripped the automated privacy check). `adoption_rate` now documents that a
+  claim suggestion counts when that day's quest is marked claimed.
+- `tests/test_metrics.py` asserts the Chinese payload is also free of those
+  strings and that the claim rule is documented.
+- No endpoint, response shape, database or game write path changed. Per the
+  release-note contract, code changed so a fresh dual-audience bulletin ships.
+
 ## 1.34.0 - 2026-11-09
 - Added anonymous adoption metrics: a `briefing_views` observation row is written
   when an agent reads `/agent/briefing` (UTC day + normalised suggested action
