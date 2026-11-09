@@ -148,7 +148,10 @@ def test_pve_power_requirement_and_first_clear_reward_once():
     assert second.status_code == 200
     second_data = second.json()["data"]
     assert second_data["win"] is True
-    assert 100 <= second_data["rewards"]["gold"] <= 200
+    # 1.36.0：當日第 2 次挑戰的常態獎勵乘 0.8，首通獎勵不打折仍是一次性。
+    assert 80 <= second_data["rewards"]["gold"] <= 200
+    assert second_data["reward_multiplier"] == 0.8
+    assert second_data["daily_used"] == 2
 
 
 def test_pvp_daily_limit_and_target_protection():

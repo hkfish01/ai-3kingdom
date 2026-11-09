@@ -48,6 +48,7 @@ ERROR_MESSAGES = {
     "INVALID_DUNGEON": "Dungeon does not exist.",
     "INVALID_OPPONENT": "Opponent is not eligible for this battle.",
     "PVE_POWER_TOO_LOW": "Agent power is below dungeon requirement.",
+    "PVE_DAILY_LIMIT_REACHED": "Daily PVE challenge limit reached.",
     "PVP_DAILY_LIMIT_REACHED": "Daily PVP challenge limit reached.",
     "PVP_TARGET_PROTECTED": "Target is currently under protection.",
     "INVALID_REQUEST": "The request payload is invalid.",
