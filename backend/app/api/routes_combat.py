@@ -5,13 +5,24 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..api.deps import get_current_user
 from ..config import settings
 from ..db import get_db
 from ..errors import AppError
-from ..models import ActionLog, Agent, AgentProtection, BattleLog, DungeonClear, PvpChallengeDaily, User
+from ..models import (
+    ActionLog,
+    Agent,
+    AgentProtection,
+    BattleLog,
+    DungeonClear,
+    PveChallengeDaily,
+    PvpChallengeDaily,
+    User,
+)
+from ..rules import PVE_DAILY_LIMIT, PVE_ENERGY_COST, PVE_REWARD_DECAY, PVE_REWARD_FLOOR
 from ..schemas import PveChallengeRequest, PvpChallengeRequest
 from ..services import combat
 from ..services import quests as quest_service
@@ -147,6 +158,48 @@ def _get_or_create_daily_counter(db: Session, agent_id: int, day: str) -> PvpCha
     return row
 
 
+def _get_or_create_pve_daily_counter(db: Session, agent_id: int, day: str) -> PveChallengeDaily:
+    """取當日計數並上列鎖；同秒併發的挑戰會被串行化，不會一起讀到同一個 count。
+
+    SQLite 會忽略 FOR UPDATE（本機／CI 為單執行緒，無影響）；PostgreSQL 會真正鎖列。
+    兩個請求同時第一次插入時，唯一鍵會讓其中一個 IntegrityError，重查即可。
+    """
+    row = (
+        db.query(PveChallengeDaily)
+        .filter(PveChallengeDaily.agent_id == agent_id, PveChallengeDaily.day == day)
+        .with_for_update()
+        .first()
+    )
+    if row:
+        return row
+    row = PveChallengeDaily(agent_id=agent_id, day=day, count=0)
+    db.add(row)
+    try:
+        db.flush()
+    except IntegrityError:
+        db.rollback()
+        row = (
+            db.query(PveChallengeDaily)
+            .filter(PveChallengeDaily.agent_id == agent_id, PveChallengeDaily.day == day)
+            .with_for_update()
+            .first()
+        )
+    return row
+
+
+def _pve_reward_percent(used_before: int) -> int:
+    """當日第 n 次（used_before = n-1）的獎勵百分比，用整數算避免浮點誤差。"""
+    return max(
+        int(PVE_REWARD_FLOOR * 100),
+        100 - int(PVE_REWARD_DECAY * 100) * used_before,
+    )
+
+
+def _pve_reward_multiplier(used_before: int) -> float:
+    """同一個係數的小數形式，供人讀與 agent 讀的回應欄位使用。"""
+    return _pve_reward_percent(used_before) / 100
+
+
 def _is_agent_protected(db: Session, agent_id: int, now: datetime) -> bool:
     row = db.query(AgentProtection).filter(AgentProtection.agent_id == agent_id).first()
     if not row:
@@ -185,7 +238,17 @@ def list_pve_dungeons(current_user: User = Depends(get_current_user)):
                     "first_clear_reward": {"gold": d.first_clear_gold} if d.first_clear_gold else None,
                 }
                 for d in combat.list_dungeons()
-            ]
+            ],
+            # 1.36.0：讓人與 agent 在挑戰前就能讀到硬上限，不用靠失敗來試規則。
+            "rules": {
+                "daily_limit": PVE_DAILY_LIMIT,
+                "energy_cost": PVE_ENERGY_COST,
+                "reward_decay_per_attempt": PVE_REWARD_DECAY,
+                "reward_multiplier_floor": PVE_REWARD_FLOOR,
+                "first_clear_bonus_undiscounted": True,
+                "day_boundary": "UTC",
+                "failed_challenge_still_costs_energy_and_attempt": True,
+            },
         },
     }
 
@@ -197,6 +260,17 @@ def pve_challenge(
     current_user: User = Depends(get_current_user),
 ):
     attacker = _get_owned_agent(db, current_user.id, payload.agent_id)
+
+    # 1.36.0：先取當日計數並上列鎖，同秒併發的請求會在此排隊，第 6 次一定被擋下。
+    # 上限先於體力檢查，讓「今天已打滿」的回應不會被誤報成體力不足。
+    day = _utc_day()
+    daily_counter = _get_or_create_pve_daily_counter(db, attacker.id, day)
+    if daily_counter.count >= PVE_DAILY_LIMIT:
+        raise AppError("PVE_DAILY_LIMIT_REACHED", "Daily PVE challenge limit reached.", status_code=422)
+    used_before = daily_counter.count
+    reward_percent = _pve_reward_percent(used_before)
+    reward_multiplier = _pve_reward_multiplier(used_before)
+
     dungeon = combat.get_dungeon(payload.dungeon_id)
     if not dungeon:
         raise AppError("INVALID_DUNGEON", "Dungeon does not exist.", status_code=404)
@@ -206,6 +280,8 @@ def pve_challenge(
     attacker_raw_power = combat.raw_power(attacker_troops, attacker.martial)
     if attacker_raw_power < dungeon.power_requirement:
         raise AppError("PVE_POWER_TOO_LOW", "Agent power is below dungeon requirement.", status_code=422)
+    if (attacker.energy or 0) < PVE_ENERGY_COST:
+        raise AppError("INSUFFICIENT_ENERGY", "Not enough energy for this action.", status_code=422)
 
     defender_troops = combat.clamp_troops(dungeon.enemy_troops)
     attacker_power = combat.total_power(attacker_troops, attacker.martial, defender_troops)
@@ -220,8 +296,9 @@ def pve_challenge(
 
     rewards = {"gold": 0, "food": 0, "exp": 0}
     if attacker_win:
-        rewards["gold"] = random.randint(*dungeon.reward_gold)
-        rewards["food"] = random.randint(*dungeon.reward_food)
+        # 當日重複挑戰的常態獎勵逐次遞減；一次性的首通獎勵不打折，保留探索誘因。
+        rewards["gold"] = random.randint(*dungeon.reward_gold) * reward_percent // 100
+        rewards["food"] = random.randint(*dungeon.reward_food) * reward_percent // 100
         rewards["exp"] = dungeon.reward_exp
         first_clear = (
             db.query(DungeonClear)
@@ -233,6 +310,11 @@ def pve_challenge(
             db.add(DungeonClear(agent_id=attacker.id, dungeon_id=dungeon.id))
         attacker.gold += rewards["gold"]
         attacker.food += rewards["food"]
+
+    # 不論勝敗，挑戰都要付體力與一次名額；被閘門擋下的請求則完全不扣。
+    attacker.energy = max(0, (attacker.energy or 0) - PVE_ENERGY_COST)
+    daily_counter.count += 1
+    db.add(daily_counter)
 
     battle_id = f"pve_{uuid4().hex}"
     db.add(
@@ -255,7 +337,7 @@ def pve_challenge(
             city_name=settings.city_name,
             action_type="pve_challenge",
             payload_json=json.dumps(payload.model_dump()),
-            energy_cost=0,
+            energy_cost=PVE_ENERGY_COST,
             result_json=json.dumps(
                 {
                     "battle_id": battle_id,
@@ -265,6 +347,9 @@ def pve_challenge(
                     "rewards": rewards,
                     "losses": attacker_losses,
                     "enemy_losses": defender_losses,
+                    "daily_used": daily_counter.count,
+                    "daily_limit": PVE_DAILY_LIMIT,
+                    "reward_multiplier": reward_multiplier,
                 }
             ),
         )
@@ -289,6 +374,11 @@ def pve_challenge(
             "rewards": rewards,
             "losses": attacker_losses,
             "enemy_losses": defender_losses,
+            "daily_used": daily_counter.count,
+            "daily_limit": PVE_DAILY_LIMIT,
+            "daily_remaining": max(0, PVE_DAILY_LIMIT - daily_counter.count),
+            "energy_cost": PVE_ENERGY_COST,
+            "reward_multiplier": reward_multiplier,
         },
     }
 

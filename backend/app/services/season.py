@@ -7,6 +7,9 @@
   賽季是排行榜與敘事層，既有玩法完全不受影響。
 - **公開欄位限縮**：不回 owner、email、token、claim code 或 action payload。
 - **演武不計戰績**：`arena_*` 的 NPC 表演賽不列入勝場，避免每日自動賽事刷分。
+- **征伐不計戰績（1.36.0）**：`pve_*`／`PVE:` 的副本挑戰不列入勝場，且每位諸侯
+  計入積分的勝場最多 20 場。舊規則「勝場×40 無上限」讓重複刷副本直接買下霸主；
+  現在積分是即時計算，改公式就自動溯及本季所有歷史戰報，不需改 DB、不沒收存量。
 - 開關 `SEASON_ENABLED`：Python 預設關閉（本機／CI 不製造資料），production compose 預設啟用。
 """
 
@@ -68,6 +71,11 @@ def _json_load(raw: str, fallback: Any) -> Any:
         return fallback
 
 
+# 1.36.0：勝場積分封頂。PvE 與校場演武已在 _season_wins 排除，這裡再擋一次
+# 「靠大量有效 PvP 勝場無限放大積分」，同時讓公開榜的 wins 欄位等於計分勝場。
+SEASON_WINS_CAP = 20
+
+
 def load_current(db: Session) -> dict[str, Any]:
     return _json_load(get_state(db, CURRENT_KEY), {})
 
@@ -87,12 +95,14 @@ def season_rules() -> dict[str, Any]:
     """公開勝利條件；前端直接顯示，不讓玩家猜分數怎麼算。"""
     return {
         "length_days": settings.season_length_days or DEFAULT_LENGTH_DAYS,
-        "score_formula_zh": "聲望×2 ＋ 兵力×3 ＋ 金÷100（上限100）＋ 糧÷200（上限50）＋ 勝場×40 ＋ 已選邊＋20",
-        "score_formula_en": "reputation x2 + troops x3 + gold/100 (cap 100) + food/200 (cap 50) + wins x40 + faction +20",
+        "score_formula_zh": f"聲望×2 ＋ 兵力×3 ＋ 金÷100（上限100）＋ 糧÷200（上限50）＋ 計分勝場×40（上限{SEASON_WINS_CAP}場）＋ 已選邊＋20",
+        "score_formula_en": f"reputation x2 + troops x3 + gold/100 (cap 100) + food/200 (cap 50) + scored wins x40 (cap {SEASON_WINS_CAP}) + faction +20",
+        "wins_cap": SEASON_WINS_CAP,
+        "wins_points": 40,
         "winner_zh": "赛季最後一個 HKT 日結束，翌日結算；積分最高者為霸主。同分先比聲望，再比兵力。",
         "winner_en": "Settled the day after the final HKT day. Highest score wins; ties break on reputation, then troops.",
-        "exclusions_zh": "校場演武不計勝場；賽季不重置任何諸侯數值，也不替 agent 做決策。",
-        "exclusions_en": "Arena exhibitions do not count as wins. No agent stats are reset and no decisions are made for agents.",
+        "exclusions_zh": "副本征伐與校場演武不計勝場；賽季不重置任何諸侯數值，也不替 agent 做決策。",
+        "exclusions_en": "PvE dungeon runs and arena exhibitions do not count as wins. No agent stats are reset and no decisions are made for agents.",
     }
 
 
@@ -102,7 +112,11 @@ def season_rules() -> dict[str, Any]:
 
 
 def _season_wins(db: Session, start: date, end: date) -> dict[int, int]:
-    """統計本季真實戰鬥勝場；排除 NPC 校場演武（arena_*）。"""
+    """統計本季計分勝場；排除副本征伐（pve_*）與 NPC 校場演武（arena_*），並封頂。
+
+    積分是每次查詢即時算出來的，沒有落地快取，所以規則一改就自動溯及本季
+    所有歷史戰報（包含已發生的 1806 場副本勝利），不需要 migration 或回沖資料。
+    """
     since = _hkt_day_start_utc_naive(start)
     until = _hkt_day_start_utc_naive(end + timedelta(days=1))
     rows = (
@@ -112,13 +126,19 @@ def _season_wins(db: Session, start: date, end: date) -> dict[int, int]:
     )
     wins: dict[int, int] = {}
     for row in rows:
-        if (row.request_id or "").startswith("arena_"):
+        request_id = row.request_id or ""
+        defender_city = row.defender_city or ""
+        if (
+            request_id.startswith("arena_")
+            or request_id.startswith("pve_")
+            or defender_city.startswith("PVE:")
+        ):
             continue
         if row.outcome == "attacker_win" and row.attacker_agent_id:
             wins[row.attacker_agent_id] = wins.get(row.attacker_agent_id, 0) + 1
         elif row.outcome == "defender_win" and row.defender_agent_id:
             wins[row.defender_agent_id] = wins.get(row.defender_agent_id, 0) + 1
-    return wins
+    return {agent_id: min(count, SEASON_WINS_CAP) for agent_id, count in wins.items()}
 
 
 def _score_agent(agent: Agent, wins: int) -> dict[str, Any]:

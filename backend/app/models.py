@@ -314,6 +314,21 @@ class PvpChallengeDaily(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, onupdate=utc_now)
 
 
+class PveChallengeDaily(Base):
+    """PvE 每日次數（1.36.0）。唯一鍵 + 列鎖讓同秒併發請求不會超發挑戰次數。"""
+
+    __tablename__ = "pve_challenge_daily"
+    __table_args__ = (
+        UniqueConstraint("agent_id", "day", name="uq_pve_challenge_daily_agent_day"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    agent_id: Mapped[int] = mapped_column(ForeignKey("agents.id"), index=True)
+    day: Mapped[str] = mapped_column(String(10), index=True)  # UTC date: YYYY-MM-DD
+    count: Mapped[int] = mapped_column(Integer, default=0)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, onupdate=utc_now)
+
+
 class Announcement(Base):
     __tablename__ = "announcements"
 

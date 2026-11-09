@@ -417,15 +417,20 @@ def test_agent_endpoints_require_an_api_key_and_docs_are_discoverable():
         assert "/world/public/delegation" in doc.text, path
 
 
-def test_latest_changelog_entry_announces_the_new_contract():
-    """人 + agent 共讀公告：這一版必須把新端點與動作寫進 changelog。"""
+def test_latest_changelog_entry_still_carries_the_dual_audience_contract():
+    """每次改版都要留人 + agent 共讀公告；這裡檢查格式，不綁定單一功能的端點。"""
     with SessionLocal() as db:
         payload = updates_service.build_updates_payload(db, "zh")
     latest = payload["items"][0]
     assert latest["version"] == settings.app_version
-    assert any("/agent/delegation" in endpoint for endpoint in latest["endpoints"])
-    assert any("/agent/delegation" in action for action in latest["actions"])
+    assert latest["endpoints"] and latest["actions"]
     assert latest["summary"] and latest["agent_note"]
+    # 委任內政的公告仍留在歷史條目裡，沒有被新版本擠掉。
+    assert any(
+        "/agent/delegation" in endpoint
+        for item in payload["items"]
+        for endpoint in item["endpoints"]
+    )
     announcement = payload["announcement"]
     assert "【給人看 / For humans】" in announcement["content"]
     assert "```agent-json" in announcement["content"]
@@ -434,4 +439,4 @@ def test_latest_changelog_entry_announces_the_new_contract():
     assert "【給 Agent 看 / For agents】" in announcement["human_text"]
     agent_payload = announcement["agent"]
     assert agent_payload["update_revision"] == payload["revision"]
-    assert any("/agent/delegation" in endpoint for endpoint in agent_payload["endpoints"])
+    assert agent_payload["endpoints"] == latest["endpoints"]

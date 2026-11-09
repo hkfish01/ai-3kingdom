@@ -58,6 +58,7 @@ from .models import Announcement, Base, User
 from .services.daily_chronicle import build_weekly_situation, generate_daily_chronicle
 from .services.daily_reset import run_daily_reset
 from .services import delegation as delegation_service
+from .services import pve_limits as pve_limits_service
 from .services import updates as updates_service
 
 def _public_doc_base_url() -> str:
@@ -79,6 +80,8 @@ if settings.auto_create_schema:
     Base.metadata.create_all(bind=engine)
 # 委任的兩張新表即使 AUTO_CREATE_SCHEMA 被關掉也要在，否則端點會 500。
 delegation_service.ensure_schema(engine)
+# 1.36.0 PvE 每日計數表同理；少這張表，第一次征伐就會 500。
+pve_limits_service.ensure_schema(engine)
 
 app.include_router(auth_router)
 app.include_router(agent_router)

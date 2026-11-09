@@ -61,6 +61,21 @@ MARKET_MAX_QUANTITY = 20
 SCOUT_ACTION = "scout"
 SCOUT_ENERGY_COST = 20
 SCOUT_DAILY_LIMIT = 3
+
+# -- PvE 征伐限次（1.36.0）：零成本無限刷副本曾是金幣與勝場的印鈔機 --
+#
+# 舊規則：POST /pve/challenge 不扣體力、沒有每日上限、戰力過檻即 100% 必勝，
+# 每場仍發金糧，形成「刷副本 → 買糧練兵 → 解鎖更高副本 → 再刷」的無限迴圈。
+# 現在四道閘：
+# 1. 每一 UTC 日最多 5 次（比照 PVP），由資料庫列鎖串行化，同秒併發不會超發。
+# 2. 每次扣 20 體力（比照尋訪），5 次剛好用完每日 100 點，與工作／練兵競爭。
+# 3. 當日第 n 次獎勵乘上 max(0.2, 1 - 0.2×(n-1))，越刷越薄；首通獎勵不打折。
+# 4. 賽季霸主積分不再計 PvE 勝場（見 season.py），刷場無法換成排名。
+# 失敗的挑戰照樣消耗體力與次數；體力不足或超過上限時不扣任何資源。
+PVE_DAILY_LIMIT = 5
+PVE_ENERGY_COST = 20
+PVE_REWARD_DECAY = 0.2
+PVE_REWARD_FLOOR = 0.2
 SCOUT_ABILITY_CAP = 99
 SCOUT_FOCUS = ("balanced", "talent", "supply")
 SCOUT_FOCUS_BONUS = 0.20

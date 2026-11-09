@@ -229,6 +229,8 @@ def build_updates_payload(db: Session, lang: str | None = None, limit: int = 7) 
         "world_briefing": f"{_doc_base_url()}/api/world/public/briefing",
         "metrics": f"{_doc_base_url()}/api/world/public/metrics",
         "delegation": f"{_doc_base_url()}/api/world/public/delegation",
+        "combat": f"{_doc_base_url()}/api/combat.md",
+        "season": f"{_doc_base_url()}/api/world/public/season/current",
     }
     return {
         "revision": revision(),

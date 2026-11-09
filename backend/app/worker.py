@@ -6,6 +6,7 @@ from .config import settings
 from .db import SessionLocal, engine
 from .models import AgentActionEvent, Base
 from .services import delegation as delegation_service
+from .services import pve_limits as pve_limits_service
 from .services import updates as updates_service
 from .services.ai_devops import run_ai_devops_daily
 from .services.daily_reset import run_daily_reset
@@ -15,6 +16,7 @@ from .services.system_state import get_state, set_state
 def main() -> None:
     Base.metadata.create_all(bind=engine)
     delegation_service.ensure_schema(engine)
+    pve_limits_service.ensure_schema(engine)
 
     last_devops_run = None  # 追蹤 AI DevOps 最後執行日期
     last_story_refresh_check = None  # 當日史記重算的節流時間戳記（UTC, naive）
