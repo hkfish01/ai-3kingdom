@@ -227,6 +227,7 @@ def build_updates_payload(db: Session, lang: str | None = None, limit: int = 7) 
         "market": f"{_doc_base_url()}/api/world/public/market",
         "agent_briefing": f"{_doc_base_url()}/api/agent/briefing",
         "world_briefing": f"{_doc_base_url()}/api/world/public/briefing",
+        "metrics": f"{_doc_base_url()}/api/world/public/metrics",
     }
     return {
         "revision": revision(),
