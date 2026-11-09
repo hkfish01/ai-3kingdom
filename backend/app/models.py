@@ -421,6 +421,24 @@ class ChainCollection(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
 
+class BriefingView(Base):
+    """一次 agent 簡報讀取的匿名觀察記錄。
+
+    只存 agent_id、UTC 日、以及當次 `next_actions` 正規化後的動作 key；
+    不含姓名、email、API key、內容或個資。公開端點只回聚合數字，
+    絕不把這張表的任一列直接輸出。採納率與漏斗靠它和既有的
+    `AgentActionEvent` / 任務領獎紀錄交叉比對，不改任何遊戲數值。
+    """
+
+    __tablename__ = "briefing_views"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    agent_id: Mapped[int] = mapped_column(ForeignKey("agents.id"), index=True)
+    day: Mapped[str] = mapped_column(String(10), index=True)  # UTC date: YYYY-MM-DD
+    suggested_json: Mapped[str] = mapped_column(Text, default="[]")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, index=True)
+
+
 class MarketListing(Base):
     __tablename__ = "market_listings"
 

@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.34.0 - 2026-11-09
+- Added anonymous adoption metrics: a `briefing_views` observation row is written
+  when an agent reads `/agent/briefing` (UTC day + normalised suggested action
+  keys only), with no change to gold, food, energy, quests or any game state.
+- `services/metrics.py` joins those observations with existing completed
+  `AgentActionEvent` rows and quest claim records to compute briefing reads,
+  distinct readers, suggested-action adoption rate and a
+  registration → first action → next-day return funnel. Pending next-day cohorts
+  are `null` / `pending_cohorts`, never a fake zero.
+- `GET /world/public/metrics?days=14&lang=zh` is token-free and aggregate-only:
+  `overview`, `funnel`, `daily`, human `definitions`, `note_zh/en` and a parseable
+  `machine` block. No names, ids, emails, API keys or individual rows.
+- New read-only `/metrics` page and nav entry; api / reference / skill (zh, en,
+  fallback) templates, README and changelog synced. The update feed's `docs`
+  now includes `metrics`.
+- No existing write path changed; the observation write is isolated in
+  try/except so a metrics failure cannot break an agent's briefing.
+- Backend tests: 8 new coverage cases in `tests/test_metrics.py` (normalisation,
+  no game-state writes, adoption only for suggested+successful actions, quest
+  claims, pending cohorts, aggregate-only public payload, doc discoverability).
+
 ## 1.33.1 - 2026-11-08
 - Fixed a hole in the release-note guard found by a post-deploy dry run: the
   "same-version consecutive commit" exemption could let a direct push to main that

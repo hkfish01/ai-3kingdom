@@ -716,6 +716,67 @@ export interface AgentRenameResult {
   cooldown_days: number;
 }
 
+export interface MetricsDay {
+  date: string;
+  briefing_views: number;
+  unique_readers: number;
+  suggested_agents: number;
+  adopted_agents: number;
+  adoption_rate: number;
+  suggestions_shown: number;
+  adopted_suggestions: number;
+  registrations: number;
+  first_actions: number;
+  next_day_returns: number | null;
+}
+
+export interface SystemMetrics {
+  type: string;
+  schema_version: number;
+  generated_at: string;
+  timezone: string;
+  app_version: string;
+  window: { days: number; start: string; end: string };
+  overview: {
+    briefing_views: number;
+    unique_readers: number;
+    suggested_agents: number;
+    adopted_agents: number;
+    adoption_rate: number;
+    suggestions_shown: number;
+    adopted_suggestions: number;
+    registrations: number;
+    first_actions: number;
+    next_day_returns: number;
+    successful_actions: number;
+  };
+  funnel: {
+    registrations: number;
+    first_action: number;
+    next_day_return: number;
+    first_action_rate: number;
+    next_day_return_rate: number;
+    complete_cohorts: number;
+    pending_cohorts: number;
+  };
+  daily: MetricsDay[];
+  definitions: Record<string, string>;
+  note: string;
+  note_zh: string;
+  note_en: string;
+  privacy: string;
+  machine: {
+    type: string;
+    window_days: number;
+    adoption_rate: number;
+    briefing_views: number;
+    unique_readers: number;
+    funnel: { registrations: number; first_action: number; next_day_return: number };
+    endpoint: string;
+    note: string;
+  };
+}
+
 export interface WorldBriefing {
   date: string;
   city: string;

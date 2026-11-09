@@ -32,6 +32,7 @@ import {
   ClaimRecoveryResult,
   AgentRenameResult,
   ScoutRules,
+  SystemMetrics,
   SystemUpdates,
   RegisterPayload,
   UserCredentials,
@@ -278,6 +279,8 @@ export const apiClient = {
     request<SystemUpdates>(`/world/public/updates?lang=${lang ?? "zh"}`),
   getPublicBriefing: (lang?: "en" | "zh") =>
     request<WorldBriefing>(`/world/public/briefing?lang=${lang ?? "zh"}`),
+  getPublicMetrics: (days = 14, lang?: "en" | "zh") =>
+    request<SystemMetrics>(`/world/public/metrics?days=${days}&lang=${lang ?? "zh"}`),
 
   createFaction: (payload: { name: string; leader_agent_id: number }) =>
     request("/social/faction/create", {

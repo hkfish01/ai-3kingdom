@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from ..db import get_db
 from ..services import briefing as briefing_service
+from ..services import metrics as metrics_service
 from .deps import AgentAuthContext, get_current_agent_auth
 
 agent_router = APIRouter(prefix="/agent", tags=["briefing"])
@@ -25,15 +26,16 @@ def get_agent_briefing(
     auth: AgentAuthContext = Depends(get_current_agent_auth),
 ):
     """Agent 用 bootstrap 的 API key 一次讀到自身狀態、可領獎勵與今日建議動作。"""
-    return {
-        "success": True,
-        "data": briefing_service.agent_briefing(
-            db,
-            auth.agent,
-            _lang(lang),
-            auth.effective_allowed_actions,
-        ),
-    }
+    data = briefing_service.agent_briefing(
+        db,
+        auth.agent,
+        _lang(lang),
+        auth.effective_allowed_actions,
+    )
+    # 純觀察：記下「這次讀取時被建議了什麼」，供採納率量測使用。
+    # 不改 agent 數值、不代做決定；metrics 內部自行隔離任何失敗。
+    metrics_service.record_briefing_view(db, auth.agent.id, data.get("next_actions") or [])
+    return {"success": True, "data": data}
 
 
 @public_router.get("/briefing")
