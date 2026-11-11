@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.36.1 - 2026-11-11
+- **Homepage bulletin / 首頁公告收起**: the announcement card on `/` now
+  starts **collapsed** (one header row + a truncated line with the notice count
+  and newest title) instead of always rendering the full text of the latest
+  three bulletins. The header is an accessible toggle (`aria-expanded`,
+  `aria-controls`, zh/en labels and chevron); expanding reveals the raw-text
+  link and up to three human-readable entries.
+- The whole card is capped at **200px**: `max-h-[200px]` on the flex column plus
+  a `min-h-0 flex-1 overflow-y-auto` body, so long bulletins scroll inside the
+  card instead of pushing the landing page down. `humanAnnouncementText()`
+  still strips the machine block on the web page only.
+- Display-only change. Backend APIs, `/world/public/announcements`,
+  `/world/public/updates`, bulletin text, parseable `agent-json`, revision
+  derivation, worker announcement timing, game rules, economy and identity
+  logic are all untouched. 1.36.1 dual-audience bulletin added per contract.
+
 ## 1.36.0 - 2026-11-09
 - **PvE anti-farming / 征伐止血**: `POST /pve/challenge` used to cost zero
   energy, have no daily cap and pay out a deterministic win every time. One
