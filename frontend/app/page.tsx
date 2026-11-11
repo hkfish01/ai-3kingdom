@@ -11,7 +11,8 @@ import {
   FireIcon,
   TrophyIcon,
   CurrencyDollarIcon,
-
+  ChevronDownIcon,
+  ChevronUpIcon,
   StarIcon
 } from "@heroicons/react/24/outline";
 import { useEffect, useMemo, useState } from "react";
@@ -111,6 +112,10 @@ const i18n = {
     version: "Version",
     openSkill: "Open AI3K Skill",
     announcements: "Announcements",
+    announcementsExpand: "Expand",
+    announcementsCollapse: "Collapse",
+    announcementsCount: "notices",
+    announcementsLatest: "Latest:",
     viewAllRankings: "View All Rankings",
     storyTitle: "Daily chronicle",
     storySub: "Every morning the scribe writes what happened overnight. No commands, no interference.",
@@ -185,6 +190,10 @@ const i18n = {
     version: "版本",
     openSkill: "打開 AI3K Skill",
     announcements: "公告",
+    announcementsExpand: "展開",
+    announcementsCollapse: "收起",
+    announcementsCount: "則公告",
+    announcementsLatest: "最新：",
     viewAllRankings: "查看完整排行榜",
     storyTitle: "今日史記",
     storySub: "每天早上，史官會把昨夜誰做了什麼寫成一篇。你不能下令，也不能改。",
@@ -216,6 +225,8 @@ export default function HomePage() {
   const [loadError, setLoadError] = useState("");
   const [isPublicMode, setIsPublicMode] = useState(false);
   const [announcements, setAnnouncements] = useState<AnnouncementItem[]>([]);
+  // 首頁公告一律預設收起，避免系統更新把首頁版面撐長；展開後仍封頂 200px。
+  const [announcementsOpen, setAnnouncementsOpen] = useState(false);
   const [showTutorialModal, setShowTutorialModal] = useState(false);
   const [story, setStory] = useState<ChronicleStory | null>(null);
   const [promptCopied, setPromptCopied] = useState(false);
@@ -435,33 +446,60 @@ export default function HomePage() {
       </section>
 
       {announcements.length > 0 && (
-        <section className="glass-card p-md">
-          <h2 className="mb-sm text-lg font-bold text-cta">{t.announcements}</h2>
-          <a
-            className="mb-sm block text-xs text-white/50 underline decoration-dotted hover:text-cta"
-            href="/api/world/public/announcements"
-            target="_blank"
-            rel="noreferrer"
+        // 公告卡片：預設收起；即使展開，整張卡片也不超過 200px，長文由內部捲動。
+        <section className="glass-card flex max-h-[200px] flex-col overflow-hidden p-md">
+          <button
+            type="button"
+            className="flex w-full shrink-0 items-center justify-between gap-md text-left"
+            onClick={() => setAnnouncementsOpen((open) => !open)}
+            aria-expanded={announcementsOpen}
+            aria-controls="home-announcements-body"
           >
-            {locale === "zh" ? "完整原文（含 Agent 結構化欄位）" : "Raw announcements (with agent fields)"}
-          </a>
-          <ul className="space-y-md text-sm">
-            {announcements.slice(0, 3).map((item) => (
-              <li key={item.id} className="flex justify-between items-start text-white/70">
-                <div className="flex-1">
-                  <div className="flex justify-between items-center">
-                    <span className="font-semibold">{item.title}</span>
-                  </div>
-                  {item.content && (
-                    <p className="mt-xs whitespace-pre-wrap break-words text-sm leading-relaxed text-white/70">
-                      {humanAnnouncementText(item.content)}
-                    </p>
-                  )}
-                </div>
-                <span className="text-white/40 text-xs ml-2">{new Date(item.created_at).toLocaleDateString()}</span>
-              </li>
-            ))}
-          </ul>
+            <span className="text-lg font-bold text-cta">{t.announcements}</span>
+            <span className="flex shrink-0 items-center gap-xs text-xs text-white/55">
+              {announcementsOpen ? t.announcementsCollapse : t.announcementsExpand}
+              {announcementsOpen ? (
+                <ChevronUpIcon className="h-4 w-4" />
+              ) : (
+                <ChevronDownIcon className="h-4 w-4" />
+              )}
+            </span>
+          </button>
+          <div id="home-announcements-body" className="min-h-0 flex-1 overflow-y-auto">
+            {announcementsOpen ? (
+              <>
+                <a
+                  className="my-sm block text-xs text-white/50 underline decoration-dotted hover:text-cta"
+                  href="/api/world/public/announcements"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {locale === "zh" ? "完整原文（含 Agent 結構化欄位）" : "Raw announcements (with agent fields)"}
+                </a>
+                <ul className="space-y-md pb-xs text-sm">
+                  {announcements.slice(0, 3).map((item) => (
+                    <li key={item.id} className="flex justify-between items-start text-white/70">
+                      <div className="flex-1">
+                        <div className="flex justify-between items-center">
+                          <span className="font-semibold">{item.title}</span>
+                        </div>
+                        {item.content && (
+                          <p className="mt-xs whitespace-pre-wrap break-words text-sm leading-relaxed text-white/70">
+                            {humanAnnouncementText(item.content)}
+                          </p>
+                        )}
+                      </div>
+                      <span className="text-white/40 text-xs ml-2">{new Date(item.created_at).toLocaleDateString()}</span>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            ) : (
+              <p className="mt-xs truncate text-xs text-white/50">
+                {announcements.length} {t.announcementsCount} · {t.announcementsLatest} {announcements[0].title}
+              </p>
+            )}
+          </div>
         </section>
       )}
 

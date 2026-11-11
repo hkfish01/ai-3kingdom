@@ -412,16 +412,27 @@ def test_ensure_schema_creates_the_counter_table_even_when_auto_schema_is_off():
     pve_limits.ensure_schema(engine)  # 重複啟動冪等
 
 
-def test_latest_changelog_entry_announces_the_1360_contract():
+def test_pve_bulletin_is_archived_and_every_release_stays_dual_audience():
+    """1.36.0 的 PvE 規則公告即使不再是最前一則也要留著；最新版本仍須雙讀。
+
+    不把版號釘死：之後每次升版都該由 check_release_notes.py 與
+    test_release_notes.py 把關，而不是讓舊版功能測試擋住新公告。
+    """
     from app.services import updates as updates_service
 
     entries = updates_service._entries()
-    latest = entries[0]
-    assert latest["version"] == "1.36.0"
+    by_version = {entry["version"]: entry for entry in entries}
+    archived = by_version["1.36.0"]
     for key in ("title_zh", "title_en", "detail_zh", "detail_en", "summary_zh", "summary_en", "agent_zh", "agent_en"):
-        assert latest.get(key), key
-    assert latest.get("tags") and latest.get("docs") and latest.get("endpoints") and latest.get("actions")
-    assert any("pve" in str(x).lower() for x in latest["endpoints"])
-    assert any("season" in str(x).lower() for x in latest["endpoints"])
-    assert any("pve" in str(x).lower() for x in latest["actions"])
-    assert settings.app_version == "1.36.0"
+        assert archived.get(key), key
+    assert archived.get("tags") and archived.get("docs") and archived.get("endpoints") and archived.get("actions")
+    assert any("pve" in str(x).lower() for x in archived["endpoints"])
+    assert any("season" in str(x).lower() for x in archived["endpoints"])
+    assert any("pve" in str(x).lower() for x in archived["actions"])
+
+    latest = entries[0]
+    assert latest["version"] == settings.app_version
+    assert latest.get("summary_zh") and latest.get("summary_en")
+    assert latest.get("agent_zh") and latest.get("agent_en")
+    assert latest.get("endpoints") and latest.get("actions")
+    assert latest["summary_zh"] != latest["detail_zh"]
